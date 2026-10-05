@@ -14,6 +14,7 @@ Turn off early messages in Settings to translate only finished sentences and avo
 ## Distribution and updates
 
 - Windows installer, exact corresponding-source ZIP, complete distribution ZIP, license notices and SHA-256 checksums are provided together.
+- For application source, download `SayWhat-Corresponding-Source.zip`. GitHub's automatic "Source code" archives contain only the public website/docs repository.
 - SayWhat?'s original contributions are GPL-3.0-only; third-party licenses remain in force.
 - Settings has a manual **Check for updates** action. It reads bounded public metadata, offers the verified GitHub release page, and does not automatically install or interrupt translation.
 

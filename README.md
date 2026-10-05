@@ -36,6 +36,8 @@ Speech recognition and translation run locally. Saved people and voice fingerpri
 
 This repository contains the public website and documentation, not the entire development history. Each release includes its **matching corresponding-source ZIP**, build scripts, license texts, notices and checksums beside the installer. Download the source from the same versioned release as your installer.
 
+Use the release asset named `SayWhat-Corresponding-Source.zip` for application source. GitHub's automatically generated "Source code" ZIP/tar archives contain this website/docs repository only.
+
 SayWhat?'s original contributions are provided under **GPL-3.0-only**. FoxTrans GPLv3 code and third-party components retain their copyright and license notices. Recipients may inspect, modify and redistribute under the applicable licenses; the source ZIP is not confidential. Model weights have separate licenses. See [LICENSE](LICENSE), the release's `SOURCE-AND-LICENSES.md` and third-party notices for details.
 
 ## Website maintenance
