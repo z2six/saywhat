@@ -29,7 +29,7 @@
         <div class="hero-copy">
           <p class="eyebrow"><span class="small-dot" aria-hidden="true"></span> Windows app · Preview</p>
           <h1 id="intro-title">Voice translation<br><span>for VRChat</span></h1>
-          <p class="hero-description">Translate your voice into VRChat chat and other players’ voices into subtitles.</p>
+          <p class="hero-description">Translate your voice into VRChat chat and other players’ voices into subtitles. Optional local AI identifies speakers in group conversations.</p>
           <div class="hero-actions"><a class="button primary" href="#download">Download <span aria-hidden="true">↓</span></a><a class="text-link" href="#setup">Setup steps <span aria-hidden="true">↗</span></a></div>
           <p class="small-print">Windows 11 x64 · Runs locally</p>
         </div>
@@ -66,7 +66,13 @@
 
     <section class="features wrap" aria-label="Translation features">
       <article class="feature-card own-card"><span class="feature-number">01 / Your voice</span><h2>Microphone → VRChat chat</h2><p>Send translated speech to your chatbox without opening the keyboard.</p><ul><li>Pauses new microphone capture when your VRChat mic is muted.</li><li>Can finish an already-captured sentence after you mute.</li><li>Optional cumulative translated messages while you speak.</li></ul></article>
-      <article class="feature-card subtitles-card"><span class="feature-number">02 / Their voices</span><h2>VRChat audio → Subtitles</h2><p>Read translated voices in a movable subtitle window. Start or close subtitles independently of your microphone translation.</p><ul><li>Captures VRChat, rather than all Windows playback.</li><li>Choose the subtitle language separately.</li><li>Toggle always on top; optionally save names and recognize voices.</li></ul></article>
+      <article class="feature-card subtitles-card"><span class="feature-number">02 / Their voices</span><h2>VRChat audio → Subtitles</h2><p>Read translated voices in a movable subtitle window. Start or close subtitles independently of your microphone translation.</p><ul><li>Captures VRChat, rather than all Windows playback.</li><li>Choose the subtitle language separately.</li><li>Optional AI voice identification attaches speaker names to subtitles.</li><li>Toggle always on top.</li></ul></article>
+    </section>
+
+    <section id="speakers" class="requirements-section wrap" aria-labelledby="speakers-title">
+      <div class="section-intro"><p class="eyebrow">Optional · Local AI</p><h2 id="speakers-title">Recognize who’s speaking</h2><p>A voice-identification model compares voices, not where people are standing, to help you follow speakers in a group.</p></div>
+      <div class="model-options"><article class="model-option"><span class="model-tag recommended">On your PC</span><h3>Identify voices</h3><p>Matches clear speech to voice profiles and labels the subtitles. Voice identification can be turned off without stopping translation; turning it off unloads its model.</p></article><article class="model-option"><span class="model-tag">Your corrections</span><h3>Save names and correct matches</h3><p>Name a speaker or correct a mistaken match. Confirmed examples of an isolated voice help future matching. Saved names and voice profiles stay on your device; voice samples are not uploaded.</p></article></div>
+      <p class="section-note">This identifies speakers; it does not separate voices talking over each other. Music, recordings and unclear speech can still cause mistaken matches.</p>
     </section>
 
     <section id="setup" class="setup-section wrap" aria-labelledby="setup-title">
