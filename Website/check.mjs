@@ -12,7 +12,7 @@ const script = readFileSync(resolve(root, "release.js"), "utf8");
 const manifest = JSON.parse(readFileSync(resolve(root, "release.json"), "utf8"));
 let checks = 0;
 function check(condition, message) { checks++; assert.ok(condition, message); }
-check(manifest.schemaVersion === 1 && manifest.ready === false, "Scaffold must not advertise unpublished downloads.");
+check(manifest.schemaVersion === 1 && typeof manifest.ready === "boolean", "Manifest readiness is an explicit versioned boolean.");
 check(manifest.channel === "preview", "Preview status is explicit.");
 check((html.match(/<main\b/g) || []).length === 1 && (html.match(/<\/main>/g) || []).length === 1, "Exactly one main landmark exists.");
 check((html.match(/<h1\b/g) || []).length === 1, "One clear page heading exists.");
@@ -98,7 +98,7 @@ function assertUnavailable(fixture) {
   }
   check(fixture.elements.get("checksum-panel").hidden, "Checksum panel is hidden without a verified-ready manifest.");
 }
-const pending = await browserFixture(manifest);
+const pending = await browserFixture({ ...manifest, ready: false });
 assertUnavailable(pending);
 let prevented = false;
 pending.elements.get("installer-link").events.get("click")({ preventDefault: () => { prevented = true; } });
@@ -179,4 +179,11 @@ assertUnavailable(await browserFixture(ready, false, { ok: false }));
 const stalled = await browserFixture(ready, false, { stall: true });
 assertUnavailable(stalled);
 check(stalled.calls[0].options.signal.aborted && stalled.stats.released, "A stalled body read is aborted by the same bounded timeout and releases its reader.");
+const current = await browserFixture(manifest);
+if (manifest.ready) {
+  check(current.elements.get("installer-link").getAttribute("aria-disabled") === null, "The published manifest passes the same strict client gate.");
+  check(current.elements.get("installer-link").href === manifest.installer.url, "Current installer URL binds exactly.");
+  check(current.elements.get("source-link").href === manifest.source.url, "Current corresponding-source URL binds exactly.");
+  check(current.elements.get("distribution-link").href === manifest.distribution.url, "Current complete-ZIP URL binds exactly.");
+} else assertUnavailable(current);
 console.log(`PASS: ${checks} offline website asset/anchor/accessibility-structure/release-gate checks. No network, server, app, model, audio or real clipboard.`);

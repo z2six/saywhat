@@ -1,23 +1,23 @@
 {
   "schemaVersion": 1,
-  "ready": false,
+  "ready": true,
   "version": "0.1.14",
   "channel": "preview",
-  "publishedAt": null,
+  "publishedAt": "2026-10-05T23:43:03Z",
   "repositoryUrl": "https://github.com/z2six/saywhat",
   "releaseUrl": "https://github.com/z2six/saywhat/releases/tag/v0.1.14",
   "sourceLicense": "GPL-3.0-only",
   "installer": {
     "url": "https://github.com/z2six/saywhat/releases/download/v0.1.14/SayWhat-0.1.14-Setup.exe",
-    "sha256": null,
-    "sizeBytes": 0
+    "sha256": "787b060ab826d9b47562afd2271d4b8fce62698c03c651b69e391fccffb4d44a",
+    "sizeBytes": 131944593
   },
   "source": {
-    "url": null,
-    "sha256": null
+    "url": "https://github.com/z2six/saywhat/releases/download/v0.1.14/SayWhat-Corresponding-Source.zip",
+    "sha256": "a45c0adbed8bd4c7fdf5ecbf107c23fecd0929acd699cf59c0e7ecb49817e85f"
   },
   "distribution": {
-    "url": null,
-    "sha256": null
+    "url": "https://github.com/z2six/saywhat/releases/download/v0.1.14/SayWhat-0.1.14-Complete.zip",
+    "sha256": "de3010b3877117f64ebd0c66dadda3158f51c78b84c4577a8362ff4e7f60b813"
   }
 }
