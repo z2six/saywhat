@@ -1,0 +1,14 @@
+# Keep local deployment/auth caches and release binaries out of this docs repo.
+.wrangler/
+node_modules/
+.env
+.env.*
+.dev.vars*
+*.exe
+*.dll
+*.zip
+*.gguf
+*.onnx
+*.wav
+*.mp3
+*.log
