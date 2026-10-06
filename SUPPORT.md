@@ -1,6 +1,6 @@
 # Help with SayWhat?
 
-Start with the [website FAQ](https://saywhat.pages.dev/#help). To report a bug, [open an issue](https://github.com/z2six/saywhat/issues).
+Open **Help** in SayWhat?’s sidebar for setup and troubleshooting advice, or read the [website FAQ](https://saywhat.pages.dev/#help). To report a bug, [open an issue](https://github.com/z2six/saywhat/issues).
 
 Please include:
 
