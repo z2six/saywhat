@@ -26,6 +26,8 @@ Click **Select a person** under a subtitle. The small picker offers recent names
 
 A message can be labeled without teaching the model. Learning is withheld when recognition was off, the evidence has expired, no valid embedding exists, audio is mixed/too short/clipped, or the bounded reference collection is full. Recent in-memory evidence is retained for at most five minutes, with at most 200 observations. The raw audio is not retained as a training dataset.
 
+Recognition now runs in the background so a subtitle need not wait for its name. If a usable fingerprint is not yet available when you select a person, that correction can be label-only; the app reports whether a voice example was saved. Choosing a name is not a guarantee that every message becomes a training example.
+
 Repeated revisions of the same voiced interval represent **one** example, not independent evidence. Re-labeling moves/replaces that contribution; it does not add duplicate reinforcement. Undo removes or restores the prior contribution. Special choices such as music/recording or unidentified voice do not teach a named person.
 
 Automatic guesses do not train the manually confirmed references. Anonymous guessed centroids are deliberately frozen after enrollment, preventing a repeated mistaken singer match from gradually contaminating a person's stored voice.
@@ -56,8 +58,12 @@ These names describe different tasks:
 | Diarization | “Who spoke when; were several voices active?” | Usually labels/timestamps, not separate waveforms |
 | Speech separation/extraction | “Estimate an individual voice from this mixture.” | Yes, subject to artifacts/errors |
 
-Current **live** subtitles recognize/transcribe a mixed VRChat playback stream; they do not run independent ASR for simultaneously overlapping people. Saved names or a larger identity model do not change that. Left/right position is not treated as a person's permanent identity.
+**Quick/Normal** transcribe mixed VRChat playback through Voxtral. They do not independently recover each simultaneously overlapping voice. Saved names or a larger fingerprint model do not change that. Left/right position is not treated as a person's permanent identity.
+
+Optional **Groups** uses VibeVoice streaming recognition to return text with temporary voice labels, then translates each route into its own bubbles. It can help recover more than one person's words from a chunk, but does not output isolated recordings. Its labels are session-scoped: “voice 0” is not permanently the same person after a recognition reset.
+
+SayWhat? keeps the original mixed audio, but VibeVoice replies have **whole-chunk spans**, not individual-person or word timestamps. A chunk with multiple voices cannot safely teach a named person's fingerprint. Only a chunk with one labelled voice and usable clear-audio evidence is eligible for optional fingerprint matching. Unlabelled replies are translated without binding all unknown voices to a person. Clear matching or a manual assignment can connect a temporary voice to an existing saved person; manual choices take precedence and still label that session when automatic matching is off. Missed overlap can evade audio checks, so the app cannot promise every eligible example is truly isolated.
 
 An experimental **MossFormer2 INT8 two-voice separator** is available for explicit local-WAV evaluation under advanced voice options. It produces two anonymous waveform estimates, not stable named people. Downloading it does **not** enable live separation. Evaluation uses a local 16 kHz WAV sample, CPU inference, warm-up and measured passes; exporting results saves audio only after a separate explicit action.
 
-A future live separator must be tested for real VRChat Mandarin/music/reverb, output-slot identity changes, extra recognition streams, recovery, latency and game performance—not merely whether its model loads. [Voice-model research](voice-model-research.md) covers candidates separately from currently implemented functionality.
+A future waveform separator would still need tests for real VRChat Mandarin/music/reverb, output-slot identity changes, extra recognition streams, recovery, latency and game performance—not merely whether its model loads. Groups is attributed transcription, not that separator. [Voice-model research](voice-model-research.md) distinguishes implemented features from remaining candidates.

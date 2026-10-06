@@ -12,14 +12,16 @@ Your voice
              → local translation → OSC sentence proxy → VRChat chat
 
 Other voices
-  VRChat process playback → Voxtral realtime ASR (separate server process in WSL)
-                          → optional local voice identification
-                          → local translation → subtitle bubbles
+  VRChat process playback → retained original mixed audio
+    Quick / Normal → Voxtral realtime ASR → source text
+    Groups         → VibeVoice streaming ASR → text per temporary voice ID
+      source text → local translation → separate subtitle bubbles
+      usable original audio → optional saved-person matching → bubble names/photos
 ```
 
 ASR means converting audio into source-language text; translation converts that text to the chosen target language. These are distinct models and failure stages. A larger translator cannot reconstruct words the speech recognizer omitted.
 
-The directions can run separately. When both run, they use separate recognition-server instances and audio state. By default they share one loaded translation model, but their requests do not share conversation text. Optional separate translators duplicate model residency; they are not a speaker-separation feature.
+The directions can run separately. When both run, they use independent speech services and audio state. By default they share one loaded translation model, but their requests do not share conversation text. Optional separate translators duplicate model residency; they are not a speaker-separation feature. Built-in profiles change operational settings without replacing chosen translators, languages or appearance. Saved custom profiles also restore those user choices.
 
 ## Your microphone
 
@@ -41,11 +43,23 @@ The default playback source is Windows per-process loopback capture for VRChat. 
 
 Playback is resampled for 16 kHz recognition. Quiet-audio normalization affects the samples sent to recognition, not the user's speaker/headphone volume. The raw audio backlog is capped around two seconds; overloaded playback drops old chunks to retain recent speech rather than growing minutes behind live audio.
 
-Subtitle segmentation tracks a watermark in cumulative recognition text. It commits a bubble on stable sentence punctuation, the configured settling interval, recognition finalization, or bounded clause/length/duration limits. Stable punctuation can commit after 500 ms; long unpunctuated speech has a seven-second soft duration limit and text bounds of about 220 characters or 80 CJK characters. Consequently, **Other voices: silence before finalizing** is not the only way a subtitle can become a new bubble. Useful stable interim text can revise the current bubble without resetting recognition.
+Subtitle segmentation tracks a watermark in cumulative recognition text. It commits a bubble on stable sentence punctuation, the configured settling interval, recognition finalization, or bounded clause/length/duration limits. Stable punctuation uses a configurable wait: 500 ms in Normal and 250 ms in Quick. Long unpunctuated speech has a seven-second soft duration limit and text bounds of about 220 characters or 80 CJK characters. Consequently, **Other voices: silence before finalizing** is not the only way a subtitle can become a new bubble. Useful stable interim text can revise the current bubble without resetting recognition.
 
-Translation has a bounded four-item queue with oldest-first dropping under overload. It uses a single reader and rejects superseded revisions. Worker supervision, audio-device reprobes and a speech-progress watchdog attempt recovery when a recognizer connection or capture worker stops progressing. Subtitle retries require recent speech and use a 20/20/30/40-second capped cooldown rather than a permanently exhausted two-attempt allowance. Useful changed recognition text—not padding, duplicate snapshots or decoder-reset acknowledgments—rearms progress.
+Translation has a bounded eight-item queue and a single reader. Committed sentences wait for capacity with visible backlog feedback rather than being silently dropped to make room. Obsolete interim revisions can be skipped or canceled; newer drafts do not invalidate already committed sentences. Optional voice matching runs in a separate bounded background queue, so translation does not wait for identity inference. A late safe match changes the current bubble's name/photo, not its translated words, and cannot overwrite a manual correction.
 
-Final recognition can wait up to eight seconds when no newer turn is waiting. If newer speech queues during that wait, the finalization deadline shortens to 1.2 seconds so old stalled work does not consume the whole fresh-audio buffer. Queues remain bounded: this cannot restore audio the recognizer never processed, and drops are reported. A visible recovery state indicates an attempt, not proof that useful words returned. See [diagnostics](performance-and-troubleshooting.md).
+In the Voxtral path, worker supervision, audio-device reprobes and a speech-progress watchdog attempt recovery when a recognizer connection or capture worker stops progressing. Subtitle retries require recent speech and use a 20/20/30/40-second capped cooldown rather than a permanently exhausted two-attempt allowance. Useful changed recognition text—not padding, duplicate snapshots or decoder-reset acknowledgments—rearms progress.
+
+Voxtral final recognition can wait up to eight seconds when no newer turn is waiting. If newer speech queues during that wait, the finalization deadline shortens to 1.2 seconds so old stalled work does not consume the whole fresh-audio buffer. Queues remain bounded: this cannot restore audio the recognizer never processed, and audio drops are reported. A visible recovery state indicates an attempt, not proof that useful words returned. See [diagnostics](performance-and-troubleshooting.md).
+
+### Groups: attributed text, not separated audio
+
+Groups sends continuous mixed playback to a local **VibeVoice ASR Streaming** service. The model returns text with temporary voice labels. SayWhat? maintains separate sentence state, translation requests and bubbles for those labels. The labels belong to that recognition session; they are not saved People IDs or VRChat accounts.
+
+SayWhat? retains original audio long enough to relate replies to it. The wrapper reports the span of the **whole input chunk**, not word-level or isolated-person timestamps. Several attributed voices in one chunk therefore do not provide separate clean recordings. Such audio is excluded from saved-person fingerprint learning. An unlabelled reply can still be translated, but does not create a shared person identity or train saved people.
+
+When a chunk contains one labelled voice and passes the existing clear-audio checks, optional fingerprint matching can link its session label to a saved person. Manual assignments take precedence, remain useful with fingerprinting off, and are cleared with the session rather than binding a temporary ID forever. Mixed, short or ambiguous evidence stays unconfirmed; a label can update a bubble without saving a voice example. These checks are conservative heuristics, not proof that all overlap was detected.
+
+The configured streaming chunk plus lookahead requires roughly **3.5 seconds of audio before the first decode**, before inference and translation time. This is not a 3.5-second end-to-end promise. Groups is optional and adds downloads, memory use and delay. It may miss or conflate voices during overlap, music or difficult audio. Switching profiles stops only the affected owned services; choosing Groups is not evidence of measured in-game performance.
 
 ## Local endpoints
 
@@ -53,6 +67,7 @@ Final recognition can wait up to eight seconds when no newer turn is waiting. If
 | --- | --- |
 | `127.0.0.1:8080` HTTP/WebSocket | Your microphone's Voxtral server |
 | `127.0.0.1:8081` HTTP/WebSocket | Incoming VRChat-playback Voxtral server |
+| `127.0.0.1:8082` HTTP/WebSocket | Optional incoming VibeVoice Groups service |
 | `127.0.0.1:1235/v1` HTTP | Built-in translator for your voice; shared by subtitles when sharing is on |
 | `127.0.0.1:1236/v1` HTTP | Separate built-in subtitle translator when sharing is off |
 | `127.0.0.1:9010` UDP | Internal OSC sentence proxy input |
@@ -60,7 +75,7 @@ Final recognition can wait up to eight seconds when no newer turn is waiting. If
 | `127.0.0.1:9001` UDP | VRChat outgoing mute/state listener used by the controller |
 | `127.0.0.1:9000` UDP | VRChat chat and typing output |
 
-Voxtral readiness is checked through `/health`. Translation uses an OpenAI-compatible `/v1/models` and `/v1/chat/completions` interface. Local Voxtral sessions are unauthenticated and bound to loopback. Do not expose these endpoints to a network; loopback restriction is not authentication against other local processes.
+Voxtral and Groups readiness are checked through `/health`; Groups streams through `/v1/realtime`. Translation uses an OpenAI-compatible `/v1/models` and `/v1/chat/completions` interface. Managed speech services are local and unauthenticated, bound to loopback. Do not expose these endpoints to a network; loopback restriction is not authentication against other local processes.
 
 ## OSC connection versus delivery
 

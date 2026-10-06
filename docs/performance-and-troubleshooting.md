@@ -26,7 +26,7 @@ Use several realistic conversational phrases, not a single “hello.” Word cho
 
 ## Low-load starting point
 
-1. Share one **Hy-MT2 1.8B** translator for both directions and use Fast style.
+1. For one-to-one subtitles, try **Settings → Translation profiles → Quick → Apply profile**. It disables familiar-voice matching and shortens subtitle waits/lookahead without replacing your translator. Share one **Hy-MT2 1.8B** translator for both directions if a smaller translator is also wanted.
 2. Keep extra target languages off. They use sequential translation requests, not free parallel outputs.
 3. Run only the directions needed. Each adds capture and a recognition-server instance.
 4. If game performance suffers, disable optional voice recognition and compare again. It is separate CPU work, not the large GPU speech/translation model.
@@ -34,6 +34,8 @@ Use several realistic conversational phrases, not a single “hello.” Word cho
 6. If early previews add too much translator load, turn them off and compare final-only behavior. Turning them on can improve first-visible output, but is not guaranteed to improve final latency.
 
 Larger translation models can improve a phrase but still be slower despite fitting in VRAM. Reducing idle caches or loading two models does not increase GPU compute capacity. Test in the same crowded world and with the same VRChat graphics settings before drawing conclusions.
+
+Normal matching now runs alongside translation rather than delaying text until an identity result arrives. Groups is a different trade-off: attributed multi-voice recognition with roughly 3.5 seconds of first-decode audio buffering, plus inference and translation time. Its optional 7B speech model adds download/memory requirements and is not a proven latency improvement. Switch back to Normal if this delay or resource pressure is unsuitable; save tuned preferences as a custom profile.
 
 ## “Typing dots, but no new chat”
 
@@ -55,7 +57,7 @@ The source can fail before translation: wrong capture route, VRChat moved to ano
 
 The incoming service logs captured versus sent bytes, audio levels/gain, transcript counts, voice/transcript ages, backlog and recovery attempts. This distinguishes no audio, audio without meaningful recognition, and text waiting on translation. Speech/device workers are supervised and reconnect after failure, but recurring recovery means a problem still exists. Version 0.1.23 rearms bounded retries after a cooldown and keeps an active warning until useful recognition text returns; empty output, duplicate snapshots and decoder-reset messages do not establish recovery.
 
-Queues are intentionally bounded. The incoming audio backlog retains recent speech and drops stale chunks; the four-item translation queue can drop older items during overload. Seeing drops means the pipeline cannot keep up with that session. Increasing queue sizes would conceal the problem as steadily growing lag.
+Queues are intentionally bounded. The Voxtral incoming audio backlog retains recent speech and drops stale chunks. The eight-item translation queue keeps committed sentences with backpressure and a visible catching-up state; obsolete draft revisions can be skipped. The separate identity queue may discard old optional matching work without discarding its translation. Groups buffering also reports overload rather than silently accumulating unbounded audio. These bounds cannot make an overloaded pipeline keep up or restore audio already lost.
 
 ## “Wrong language or poor word choice”
 
@@ -82,4 +84,4 @@ The explicit local health check does not start engines; an unused stopped endpoi
 
 ## Report a reproducible problem
 
-Use [GitHub Issues](https://github.com/z2six/saywhat/issues), including app/Windows versions, model/runtime, shared/separate mode, active directions, pause/lookahead choices, expected behavior and a small redacted log excerpt. Note whether it happens only during overlap, music, mute/unmute, audio-device changes, or crowded worlds. If possible compare final-only versus early previews and optional voice recognition on versus off without changing every setting at once.
+Use [GitHub Issues](https://github.com/z2six/saywhat/issues), including app/Windows versions, profile and incoming speech engine, model/runtime, shared/separate mode, active directions, pause/lookahead choices, expected behavior and a small redacted log excerpt. Note whether it happens only during overlap, music, mute/unmute, audio-device changes, or crowded worlds. If possible compare final-only versus early previews and optional voice recognition on versus off without changing every setting at once.

@@ -1,6 +1,6 @@
 # Local voice models: identification and overlapping speech
 
-Research checked on **6 October 2026**. This page distinguishes what SayWhat? currently implements from possible future work. It is not an announcement that these candidate models have been added or benchmarked in VRChat.
+Research checked on **6 October 2026**. This page distinguishes implemented options from possible future work. Version 0.1.24 adds optional VibeVoice streaming Groups recognition; the other research candidates below are not automatically installed or benchmarked in VRChat.
 
 ## What needs to improve
 
@@ -19,6 +19,7 @@ A stronger identity model alone does not perform the third job. Diarization can 
 | CAM++ | Voice identity | Low-overhead local matching of clear examples | Not a waveform separator; ambiguous audio should remain unidentified | Available in the app |
 | ERes2Net | Voice identity | Alternative identity model already selectable | More computation is not a guarantee of better VRChat results | Available in the app |
 | ERes2NetV2 | Voice identity | Candidate for improved short-example matching with a more efficient architecture | Needs a verified compatible export and tests with VRChat compression and changing microphones | Research only |
+| VibeVoice ASR Streaming 1.5B / 7B | Attributed speech transcription | Optional Groups mode: separate text routes and bubbles for temporary voices, with guarded matching to saved People | Whole-chunk spans only; no isolated audio or word timestamps, and extra buffering/memory | Available through explicit preparation in 0.1.24; live performance not established |
 | NVIDIA Nemotron 3 Diarization | Streaming voice activity / diarization | Most interesting new candidate for stable temporal tracking and detecting overlap | Outputs activity probabilities for up to eight voices, **not separate audio** | Research only |
 | NVIDIA Streaming Sortformer 4spk v2.1 | Streaming diarization | Older four-voice comparison baseline for Nemotron | Four output voice channels; still needs separate identification and overlap extraction | Research only |
 | pyannote Community-1 | Diarization | Useful offline accuracy baseline and voice-count evaluation | Initial model access requires accepting conditions; the standard pipeline is file-oriented rather than a drop-in low-latency live component | Research only |
@@ -32,7 +33,7 @@ NVIDIA released this model on **23 September 2026**. Its official model card des
 
 NVIDIA's native **NeMo-Speech.cpp** runtime now documents Nemotron and Sortformer diarization, a streaming C interface, Windows builds and CPU/CUDA/Vulkan backends. A native component could avoid bundling a large Python environment. Backend availability and documentation do not establish how fast the combined app runs while VRChat uses the same GPU. [Runtime](https://github.com/NVIDIA/NeMo-Speech.cpp), [build options](https://github.com/NVIDIA/NeMo-Speech.cpp/blob/main/docs/build.md), [native SDK](https://github.com/NVIDIA/NeMo-Speech.cpp/blob/main/docs/sdk.md).
 
-**Assessment:** prioritize an isolated prototype of this component for voice tracking and overlap detection. Keep existing saved-person matching to associate its temporary voice channels with names. This is an engineering recommendation, not a measured performance result or a claim that it will recover overlapping words.
+**Assessment:** Nemotron remains a possible voice-activity/overlap prototype, not the Groups engine shipped in 0.1.24. Existing saved-person matching would still be needed to associate its temporary channels with names. It does not itself recover overlapping words. The implemented VibeVoice path and its evidence limits are described in [architecture](architecture.md#groups-attributed-text-not-separated-audio).
 
 ## Recovering overlapping words
 
@@ -48,7 +49,7 @@ CAM++ remains the low-overhead starting point. ERes2Net is already an option. ER
 
 Community-1 improves speaker assignment/counting and can run fully offline after its gated initial download. Its regular output and its additional exclusive output have different uses: an exclusive timeline simplifies assigning transcript timestamps, but should not be mistaken for recovering two simultaneous transcripts. It is better suited to an offline comparison first than an unmeasured live replacement. [Official Community-1 card](https://huggingface.co/pyannote/speaker-diarization-community-1).
 
-## Proposed evaluation order
+## Future waveform-separation evaluation
 
 1. Keep current recognition and translation available as the baseline. Do not silently load a new GPU model or change saved voice profiles.
 2. Test Nemotron tracking on explicitly provided recordings: two voices, alternating turns, genuine overlap, song playback, whispering and speaker re-entry. Verify that temporary channel changes do not create new people.
@@ -61,6 +62,6 @@ No audio is uploaded as part of this proposal. Any sample export, model download
 
 ## What has not been measured
 
-No new candidate was loaded or benchmarked for this research update. There is no justified estimate yet for GPU memory use, final translation delay, Mandarin accuracy, song rejection or frame-rate impact in the combined pipeline. Published model benchmarks use different datasets and must not be compared as if they were the same VRChat test.
+No candidate was live-benchmarked for this documentation update. The implemented Groups path has offline routing, safety and preparation checks, not an in-game GPU accuracy/latency result. There is no justified measured claim yet for peak GPU memory, final translation delay, Mandarin accuracy, song rejection or frame-rate impact in the combined Groups pipeline. Published model benchmarks use different datasets and must not be compared as if they were the same VRChat test.
 
 See [the technical documentation index](README.md) for current settings and implementation details.

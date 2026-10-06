@@ -6,11 +6,12 @@
 
 | Task | Current component | Input → output |
 | --- | --- | --- |
-| Speech recognition | Voxtral Mini 4B Realtime 2602 Q4_K_M | Audio → source text |
+| Speech recognition: microphone, Quick/Normal subtitles | Voxtral Mini 4B Realtime 2602 Q4_K_M | Audio → source text |
+| Speech recognition: optional Groups subtitles | VibeVoice ASR Streaming 1.5B or 7B | Mixed audio → text attributed to temporary voices |
 | Translation | Selected local GGUF translator | Source text → chosen language |
 | Optional voice recognition | Compatible sherpa-onnx voice-embedding model | Clear audio sample → fingerprint for matching |
 
-Voice recognition does not translate, identify a VRChat account, or extract individual voices from a mixture. [Actual separation](people-and-voice-recognition.md#identification-diarization-and-separation) is a distinct task.
+Fingerprint-based voice recognition does not translate, identify a VRChat account, or extract individual voices from a mixture. Groups is a separate speech recognizer: its attributed text is not isolated audio, and its temporary voice labels are not saved People identities. [These distinctions](people-and-voice-recognition.md#identification-diarization-and-separation) matter when learning from examples.
 
 The automatic-setup CAM++ artifact is size/hash pinned. The current optional voice-model download button uses HTTPS and completeness checks, but does not provide the same per-artifact pinned SHA-256 verification as the translation catalog. Imported ONNX files are user-selected artifacts. Do not treat every optional voice model as independently verified just because it appears in the picker.
 
@@ -61,7 +62,17 @@ SayWhat? uses [MrShitFox/voxtral.cpp](https://github.com/MrShitFox/voxtral.cpp),
 
 Speech runs under WSL2 Ubuntu. Automatic setup installs/builds the speech component after consent; NVIDIA setup selects the managed CUDA path where supported, while other/manual configurations can use registered supported backends. Native Windows translation acceleration and WSL speech acceleration are **separate choices**. A Windows Vulkan translator working does not prove that WSL Vulkan speech works.
 
-Running both directions needs two recognition-server instances. Model file size understates their live memory requirements. Normal Stop/Quit releases app-owned instances; it does not remove cached weights.
+Running both directions needs independent recognition services: microphone Voxtral plus incoming Voxtral or VibeVoice. Model file size understates their live memory requirements. Normal Stop/Quit releases app-owned instances; it does not remove cached weights.
+
+### Optional Groups runtime
+
+Groups uses **VibeVoice-ASR-Streaming**, not offline VibeVoice ASR or text-to-speech. **Groups model options** offers 1.5B (about 6 GB of model downloads) and 7B (about 18 GB), plus several gigabytes of local runtime dependencies. Download size is not a peak-VRAM estimate. Start with 1.5B; a larger model is not a speed fix.
+
+Preparation is a separate consented operation using the registered speech WSL distribution. The app manages the local Python service and cached model files; no separate user-installed translation UI is required. Weights are not bundled in the installer. Inference runs offline through the loopback service, and ordinary Start refuses missing preparation rather than installing files in the background.
+
+The streaming model buffers roughly 3.5 seconds of audio for the first decode before compute/translation time. It returns attributed text, not separated audio or word timestamps. Its output feeds the **same chosen translator** used for Normal subtitles; it does not load a translator per voice. Optional saved-person fingerprints still use the original captured audio only when suitable evidence is available. See [Groups architecture and evidence limits](architecture.md#groups-attributed-text-not-separated-audio).
+
+Groups recovery, routing and preparation have offline checks. Actual GPU performance, overlap accuracy and frame-time impact with VRChat require live testing; no measured speed advantage is claimed.
 
 ## Hardware advice and measurement
 

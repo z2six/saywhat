@@ -20,11 +20,22 @@ No separate LM Studio or FoxTrans installation is needed. Setup may ask for Wind
 - Translates your voice into one language, with optional second and third languages.
 - Shows translated VRChat voices in a movable subtitle window.
 - Saves names and photos in **People**, with translation counts and clear voice examples. Choose a picture file or paste an image, crop it, and save a size-limited local copy. Smaller pictures appear beside subtitles.
-- Optionally recognizes familiar voices and attaches names to subtitles. Correct a name below a message to help recognition learn from a clear example. This does not separate people talking over each other.
+- Optionally recognizes familiar voices and attaches saved names to subtitles. Correct a name below a message to help matching learn from a usable clear example.
+- Offers an optional **Groups** speech model that returns separate attributed text for multiple voices. It can help with overlapping conversation, but does not produce isolated recordings or guarantee that every voice is recovered.
 - Pauses new microphone capture when your VRChat mic is muted.
 - Offers local translation models, themes, four app interface languages and in-app updates.
 
 Need guidance? Open **Help** in the sidebar, or **?** in the subtitle window. **Settings → Run setup again** lets you repeat setup without removing downloaded files or saved people.
+
+## Translation profiles
+
+Choose a profile near the top of **Settings**, then **Apply profile**:
+
+- **Quick:** shorter subtitle waits and familiar-voice matching off. A lower-load starting point for one-to-one conversation.
+- **Normal:** the existing realtime speech path with optional familiar-voice matching.
+- **Groups:** optional VibeVoice streaming recognition for multiple attributed voices. Adds buffering and memory use; review and approve its extra downloads first.
+
+These presets keep your chosen translator, languages and appearance. The subtitle window switches between Normal and Groups; Quick is selected in Settings. **Save current settings as…** creates a custom profile, including model and language choices, without copying model files or saved people. [Profile details and limits](docs/settings-reference.md#translation-profiles).
 
 ## Before installing
 

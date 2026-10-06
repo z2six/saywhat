@@ -2,7 +2,7 @@
 
 [Project home](../README.md) · [Downloads](https://github.com/z2six/saywhat/releases) · [Quick help](../SUPPORT.md)
 
-These pages explain the Windows application's behavior, configuration and limitations for technically interested users and developers. They describe the 0.1.23 preview. An older installed release may have different controls or defaults; a newer documentation page does not update your installation.
+These pages explain the Windows application's behavior, configuration and limitations for technically interested users and developers. They describe the 0.1.24 preview. An older installed release may have different controls or defaults; a newer documentation page does not update your installation.
 
 | Read this | To understand |
 | --- | --- |
@@ -19,6 +19,7 @@ These pages explain the Windows application's behavior, configuration and limita
 ## What SayWhat? does not claim
 
 - Voice identification does **not** separate overlapping voices into independent recordings.
+- Groups recognition can return multiple attributed transcripts, but does not supply isolated recordings or word-level timestamps. Saved-person matching remains a separate, optional step on usable original audio.
 - Model size, available VRAM and a successful health check do **not** guarantee accurate or fast translation while gaming.
 - The OSC connection indicator checks a live local VRChat service. UDP chat output has no delivery acknowledgment.
 - All inference is local, but downloading tools/models and checking for updates are online operations.
