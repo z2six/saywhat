@@ -1,4 +1,5 @@
-# Keep local deployment/auth caches and release binaries out of this docs repo.
+# This repository publishes downloads and user documentation, not website implementation.
+Website/
 .wrangler/
 node_modules/
 .env

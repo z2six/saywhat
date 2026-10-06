@@ -1,48 +1,42 @@
 # SayWhat?
 
-Local voice translation for VRChat on Windows.
+Voice translation for VRChat on Windows. Translate your microphone into VRChat chat, or read other players’ voices in a separate subtitle window. Use either feature on its own or both together.
 
-[Website & download](https://saywhat.pages.dev/) · [Preview releases](https://github.com/z2six/saywhat/releases) · [Report a problem](https://github.com/z2six/saywhat/issues)
+**[Download SayWhat?](https://saywhat.pages.dev/#download)** · [Website](https://saywhat.pages.dev/) · [Release notes](https://github.com/z2six/saywhat/releases) · [Help](SUPPORT.md)
 
-SayWhat? translates your microphone into VRChat chat and other players' voices into a separate subtitle window. Start either direction independently and choose their translation languages separately.
+## Get started
 
-## Install
+1. Download and run the Windows installer.
+2. Open SayWhat? and follow its setup steps to choose languages and download the local models.
+3. Enable **OSC → Enabled** in VRChat’s Action Menu.
+4. Start your voice translation, subtitles, or both in SayWhat?.
 
-1. Download `SayWhat-0.1.15-Setup.exe` from the [0.1.15 preview release](https://github.com/z2six/saywhat/releases/tag/v0.1.15).
-2. Install for yourself or all users, then open SayWhat? from Start.
-3. Follow Setup to choose languages and prepare the local tools and models. Downloads and Windows permissions require your approval; WSL setup may require a restart.
-4. Enable OSC in VRChat, then choose Start in SayWhat?. Setup alone does not start listening.
+No separate LM Studio or FoxTrans installation is needed. Setup may ask for Windows administrator permission or a restart while preparing speech recognition.
 
-No separate LM Studio or FoxTrans installation is needed for automatic setup. Model weights are downloaded during setup rather than shipped in the installer.
+## What it does
 
-This is an **unsigned preview**, not a fully fresh-PC-certified release. Review the [requirements](https://saywhat.pages.dev/#requirements) and [release notes](docs/RELEASE-NOTES-0.1.15.md) first. Do not disable antivirus protections if a download is flagged; report the detection instead.
+- Translates your voice into one language, with optional second and third languages.
+- Shows translated VRChat voices in a movable subtitle window.
+- Optionally recognizes saved voices and attaches names to subtitles. Names and voice profiles stay on your PC. This does not separate people talking over each other.
+- Pauses new microphone capture when your VRChat mic is muted.
+- Offers local translation models, themes, four app interface languages and update notifications.
 
-## Features
+## Before installing
 
-- Realtime Voxtral recognition and local Hy-MT2 translation, with smaller and larger translator downloads in the app.
-- Optional TranslateGemma 4B and Liquid AI EN–JP downloads with model-specific requests and terms notices. Liquid is limited to English/Japanese.
-- Optional own-voice translation into two or three languages on separate chatbox lines, off by default.
-- Optional cumulative submitted chat messages while you speak, followed by the finished sentence. They do not open VRChat's keyboard.
-- Microphone capture pauses when your VRChat mic is muted; an already-captured sentence can finish.
-- Subtitles capture VRChat rather than all Windows audio, with a toggle for always on top.
-- Optional locally saved people and voice recognition. Recognizing a voice is not the same as separating simultaneous overlapping speakers.
-- VRChat OSC availability indicator and connection guidance, without claiming a chat-delivery acknowledgment.
-- English, Simplified Chinese, Japanese and Korean interface languages, themes, diagnostics and launch-time update checks.
+SayWhat? currently requires **Windows 11 x64**, supported GPU acceleration and several gigabytes of free disk space. It is not a standalone Quest or iPad app. See the [system requirements](https://saywhat.pages.dev/#requirements).
 
-## Requirements and privacy
+This is an **unsigned preview**. Fresh-PC installation, hardware compatibility and long-session performance are still being tested. If antivirus flags a download, keep protection enabled and [report it](SUPPORT.md).
 
-Windows 11 x64, VRChat, free space for several gigabytes of tools/models and supported GPU acceleration. Speech setup uses an app-owned WSL2 Ubuntu environment. Virtualization, administrator permission and a restart may be needed. The app checks acceleration support; availability and performance vary by hardware and driver.
+## Privacy
 
-Speech recognition and translation run locally. Saved people and voice fingerprints stay on your PC. Setup downloads tools/models from third-party providers; enabled launch-time and manual update checks request public release metadata. Update now verifies the installer before opening its normal confirmation wizard and keeps settings/models. Logs may contain conversation text—review them before sharing an issue report. This website contains no analytics scripts or tracking cookies; hosting/download providers still receive normal connection metadata.
+Speech recognition and translation run on your PC. Optional saved names and voice profiles remain on your device. Downloads and update checks need an internet connection; they do not upload microphone recordings. Logs may contain conversation text, so review them before sharing.
+
+The website has no analytics or tracking cookies. Its language picker remembers only your language preference. [Privacy details](https://saywhat.pages.dev/#privacy).
 
 ## Source and licenses
 
-This repository contains the public website and documentation, not the entire development history. Each release includes its **matching corresponding-source ZIP**, build scripts, license texts, notices and checksums beside the installer. Download the source from the same versioned release as your installer.
+This repository is the public download and support page. The application’s matching source and license notices are provided with each [release](https://github.com/z2six/saywhat/releases): use **SayWhat-Corresponding-Source.zip** from the same release as your installer, not GitHub’s automatic “Source code” archives.
 
-Use the release asset named `SayWhat-Corresponding-Source.zip` for application source. GitHub's automatically generated "Source code" ZIP/tar archives contain this website/docs repository only.
+SayWhat?’s original contributions use [GPL-3.0-only](LICENSE). FoxTrans and other components retain their respective notices; models have separate terms. Recipients can inspect, modify and redistribute the application under the applicable licenses.
 
-SayWhat?'s original contributions are provided under **GPL-3.0-only**. FoxTrans GPLv3 code and third-party components retain their copyright and license notices. Recipients may inspect, modify and redistribute under the applicable licenses; the source ZIP is not confidential. Model weights have separate licenses. See [LICENSE](LICENSE), the release's `SOURCE-AND-LICENSES.md` and third-party notices for details.
-
-## Website maintenance
-
-The dependency-free Cloudflare Pages site lives in [Website](Website/README.md). Only `Website/public/` is deployed; installers and source archives are GitHub release assets. Downloads stay disabled unless the public manifest names verified version-matched assets with checksums.
+Independent project. Not affiliated with VRChat, Inc.
