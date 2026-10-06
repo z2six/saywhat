@@ -11,7 +11,7 @@
 
 ## One app to find
 
-The app-managed speech environment and unused CUDA profiler launchers are hidden from normal Start/Terminal discovery. SayWhat? and its uninstall action remain. This does not remove Ubuntu, unregister WSL or delete models. Only verified generated entries belonging to the app's internal environment are affected, with recoverable backups.
+Setup and the next explicit speech start hide the verified app-managed speech environment and unused CUDA profiler launchers from normal Start/Terminal discovery. App startup also checks their generated Windows shortcuts. Cleanup is best-effort and only affects entries proven to belong to the internal environment, with recoverable backups. SayWhat? and its uninstall action remain; Ubuntu, WSL registrations and models are not removed.
 
 ## Technical documentation
 
