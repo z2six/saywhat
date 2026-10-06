@@ -9,7 +9,7 @@ Please include:
 - What you expected and what happened instead.
 - The selected model and any visible error message, if relevant.
 
-The app’s **Advanced → Diagnostics** section can help explain a problem. Logs and screenshots may contain private conversations, saved names or file paths. Review them before posting; never share passwords, tokens or recordings you do not have permission to share.
+Open **Settings → Problems & logs → Open troubleshooting** (also available under **Advanced → Diagnostics**). **Recent issues** shows where a failure occurred. Use **Copy diagnostics** for a summary without conversation text, names, file paths or raw exceptions. Detailed logs and screenshots may contain private conversations, saved names or file paths. Review those before posting; never share passwords, tokens or recordings you do not have permission to share.
 
 For a detailed explanation rather than a quick fix, use the [technical documentation](docs/README.md). In particular:
 

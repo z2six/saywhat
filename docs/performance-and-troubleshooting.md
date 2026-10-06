@@ -53,7 +53,7 @@ Do not infer the cause just from the dots. The capture-host and proxy logs disti
 
 The source can fail before translation: wrong capture route, VRChat moved to another device, quiet audio below recognition thresholds, no lexical progress, a busy speech server, or a disconnected capture worker. Songs are a particularly poor automatic speech/identity test; their audio can be audible but not recognized as reliable conversational speech.
 
-The incoming service logs captured versus sent bytes, audio levels/gain, transcript counts, voice/transcript ages, backlog and recovery attempts. This distinguishes no audio, audio without meaningful recognition, and text waiting on translation. Speech/device workers are supervised and reconnect after failure, but recurring recovery means a problem still exists.
+The incoming service logs captured versus sent bytes, audio levels/gain, transcript counts, voice/transcript ages, backlog and recovery attempts. This distinguishes no audio, audio without meaningful recognition, and text waiting on translation. Speech/device workers are supervised and reconnect after failure, but recurring recovery means a problem still exists. Version 0.1.23 rearms bounded retries after a cooldown and keeps an active warning until useful recognition text returns; empty output, duplicate snapshots and decoder-reset messages do not establish recovery.
 
 Queues are intentionally bounded. The incoming audio backlog retains recent speech and drops stale chunks; the four-item translation queue can drop older items during overload. Seeing drops means the pipeline cannot keep up with that session. Increasing queue sizes would conceal the problem as steadily growing lag.
 
@@ -65,7 +65,7 @@ Inspect source recognition separately from translation. A glossary such as a pro
 
 ## Useful diagnostics
 
-Open **Advanced → Diagnostics**. The view refreshes the selected log and follows its newest entries. Export only after reviewing private content.
+Open **Settings → Problems & logs → Open troubleshooting**, or **Advanced → Diagnostics**. **Recent issues** gives stage-specific problem and recovery summaries. **Copy diagnostics** includes only fixed support codes, timings and safe status information—not conversation text, saved names, file paths or raw exceptions. The detailed-log view refreshes the selected log and follows its newest entries. Detailed exports can contain private content; review them before sharing.
 
 | Log | Useful for |
 | --- | --- |

@@ -38,7 +38,7 @@ These filenames are descriptive technical details, not a supported manual-edit A
 
 Live audio is buffered in memory with bounded queues; normal operation does not save raw audio recordings. Confirmed voice references are compact embeddings with their model identity and observation/quality metadata, not clips used for model-weight training. Embeddings can still be sensitive personal data; treat a copied profile database accordingly.
 
-Subtitle history and transcripts are displayed in memory, and incoming diagnostic logs **can persist source and translated text**. Some matching logs also contain names. The microphone host uses state/timing/count metadata rather than recording raw speech text, but not every log in the whole application is transcript-free. Exported diagnostics should be reviewed before sharing.
+Subtitle history and transcripts are displayed in memory, and incoming diagnostic logs **can persist source and translated text**. Some matching logs also contain names. The microphone host uses state/timing/count metadata rather than recording raw speech text, but not every log in the whole application is transcript-free. **Copy diagnostics** generates a whitelist-based summary without conversation text, names, file paths or raw exceptions. Detailed log exports still need review before sharing.
 
 Optional separator evaluation reads an explicitly selected local WAV. Choosing **Export anonymous sources** writes two estimated recordings to the user's selected files; that explicit export is different from ordinary live capture's no-recording behavior. Do not share somebody else's voice samples without appropriate permission.
 
