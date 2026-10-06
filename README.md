@@ -4,6 +4,8 @@ Voice translation for VRChat on Windows. Translate your microphone into VRChat c
 
 **[Download SayWhat?](https://saywhat.pages.dev/#download)** · [Website](https://saywhat.pages.dev/) · [Release notes](https://github.com/z2six/saywhat/releases) · [Help](SUPPORT.md)
 
+Want to understand what runs on your PC or tune a specific setting? Read the [technical documentation](docs/README.md): [architecture](docs/architecture.md), [settings reference](docs/settings-reference.md), [models](docs/models-and-runtimes.md), [voice recognition](docs/people-and-voice-recognition.md), and [performance troubleshooting](docs/performance-and-troubleshooting.md).
+
 ## Get started
 
 1. Download and run the Windows installer.
@@ -17,7 +19,7 @@ No separate LM Studio or FoxTrans installation is needed. Setup may ask for Wind
 
 - Translates your voice into one language, with optional second and third languages.
 - Shows translated VRChat voices in a movable subtitle window.
-- Saves names and photos in **People**, with translation counts and clear voice examples. Photos appear beside subtitles.
+- Saves names and photos in **People**, with translation counts and clear voice examples. Choose a picture file or paste an image, crop it, and save a size-limited local copy. Smaller pictures appear beside subtitles.
 - Optionally recognizes familiar voices and attaches names to subtitles. Correct a name below a message to help recognition learn from a clear example. This does not separate people talking over each other.
 - Pauses new microphone capture when your VRChat mic is muted.
 - Offers local translation models, themes, four app interface languages and in-app updates.
