@@ -1,5 +1,7 @@
 # SayWhat? 0.1.16 preview
 
+**Superseded by [0.1.17](https://github.com/z2six/saywhat/releases/tag/v0.1.17).** All-users setup in this version can stop with “The data-safety helper did not return a receipt.” Use the newer installer; the failed preparation step does not apply data-reset choices.
+
 ## What’s new
 
 - New installations use a **1.2-second finishing pause** for both your voice and subtitles. Existing custom timings are kept. Recognition and translation still take additional time.
