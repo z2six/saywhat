@@ -16,7 +16,11 @@ Choose a local PNG/JPEG file, or explicitly paste a copied bitmap with **Ctrl+V*
 
 Picture handling rejects oversized input before storing a copy: file inputs are bounded to 10 MiB, each dimension to 8,192 pixels, and total pixels to 16 × 1,024 × 1,024. The editing preview is reduced to at most 2,048 pixels along its longest side. The selected crop is rendered into a **512 × 512** local PNG, with a **1 MiB stored-size ceiling**, fixed DPI and no source metadata. Transparency is flattened to white and PNG compression is lossless. The unbounded original image is not kept.
 
-People uses the higher-resolution picture in a larger display; subtitle avatars use a real **64-pixel downsampled image**, shown at a smaller UI size. Missing/corrupt pictures fall back to initials rather than interrupting translation. Managed pictures use generated filenames under `people-photos`; records do not retain the original file path. Replacing/deleting a picture cleans up only app-managed files and does not delete the user's original.
+People uses the higher-resolution picture in a larger display; subtitle avatars use a real **64-pixel downsampled image**, shown at a smaller UI size. Missing/corrupt pictures fall back to generated artwork rather than interrupting translation. Managed pictures use generated filenames under `people-photos`; records do not retain the original file path. Replacing/deleting a picture cleans up only app-managed files and does not delete the user's original.
+
+From 0.1.25, saved people without photos receive abstract, locally generated vector artwork. The first accepted confirmed voice fingerprint, its recognition-model identity and the person's stable local ID produce a decorative SHA-256 seed. Names, translation text and translation counts are not inputs. That seed remains stable across corrections, model changes, renames and undo; it does not change recognition or retrain a model. Before a usable example exists, an ID-based temporary picture is used. Existing voice examples can supply a seed on load without writing data until a normal successful save. Chosen photos always take priority; removing a photo restores the generated picture.
+
+Generation does not download or start an image model, send the fingerprint anywhere, or infer age, gender or appearance. Drawing uses a bounded local cache and scales for People, the person picker and subtitles. Deleting a person removes their saved decorative seed with the record.
 
 ## What “learning” means here
 
