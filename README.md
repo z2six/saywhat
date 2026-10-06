@@ -7,7 +7,7 @@ Voice translation for VRChat on Windows. Translate your microphone into VRChat c
 ## Get started
 
 1. Download and run the Windows installer.
-2. Open SayWhat? and follow its setup steps to choose languages and download the local models.
+2. Open SayWhat? and follow its setup screens to choose languages, a theme and a translator. Review the downloads, then prepare translation.
 3. Enable **OSC → Enabled** in VRChat’s Action Menu.
 4. Start your voice translation, subtitles, or both in SayWhat?.
 
@@ -17,9 +17,12 @@ No separate LM Studio or FoxTrans installation is needed. Setup may ask for Wind
 
 - Translates your voice into one language, with optional second and third languages.
 - Shows translated VRChat voices in a movable subtitle window.
-- Optionally recognizes saved voices and attaches names to subtitles. Names and voice profiles stay on your PC. This does not separate people talking over each other.
+- Saves names and photos in **People**, with translation counts and clear voice examples. Photos appear beside subtitles.
+- Optionally recognizes familiar voices and attaches names to subtitles. Correct a name below a message to help recognition learn from a clear example. This does not separate people talking over each other.
 - Pauses new microphone capture when your VRChat mic is muted.
-- Offers local translation models, themes, four app interface languages and update notifications.
+- Offers local translation models, themes, four app interface languages and in-app updates.
+
+Need guidance? Open **Help** in the sidebar, or **?** in the subtitle window. **Settings → Run setup again** lets you repeat setup without removing downloaded files or saved people.
 
 ## Before installing
 
@@ -29,7 +32,7 @@ This is an **unsigned preview**. Fresh-PC installation, hardware compatibility a
 
 ## Privacy
 
-Speech recognition and translation run on your PC. Optional saved names and voice profiles remain on your device. Downloads and update checks need an internet connection; they do not upload microphone recordings. Logs may contain conversation text, so review them before sharing.
+Speech recognition and translation run on your PC. Saved names, photos and voice examples remain on your device. Downloads and update checks need an internet connection; they do not upload microphone recordings or your saved people. Logs may contain conversation text, so review them before sharing.
 
 The website has no analytics or tracking cookies. Its language picker remembers only your language preference. [Privacy details](https://saywhat.pages.dev/#privacy).
 

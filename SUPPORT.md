@@ -15,6 +15,12 @@ If a download is flagged by antivirus, leave protection enabled. Include the rel
 
 ## Updates and uninstalling
 
-SayWhat? can notify you of updates. Choose **Update now** to download the installer and open its update steps, or download the latest installer from the [website](https://saywhat.pages.dev/#download).
+SayWhat? checks for updates when it opens unless you turn this off in Settings. Choose **Update now** to download and verify the installer, update with visible progress and reopen the app with translation stopped. Settings, people and models are kept. Windows may still ask for permission; safety errors remain visible. If automatic reopening is unavailable, open SayWhat? from Start. You can also download the latest installer from the [website](https://saywhat.pages.dev/#download).
+
+## People and subtitles
+
+Open **People** to add a name, choose a local photo, or view saved voice examples and translation counts. Counts begin with the version that introduced them; they are not reconstructed from old conversations. Voice familiarity describes saved clear examples, not a measured accuracy percentage.
+
+Under a subtitle, choose **Select a person** to name the person who spoke. Clear examples can improve future recognition when **Voice recognition** is on. Turn it off in Settings if you only want translation or manual names. Songs, overlapping voices and unclear speech can still cause incorrect matches. The subtitle window's **?** button explains this briefly.
 
 To uninstall, use Windows **Settings → Apps → Installed apps**, or run the installer and choose its uninstall option. Review the data choices before removing saved settings or models.
