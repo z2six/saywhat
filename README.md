@@ -8,29 +8,32 @@ SayWhat? translates your microphone into VRChat chat and other players' voices i
 
 ## Install
 
-1. Download `SayWhat-0.1.14-Setup.exe` from the [0.1.14 preview release](https://github.com/z2six/saywhat/releases/tag/v0.1.14).
+1. Download `SayWhat-0.1.15-Setup.exe` from the [0.1.15 preview release](https://github.com/z2six/saywhat/releases/tag/v0.1.15).
 2. Install for yourself or all users, then open SayWhat? from Start.
 3. Follow Setup to choose languages and prepare the local tools and models. Downloads and Windows permissions require your approval; WSL setup may require a restart.
 4. Enable OSC in VRChat, then choose Start in SayWhat?. Setup alone does not start listening.
 
 No separate LM Studio or FoxTrans installation is needed for automatic setup. Model weights are downloaded during setup rather than shipped in the installer.
 
-This is an **unsigned preview**, not a fully fresh-PC-certified release. Review the [requirements](https://saywhat.pages.dev/#requirements) and [release notes](docs/RELEASE-NOTES-0.1.14.md) first. Do not disable antivirus protections if a download is flagged; report the detection instead.
+This is an **unsigned preview**, not a fully fresh-PC-certified release. Review the [requirements](https://saywhat.pages.dev/#requirements) and [release notes](docs/RELEASE-NOTES-0.1.15.md) first. Do not disable antivirus protections if a download is flagged; report the detection instead.
 
 ## Features
 
 - Realtime Voxtral recognition and local Hy-MT2 translation, with smaller and larger translator downloads in the app.
+- Optional TranslateGemma 4B and Liquid AI EN–JP downloads with model-specific requests and terms notices. Liquid is limited to English/Japanese.
+- Optional own-voice translation into two or three languages on separate chatbox lines, off by default.
 - Optional cumulative submitted chat messages while you speak, followed by the finished sentence. They do not open VRChat's keyboard.
 - Microphone capture pauses when your VRChat mic is muted; an already-captured sentence can finish.
 - Subtitles capture VRChat rather than all Windows audio, with a toggle for always on top.
 - Optional locally saved people and voice recognition. Recognizing a voice is not the same as separating simultaneous overlapping speakers.
-- English, Simplified Chinese, Japanese and Korean interface languages, themes, diagnostics and manual update checks.
+- VRChat OSC availability indicator and connection guidance, without claiming a chat-delivery acknowledgment.
+- English, Simplified Chinese, Japanese and Korean interface languages, themes, diagnostics and launch-time update checks.
 
 ## Requirements and privacy
 
 Windows 11 x64, VRChat, free space for several gigabytes of tools/models and supported GPU acceleration. Speech setup uses an app-owned WSL2 Ubuntu environment. Virtualization, administrator permission and a restart may be needed. The app checks acceleration support; availability and performance vary by hardware and driver.
 
-Speech recognition and translation run locally. Saved people and voice fingerprints stay on your PC. Setup downloads tools/models from third-party providers; manual update checks request public release metadata. Logs may contain conversation text—review them before sharing an issue report. This website contains no analytics scripts or tracking cookies; hosting/download providers still receive normal connection metadata.
+Speech recognition and translation run locally. Saved people and voice fingerprints stay on your PC. Setup downloads tools/models from third-party providers; enabled launch-time and manual update checks request public release metadata. Update now verifies the installer before opening its normal confirmation wizard and keeps settings/models. Logs may contain conversation text—review them before sharing an issue report. This website contains no analytics scripts or tracking cookies; hosting/download providers still receive normal connection metadata.
 
 ## Source and licenses
 
