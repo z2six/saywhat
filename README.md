@@ -20,7 +20,7 @@ No separate LM Studio or FoxTrans installation is needed. Setup may ask for Wind
 - Translates your voice into one language, with optional second and third languages.
 - Shows translated VRChat voices in a movable subtitle window.
 - Saves names and photos in **People**, with translation counts and clear voice examples. People without a photo get locally generated artwork based on their first confirmed voice example. Choose a picture file or paste an image to override it. Smaller pictures appear beside subtitles.
-- Optionally recognizes familiar voices and attaches saved names to subtitles. Correct a name below a message to help matching learn from a usable clear example.
+- Optionally suggests familiar people as **Maybe [name]** beside subtitles. Confirm with ✓, reject with ✕, or choose a different person. Clear reviewed examples improve later matching; automatic guesses never teach themselves. People shows confirmed and rejected review counts.
 - Offers an optional **Groups** speech model that returns separate attributed text for multiple voices. It can help with overlapping conversation, but does not produce isolated recordings or guarantee that every voice is recovered.
 - Pauses new microphone capture when your VRChat mic is muted.
 - Offers local translation models, themes, four app interface languages and in-app updates.

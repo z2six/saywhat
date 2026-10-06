@@ -2,7 +2,7 @@
 
 [Project home](../README.md) · [Downloads](https://github.com/z2six/saywhat/releases) · [Quick help](../SUPPORT.md)
 
-These pages explain the Windows application's behavior, configuration and limitations for technically interested users and developers. They describe the 0.1.24 preview. An older installed release may have different controls or defaults; a newer documentation page does not update your installation.
+These pages explain the Windows application's behavior, configuration and limitations for technically interested users and developers. They describe the 0.1.26 preview. An older installed release may have different controls or defaults; a newer documentation page does not update your installation. [What's new in 0.1.26](RELEASE-NOTES-0.1.26.md).
 
 | Read this | To understand |
 | --- | --- |

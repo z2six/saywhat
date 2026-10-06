@@ -6,7 +6,9 @@
 
 A saved person has a stable local ID, display name, optional picture, aggregate translation count, last-used timestamps and confirmed voice examples. A name is not linked to a VRChat account or uploaded to a directory. The People list supports adding, searching, renaming, deleting and changing/removing pictures without opening audio or loading translation models.
 
-Translation totals count successfully published committed subtitle chunks attributed to that person, not interim revisions. Repeated deliveries of the same chunk do not increment the count. A correction of recent attribution can move that count to another person; undo can reverse the correction. These totals began when the feature was introduced and do not reconstruct older sessions. A counter-save failure must not prevent the subtitle from displaying.
+Translation totals count successfully published committed subtitle chunks attributed to that person, not interim revisions. From 0.1.26, an automatic suggestion does not add to that person's total until the user confirms or labels the message. Repeated deliveries of the same chunk do not increment the count. A correction of recent attribution can move that count to another person; undo can reverse the correction. Older totals are retained, not reconstructed. A counter-save failure must not prevent the subtitle from displaying.
+
+**Confirmed suggestions** and **Rejected suggestions** count explicitly reviewed guesses. Unreviewed suggestions are excluded. The summary “X of Y reviewed suggestions confirmed” describes those decisions, not an independently measured accuracy percentage; selective reviewing can bias it. Revisions, relabels and undo update one decision rather than adding repeated votes.
 
 The store allows up to 64 saved people, with case-insensitively unique names of 1–64 characters and no control characters. It allows 64 confirmed examples per person per recognition model and 4,096 examples overall. Recent translation identities used for counting/correction are also bounded to 4,096; they contain opaque IDs and timestamps, not conversation text. The separate **Unnamed voice profile limit** only controls anonymous automatic profiles. It does not restrict the searchable People list to two names.
 
@@ -32,7 +34,20 @@ A message can be labeled without teaching the model. Learning is withheld when r
 
 Recognition now runs in the background so a subtitle need not wait for its name. If a usable fingerprint is not yet available when you select a person, that correction can be label-only; the app reports whether a voice example was saved. Choosing a name is not a guarantee that every message becomes a training example.
 
-Repeated revisions of the same voiced interval represent **one** example, not independent evidence. Re-labeling moves/replaces that contribution; it does not add duplicate reinforcement. Undo removes or restores the prior contribution. Special choices such as music/recording or unidentified voice do not teach a named person.
+Repeated revisions of the same voiced interval represent **one** example, not independent evidence. Re-labeling moves/replaces that contribution; it does not add duplicate reinforcement. Undo removes or restores the prior contribution. Marking music/recording never saves new voice evidence for a person.
+
+### Review a suggested name
+
+From 0.1.26, every automatically named message appears as **Maybe [name]**, with the person's picture and ✓ / ✕ controls. Its translation is already visible; reviewing a name never gates speech recognition or translation.
+
+- **✓** confirms this message. If its retained audio is eligible, the app stores a positive reference.
+- **✕** changes this message to Unknown person. Eligible evidence becomes a person-specific negative reference: this voice is **not** the suggested person. It is not evidence for another person's identity.
+- **Select a person** labels a message manually. Eligible evidence can store a positive reference for the chosen person and a negative reference for the original wrong suggestion.
+- **Undo** restores this evidence's previous label, references and reviewed outcome. Restoring an automatic guess makes it tentative again, not confirmed.
+
+Clear-example teaching uses the same one-time acknowledgement and quality gates in either direction. Unclear, mixed, clipped, short, expired or unavailable evidence can still correct a name and record a review, but cannot add a new reference. Choosing No without accepting the explanation still marks the message unknown without saving new voice evidence.
+
+References and the review outcome are committed atomically to local storage; a failed save leaves the previous decision intact. Negative references are bounded to 64 per person per exact recognition-model SHA and 4,096 overall. The recent review ledger is bounded to 4,096 opaque IDs, timestamps and decisions, without audio or transcript text. Older reviewed totals remain after ledger pruning. There is no model-weight training, cloud request, or automatic reinforcement from guesses.
 
 Automatic guesses do not train the manually confirmed references. Anonymous guessed centroids are deliberately frozen after enrollment, preventing a repeated mistaken singer match from gradually contaminating a person's stored voice.
 
@@ -44,11 +59,12 @@ Model files are keyed by their SHA-256 identity for saved references. Examples f
 
 Matching is deliberately conservative:
 
-- Samples need sufficient usable voiced audio; named matching needs the configured similarity threshold and separation from the runner-up.
+- Samples need sufficient usable voiced audio; named matching needs the configured similarity threshold and separation from the runner-up. With two or more references, two must agree rather than allowing one exceptional anchor to win. A single-reference profile has a stricter admission floor.
 - Short samples require a stricter threshold.
 - Mixed/uncertain audio is withheld from confident identity assignment.
 - The first anonymous voice can enroll from one sufficiently long clean observation; subsequent identities require repeated independent evidence.
 - Near misses are left unidentified rather than automatically spawning another person.
+- A close repeat of a rejected example can veto that person's suggestion, using only negatives from the same exact recognition model. This does not force a match to a different person.
 
 The threshold is a similarity score, **not a probability of being correct**. The People familiarity labels report saved clear examples/readiness, not a measured percentage accuracy. A model can still confuse songs, similar voices, changed microphones, short utterances or overlapping speech.
 
@@ -66,7 +82,7 @@ These names describe different tasks:
 
 Optional **Groups** uses VibeVoice streaming recognition to return text with temporary voice labels, then translates each route into its own bubbles. It can help recover more than one person's words from a chunk, but does not output isolated recordings. Its labels are session-scoped: “voice 0” is not permanently the same person after a recognition reset.
 
-SayWhat? keeps the original mixed audio, but VibeVoice replies have **whole-chunk spans**, not individual-person or word timestamps. A chunk with multiple voices cannot safely teach a named person's fingerprint. Only a chunk with one labelled voice and usable clear-audio evidence is eligible for optional fingerprint matching. Unlabelled replies are translated without binding all unknown voices to a person. Clear matching or a manual assignment can connect a temporary voice to an existing saved person; manual choices take precedence and still label that session when automatic matching is off. Missed overlap can evade audio checks, so the app cannot promise every eligible example is truly isolated.
+SayWhat? keeps the original mixed audio, but VibeVoice replies have **whole-chunk spans**, not individual-person or word timestamps. A chunk with multiple voices cannot safely teach a named person's fingerprint. Only a chunk with one labelled voice and usable clear-audio evidence is eligible for optional fingerprint matching. Unlabelled replies are translated without binding all unknown voices to a person. Clear matching or a manual assignment can connect a temporary voice to an existing saved person. Explicit message labels take precedence, but a link does not confirm all future messages on a track: later named messages remain tentative. Rejecting a suggestion also suppresses that person on that temporary track, including late recognition callbacks. Missed overlap can evade audio checks, so the app cannot promise every eligible example is truly isolated.
 
 An experimental **MossFormer2 INT8 two-voice separator** is available for explicit local-WAV evaluation under advanced voice options. It produces two anonymous waveform estimates, not stable named people. Downloading it does **not** enable live separation. Evaluation uses a local 16 kHz WAV sample, CPU inference, warm-up and measured passes; exporting results saves audio only after a separate explicit action.
 

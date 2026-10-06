@@ -21,7 +21,7 @@ Technical installations can override the root with `SAYWHAT_DATA_ROOT` (legacy `
 | `vrchat-translation-settings.json` | App choices, model selections, language/theme and one-time help preferences |
 | `provisioning.json` | Managed/imported asset registrations, runtime and WSL speech registration |
 | `setup-progress.json` | Resumable setup stage/restart state |
-| `incoming-speaker-feedback.json` | Names, photo leaf names, confirmed embeddings/model provenance and aggregate counters |
+| `incoming-speaker-feedback.json` | Names, photo leaf names, reviewed positive/negative voice fingerprints with exact model provenance, bounded opaque review records and aggregate counters; no audio or transcript text |
 | `incoming-ai-speaker-profiles.json` | Anonymous model-specific voice profiles |
 | `people-photos/` | Sanitized, size-limited user photo copies with generated names |
 | `hidden-speech-shortcuts/` | Recoverable copies of verified internal speech-tool Windows shortcuts removed from Start search |
