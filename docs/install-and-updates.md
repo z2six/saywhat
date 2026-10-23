@@ -6,15 +6,17 @@
 
 The Windows x64 installer supports current-user and all-users installations. All-users program changes need administrator permission; each user still has their own settings/People/cache data. Existing installations are detected so update/maintenance and uninstall choices can be presented instead of blindly creating another copy.
 
-The optional post-install **open SayWhat?** action opens the UI, not active translation. The first-run flow chooses interface language, theme and translation targets, checks hardware locally, suggests a dedicated translator, reviews required downloads/permissions, and prepares files. Nonrecommended choices ask for confirmation. Required Windows/WSL/runtime steps may request permission or a restart; resumable progress keeps the selected setup choices.
+The post-install **open SayWhat?** option is selected by default and opens the UI, not active translation. First setup chooses the interface language, the language you speak and one to four output languages. Theme selection is optional. It checks hardware locally, suggests models, reviews downloads/permissions and prepares your own voice translation. A nonrecommended translator asks for confirmation before the separate download review and preparation action.
 
-Model-weight download sizes are not the entire fresh setup size. Linux packages/build tools and NVIDIA toolkit preparation can need several more gigabytes and at least 20 GB of free disk space. Unknown-duration work uses honest stage/progress information rather than an invented overall percentage. A verified existing managed model can be reused without redownloading it.
+The default microphone recognizer runs directly on Windows and does not require WSL. Windows runtime prerequisites may still need permission or a restart when missing. Optional subtitles and the legacy Voxtral engine have separate preparation; only those paths need the additional managed Linux components where applicable. Resumable progress retains setup choices, and the review reflects the actual permission/restart requirements.
 
-Setup creates an isolated app-managed WSL2 Ubuntu environment where needed. It does not take over, convert, unregister, or change the default of an unrelated existing Ubuntu installation. Existing supported speech registrations can be reused in advanced setups.
+Model-weight download sizes are not the whole setup size. In a selected Linux speech workflow, build tools and NVIDIA toolkit preparation can need several more gigabytes and at least 20 GB of free disk space; that is not a blanket requirement for native own-voice setup. Unknown-duration work shows stage/progress information rather than an invented overall percentage. Verified existing managed models can be reused without redownloading them.
+
+When a selected speech workflow needs WSL2, setup creates an isolated app-managed Ubuntu environment. It does not take over, convert, unregister, or change the default of an unrelated existing Ubuntu installation. Existing supported speech registrations can be reused in advanced setups.
 
 The internal speech environment is not another app to open. Version 0.1.22 hides its generated Start/Terminal entry and the CUDA toolkit's unused profiler launchers, without unregistering WSL or removing speech models. Cleanup is limited to verified app-owned registrations and exact generated shortcuts; unrelated Ubuntu and user-created shortcuts are left alone. Recoverable shortcut copies are kept under the app's data folder, and changed Linux desktop metadata retains original backups. The environment remains listed by WSL's technical inventory for troubleshooting.
 
-Preparing files does not normally start capture or load inference models. At **Ready**, use the Home direction's explicit Start button. The short dashboard introduction is skippable; setup is restartable from the top of Settings without deleting saved People or models.
+Preparing files does not start capture or inference. At **Ready**, open Home and choose **Start translating my voice**. Subtitles have a separate preparation/Start action and can wait until needed. The short dashboard tour is skippable; setup is restartable from the top of Settings without deleting saved People or models.
 
 ## Start, stop, close and tray
 

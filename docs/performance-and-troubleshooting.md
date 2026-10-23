@@ -26,12 +26,12 @@ Use several realistic conversational phrases, not a single “hello.” Word cho
 
 ## Low-load starting point
 
-1. For one-to-one subtitles, try **Settings → Translation profiles → Quick → Apply profile**. It disables familiar-voice matching and shortens subtitle waits/lookahead without replacing your translator. Share one **Hy-MT2 1.8B** translator for both directions if a smaller translator is also wanted.
-2. Keep extra target languages off. They use sequential translation requests, not free parallel outputs.
-3. Run only the directions needed. Each adds capture and a recognition-server instance.
-4. If game performance suffers, disable optional voice recognition and compare again. It is separate CPU work, not the large GPU speech/translation model.
-5. Keep default 1.2-second pauses initially. Shortening the microphone pause trades sentence coherence for earlier finals; shortening lookahead trades recognition context for latency.
-6. If early previews add too much translator load, turn them off and compare final-only behavior. Turning them on can improve first-visible output, but is not guaranteed to improve final latency.
+1. Start only **your voice translation** on Home. Subtitles, People matching and Groups are optional and are not required for voice-to-chat.
+2. Start with one output language and the smaller **Hy-MT2** translator card. Up to four outputs are supported, but extra languages use sequential translation requests, not free parallel work.
+3. Check **I speak** on Home. With native Nemotron, choosing your actual language can reduce recognition mix-ups. Legacy Voxtral continues detecting speech automatically; its translator hint does not pin ASR.
+4. Start with the default **1.2-second** pause. Home exposes shorter or longer waits: shorter can split a sentence, longer adds delay. Timing and early-message changes keep the compatible models loaded instead of unloading/reloading them.
+5. Try **Show translations while I’m still speaking** for earlier visible chat. If speculative translations add too much load, turn it off and compare final-only behavior. Earlier output is not a guarantee of faster final translation.
+6. If you also need subtitles, share one translator and consider **Quick** in Settings for one-to-one conversation. Quick skips familiar-voice matching and shortens subtitle waits/lookahead. Turn optional matching off if its extra CPU work is unwanted; that is distinct from unloading the GPU speech/translation models.
 
 Larger translation models can improve a phrase but still be slower despite fitting in VRAM. Reducing idle caches or loading two models does not increase GPU compute capacity. Test in the same crowded world and with the same VRChat graphics settings before drawing conclusions.
 
@@ -63,7 +63,11 @@ Queues are intentionally bounded. The Voxtral incoming audio backlog retains rec
 
 Check the **direction's target language**, not the app's interface language. My voice and subtitles have independent targets. Check whether a shared specialized model supports **both** selected directions. Liquid EN–JP cannot translate Chinese; TranslateGemma requires explicit source selection and a compatible managed template.
 
+For your microphone, **I speak** and the two model roles are directly on Home. Nemotron uses the chosen language for recognition; Automatic is useful when you switch languages. Voxtral remains automatic at the speech stage, even if an older configuration has an explicit translation hint. Do not assume switching a translator also changes the recognizer.
+
 Inspect source recognition separately from translation. A glossary such as a product-name mapping helps only if a relevant recognizable source term is present; it cannot correct missing audio or restore words that were never transcribed. Wrong-script subtitle output can be rejected and retried, adding delay. A larger translator is only a plausible remedy when the source transcript is already useful.
+
+Language and microphone changes may briefly hold new capture while an already captured sentence finishes. A model change may need a download before it switches; the current translation can continue while files prepare. Watch the status in the app rather than clicking repeatedly. If subtitles share that translator, changing it can pause both directions after confirmation.
 
 ## Useful diagnostics
 

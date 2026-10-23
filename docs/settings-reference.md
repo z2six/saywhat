@@ -4,9 +4,17 @@
 
 Defaults below describe a new packaged installation before setup changes them. Existing preferences are preserved during ordinary updates. Interface language can inherit the installer's selection. Values are not measured hardware recommendations.
 
-Prefer editing in the dashboard and choosing **Save & apply**. Changing a control is not the same as saving it. Saving unchanged settings avoids unnecessary engine changes; relevant changes can require stopping/restarting affected active tools. Pinning subtitles, changing interface language/theme, changing names/photos, and toggling voice recognition have targeted paths that do not need to restart translation models. Do not edit files during an active session: some settings are snapshots read at startup.
+Home's everyday voice controls apply their changes directly. Other settings pages use **Save & apply**; changing an Advanced control is not the same as saving it. Saving unchanged settings avoids unnecessary engine changes. Pinning subtitles, changing interface language/theme, changing names/photos, and toggling voice recognition have targeted paths that do not need to restart translation models. Do not edit files during an active session: some settings are snapshots read at startup.
 
 The persisted application settings file is `vrchat-translation-settings.json` in the [per-user data directory](privacy-and-storage.md). The tables give its key names for technical inspection. They are settings, not a stable third-party API. UI labels may change or be translated; compatibility keys still use some older `Speaker` names.
+
+## Everyday voice controls on Home
+
+Click **I speak**, a target-language chip, a speech-model card or a translator card directly. Model choices show short explanations instead of hiding their names in an unlabeled dropdown. The microphone follows the Windows default unless you select another device.
+
+Pause and early-message changes apply without reloading the speech/translation models. Language or microphone changes may briefly pause new capture while the current sentence finishes, then reconnect it with compatible weights still loaded. Model changes ask for missing downloads before switching; a shared translator change can pause both active directions after confirmation. Stopped features stay stopped when saving choices.
+
+The optional subtitle card has its own source, target, preparation and Start action. Its settings do not need to be configured before using your own voice.
 
 ## Translation profiles
 
@@ -18,7 +26,7 @@ Choose a profile at the top of **Settings**, then **Apply profile**. The subtitl
 | Normal | Voxtral | 1,200 / 500 ms | 240 ms | On; optional and changeable |
 | Groups | VibeVoice streaming | Keeps current values | Uses the selected streaming model's chunk/lookahead, not the Voxtral value | Keeps the current on/off choice |
 
-Quick and Normal set the microphone final pause to 1,200 ms. Quick also selects Fast translation style. Presets do not replace chosen translation models, target/source languages or appearance. Groups changes the incoming speech engine only; your microphone remains on Voxtral.
+Quick and Normal set the microphone final pause to 1,200 ms. Quick also selects Fast translation style. Presets do not replace chosen translation models, target/source languages or appearance. Groups changes the incoming speech engine only; your selected microphone recognizer is unchanged.
 
 **Save current settings as…** captures current app preferences, including models, languages, timing and appearance. It does not copy downloaded files, saved People, voice examples or one-time setup/help acknowledgments. Up to 64 custom profiles are allowed, with unique names of 1–60 characters. **Update saved profile** explicitly replaces its snapshot; changing settings does not silently overwrite it. Built-in presets cannot be renamed or deleted. Deleting an active custom profile keeps its current settings as unsaved custom settings.
 
@@ -40,9 +48,11 @@ Groups preparation requires explicit approval for extra model/runtime downloads.
 | --- | --- | --- |
 | Translate my voice to / `OwnVoiceTargetLanguage` | `Chinese` | Primary VRChat-chat target; Chinese output is Simplified Chinese. |
 | Translate their voices to / `IncomingTargetLanguage` | `English` | Subtitle target, independent of the microphone target. |
-| Spoken language / `OwnVoiceSourceLanguage`, `IncomingSourceLanguage` | `Automatic` | Source-language choice for each translation direction. Explicit sources are required by Liquid EN–JP and TranslateGemma adapters. |
-| Translate my voice into more languages / `OwnVoiceAdditionalLanguagesEnabled` | `false` | Enables a second/third target for your chat output, not subtitles. |
-| Extra targets / `OwnVoiceAdditionalTargetLanguages` | Empty list | At most two unique supported targets, excluding the primary. One line per successful translation in selected order; extra requests add latency and compete for the same chat-length budget. |
+| I speak / `OwnVoiceSourceLanguage` | `English` | Conditions native Nemotron recognition and the translator's source selection. Automatic is available for frequent language switching. Existing Voxtral setups retain automatic ASR; an explicit saved value is only a translation hint there. |
+| Incoming source / `IncomingSourceLanguage` | `Automatic` | Subtitle translation-source hint. Explicit sources are required by Liquid EN–JP and TranslateGemma adapters; this does not pin the incoming Voxtral audio recognizer. |
+| Speech recognition / `OwnRecognitionEngine` | `nemotron` | Native Windows streaming recognition. `voxtral` retains the managed WSL path. An old configuration without this field migrates to Voxtral instead of silently replacing its working recognizer. |
+| Translate my voice into more languages / `OwnVoiceAdditionalLanguagesEnabled` | `false` | Enables up to three additional chat targets, not subtitle targets. Home's chips update this choice automatically. |
+| Extra targets / `OwnVoiceAdditionalTargetLanguages` | Empty list | At most three unique supported targets, excluding the primary: four outputs total. One line per successful translation in selected order; extra requests add latency and share the same chat-length budget. |
 | Use the same model for both directions / `ShareTranslationModel` | `true` | One loaded model/endpoint for both directions. No shared conversation history. |
 | Built-in translator / `UseManagedTranslator` | `true` in packaged app | Managed local runtime and downloads. Advanced external mode requires an already-running loopback server. |
 | My voice model / `OwnManagedModelId` | `hy-mt2-1.8b-q4_k_m` | Managed translator catalog identifier. |
@@ -51,7 +61,7 @@ Groups preparation requires explicit approval for extra model/runtime downloads.
 | Output style / `TranslationQuality` | `Fast` | Dashboard offers `Fast` and `Careful`. Careful allows more subtitle output tokens/time, not a different model. Older `Balanced`/`Quality` values remain recognized by subtitle request logic. |
 | Glossary / `Glossary` | Empty | Up to 2,000 characters in the UI. Term mappings influence supported prompts only when a source term is present; they cannot restore missing ASR words. Dedicated Liquid/TranslateGemma adapters do not receive the generic glossary/context prompt. |
 
-Supported target names are Chinese, English, Japanese, Korean, Spanish, French, German, Portuguese and Russian. The catalog's model capabilities may reduce these choices. A source-language restriction affects translation selection/prompting; it is not evidence that Voxtral can enforce an arbitrary custom recognition-language grammar.
+Supported target names are Chinese, English, Japanese, Korean, Spanish, French, German, Portuguese and Russian. The catalog's model capabilities may reduce these choices. **I speak** guides Nemotron recognition; Voxtral still detects speech automatically. The advanced **Translation language hint** field for a legacy specialized translator does not change that. The interface explains incompatible model/language pairs rather than silently selecting a different language.
 
 ## Timing, microphone and playback
 
@@ -62,9 +72,13 @@ Supported target names are Chinese, English, Japanese, Korean, Spanish, French, 
 | Stable subtitle punctuation / `SubtitlePreviewStableMilliseconds` | `500` ms | Stored range 150–1,200 ms; Quick sets 250 ms. Separate from the silence pause. |
 | Recognition lookahead / `RecognitionDelayMilliseconds` | `240` ms | 160, 240, 480 or 800 ms in the picker. Greater Voxtral lookahead adds recognition latency and may help accuracy; it is not the sentence-ending pause or VibeVoice chunk size. |
 | Show translations while I speak / `OwnVoiceSendEarlyPreviews` | `true` | Cumulative submitted chat previews followed by an authoritative final. Off means final-only and fewer speculative translator requests. It does not open/type into the chatbox editor. |
+| Microphone / `OwnMicrophoneDeviceId` | `default` | Follows the Windows default capture device. The picker can save another microphone's unique display name; ambiguous or missing devices are not silently replaced by an unrelated one. |
 | Finish captured speech after muting / `FinishCapturedSentenceOnMute` | `true` | New mic capture stops immediately; already-captured work may finish with one authorized final. False discards unfinished work. |
-| Capture VRChat playback only / `CaptureVrChatOnly` | `true` | Per-process loopback by default. Off permits wider Windows playback, including unrelated applications. VRChat-hosted music remains part of VRChat output. |
-| Playback device / `PlaybackDeviceId` | `auto-vrchat` | Automatic follows VRChat; explicit device IDs select a playback route. Changing devices may reconnect capture. |
+| Listen to / `IncomingAudioMode` | `vrchat` after normalization | `vrchat`, `application` or `desktop`. Choose an application with the searchable picker, or explicitly opt into All playback. A selected app closing pauses that capture rather than falling back to other apps. |
+| Selected application / `IncomingApplicationPath`, `IncomingApplicationName` | Empty | Saves the chosen executable and display label, not a permanent process ID. An updated executable path may require selecting the application again. |
+| Just one person / `IncomingSinglePerson`, `IncomingPersonId` | `false`, empty | Assigns subtitles to a selected saved person and bypasses automatic fingerprint matching. It does not teach a voice example by itself. |
+| Legacy capture preference / `CaptureVrChatOnly` | `true` | Retained for old settings migration. Use the source picker rather than editing this compatibility key. Music played inside a selected application is still part of its audio. |
+| Playback device / `PlaybackDeviceId` | `auto-vrchat` | Relevant to the wider playback mode. Application capture selects the process instead of an unrelated desktop device. Changing capture choices may reconnect subtitles. |
 | Boost quiet speech / `NormalizeQuietPlayback` | `true` | Incoming recognition-only gain. Does not raise playback volume or alter the microphone. |
 
 These pauses exclude subsequent recognition-final drain, translator queue/computation, and output scheduling. **1.2 seconds is not an end-to-end delivery promise.** The old untouched 2,400 ms microphone default migrates to 1,200 ms when the newer early-preview preference is absent; customized saved pauses are not replaced just because the app updates.

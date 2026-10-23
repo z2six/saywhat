@@ -2,7 +2,7 @@
 
 [Project home](../README.md) · [Downloads](https://github.com/z2six/saywhat/releases) · [Quick help](../SUPPORT.md)
 
-These pages explain the Windows application's behavior, configuration and limitations for technically interested users and developers. They describe the 0.1.26 preview. An older installed release may have different controls or defaults; a newer documentation page does not update your installation. [What's new in 0.1.26](RELEASE-NOTES-0.1.26.md).
+These pages explain the Windows application's behavior, configuration and limitations for technically interested users and developers. They describe the voice-first experience with native Windows microphone recognition and optional independent subtitles. An older installed release may have different controls or defaults; a newer documentation page does not update your installation. Check your installed version against the [release notes](https://github.com/z2six/saywhat/releases).
 
 | Read this | To understand |
 | --- | --- |

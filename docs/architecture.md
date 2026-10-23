@@ -8,11 +8,12 @@ SayWhat? is a Windows WPF desktop application. It manages local processes, a sub
 
 ```text
 Your voice
-  Microphone → capture/mute gate → Voxtral realtime ASR (WSL)
+  Microphone → capture/mute gate → Nemotron streaming ASR (Windows, default)
+                               or Voxtral realtime ASR (WSL, existing/optional)
              → local translation → OSC sentence proxy → VRChat chat
 
 Other voices
-  VRChat process playback → retained original mixed audio
+  Chosen application playback → retained original mixed audio
     Quick / Normal → Voxtral realtime ASR → source text
     Groups         → VibeVoice streaming ASR → text per temporary voice ID
       source text → local translation → separate subtitle bubbles
@@ -23,11 +24,15 @@ ASR means converting audio into source-language text; translation converts that 
 
 The directions can run separately. When both run, they use independent speech services and audio state. By default they share one loaded translation model, but their requests do not share conversation text. Optional separate translators duplicate model residency; they are not a speaker-separation feature. Built-in profiles change operational settings without replacing chosen translators, languages or appearance. Saved custom profiles also restore those user choices.
 
+First-time setup prepares the microphone direction, not both directions. Subtitles have a separate preparation path for their own speech assets and optional People/Groups components. Keeping subtitles stopped does not require installing those components. Preparing files and inspecting hardware do not start inference or open the microphone.
+
 ## Your microphone
 
 The capture host uses a local fork of FoxTrans Core. It starts muted until the VRChat process and current mute state are verified. Capture has a 300 ms pre-roll and opens an ASR turn after two consecutive voiced frames. The native microphone gate uses an RMS threshold of 0.006; this is an implementation policy, not a microphone-volume setting exposed in the dashboard.
 
-A turn contains cumulative text for the current utterance. Actual captured silence, not unchanged text or a wall-clock guess, determines the configured finalization boundary. At end of input the host sends `input_audio.end`; it waits for **both** `transcript.final` and `session.completed` before using the definitive transcript. The server performs its required final padding rather than the client appending another full silence interval.
+The new-install recognizer is native Windows Nemotron Streaming. The **I speak** choice conditions its recognition requests; Automatic remains available. Voxtral is retained for compatible existing installations and optional speech workflows. It detects the audio language automatically: a preserved explicit language in an older configuration can serve as a translator hint, but does not pin Voxtral's recognition language. Liquid and TranslateGemma still require a valid explicit translation-source language.
+
+A turn contains cumulative text for the current utterance. Actual captured silence, not unchanged text or a wall-clock guess, determines the configured finalization boundary. Each recognition adapter maps its engine's partial/final protocol into the capture host. In the Voxtral path, the host sends `input_audio.end` and waits for **both** `transcript.final` and `session.completed` before using the definitive transcript. That server performs its required final padding rather than the client appending another full silence interval.
 
 While recognition/translation drains, capture can retain two pending turns in order. Each unread turn is bounded to 15 seconds of PCM, with byte and frame-count limits. Once all pending slots are full, genuinely excess new audio is skipped with a reported backpressure outcome; capture resumes when a slot opens. An individual unread-buffer overflow fails only that turn, not already queued sentences. Empty finals, ordinary turn timeouts and translation-provider errors do not automatically discard a healthy queued next turn.
 
@@ -37,9 +42,11 @@ With **Show translations while I speak** on, speculative requests use the comple
 
 The OSC proxy sends early translations as submitted chat bubbles, **not** as text typed into VRChat's editor. Updated cumulative bubbles may repeat or revise earlier wording. It coalesces output at a conservative 1.5-second cadence and gives the final priority. This is an app policy, not a documented VRChat rate-limit guarantee. If the final equals the latest displayed preview, clearing the typing indicator is sufficient; no duplicate bubble is needed.
 
+Home changes use scoped saves. Pause/early-message changes can apply to the existing host without unloading speech or translation models. Changing language or microphone lets captured work finish, then reconnects the affected capture path while compatible model weights remain loaded. Model changes prepare missing files first; replacing a shared translator can briefly pause both active directions after confirmation. None of these paths makes two GPU models free of resource contention.
+
 ## VRChat playback and subtitles
 
-The default playback source is Windows per-process loopback capture for VRChat. It captures VRChat's mixed output, including sounds/music played **inside VRChat**. It does not create an individual stream for each player. Turning off VRChat-only capture opts into wider Windows playback capture.
+The default playback source is Windows per-process loopback capture for VRChat. The searchable application picker can instead select another running application; a separate All playback choice captures wider Windows audio. Selected-application capture waits for that application if it closes rather than falling back to unrelated audio. It includes sounds/music played **inside the selected application** and does not create an individual stream for each person. One-person mode assigns subtitles to a selected saved person and skips automatic voice matching; choosing that name is not a voice-learning example.
 
 Playback is resampled for 16 kHz recognition. Quiet-audio normalization affects the samples sent to recognition, not the user's speaker/headphone volume. The raw audio backlog is capped around two seconds; overloaded playback drops old chunks to retain recent speech rather than growing minutes behind live audio.
 
@@ -65,7 +72,7 @@ The configured streaming chunk plus lookahead requires roughly **3.5 seconds of 
 
 | Endpoint | Purpose |
 | --- | --- |
-| `127.0.0.1:8080` HTTP/WebSocket | Your microphone's Voxtral server |
+| `127.0.0.1:8080` HTTP/WebSocket | Your selected microphone recognizer: native Nemotron by default, or legacy Voxtral |
 | `127.0.0.1:8081` HTTP/WebSocket | Incoming VRChat-playback Voxtral server |
 | `127.0.0.1:8082` HTTP/WebSocket | Optional incoming VibeVoice Groups service |
 | `127.0.0.1:1235/v1` HTTP | Built-in translator for your voice; shared by subtitles when sharing is on |
@@ -75,7 +82,7 @@ The configured streaming chunk plus lookahead requires roughly **3.5 seconds of 
 | `127.0.0.1:9001` UDP | VRChat outgoing mute/state listener used by the controller |
 | `127.0.0.1:9000` UDP | VRChat chat and typing output |
 
-Voxtral and Groups readiness are checked through `/health`; Groups streams through `/v1/realtime`. Translation uses an OpenAI-compatible `/v1/models` and `/v1/chat/completions` interface. Managed speech services are local and unauthenticated, bound to loopback. Do not expose these endpoints to a network; loopback restriction is not authentication against other local processes.
+Native Nemotron readiness is checked through `/ready`. Voxtral and Groups readiness use `/health`; Groups streams through `/v1/realtime`. Translation uses an OpenAI-compatible `/v1/models` and `/v1/chat/completions` interface. Managed speech services are local and unauthenticated, bound to loopback. Do not expose these endpoints to a network; loopback restriction is not authentication against other local processes.
 
 ## OSC connection versus delivery
 

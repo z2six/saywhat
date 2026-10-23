@@ -2,12 +2,14 @@
 
 Open **Help** in SayWhat?’s sidebar for setup and troubleshooting advice, or read the [website FAQ](https://saywhat.pages.dev/#help). To report a bug, [open an issue](https://github.com/z2six/saywhat/issues).
 
+For your first voice-to-chat message, choose **I speak**, select the translation language(s) on Home, then choose **Start translating my voice**. Enable **OSC → Enabled** in VRChat’s Action Menu and unmute your VRChat microphone. Speech and translation model cards are directly on Home. Subtitles are optional and are prepared/started separately; they are not required for your own voice.
+
 Please include:
 
 - Your SayWhat? version and Windows version.
 - Whether the problem affects your voice, subtitles, setup, or something else.
 - What you expected and what happened instead.
-- The selected model and any visible error message, if relevant.
+- The selected speech recognizer and translator, spoken/output languages and any visible error message, if relevant.
 
 Open **Settings → Problems & logs → Open troubleshooting** (also available under **Advanced → Diagnostics**). **Recent issues** shows where a failure occurred. Use **Copy diagnostics** for a summary without conversation text, names, file paths or raw exceptions. Detailed logs and screenshots may contain private conversations, saved names or file paths. Review those before posting; never share passwords, tokens or recordings you do not have permission to share.
 

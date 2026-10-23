@@ -6,7 +6,8 @@
 
 | Task | Current component | Input → output |
 | --- | --- | --- |
-| Speech recognition: microphone, Quick/Normal subtitles | Voxtral Mini 4B Realtime 2602 Q4_K_M | Audio → source text |
+| Speech recognition: microphone default | Nemotron 3.5 ASR Streaming 0.6B, Q8_0, native Windows | Audio → source text, guided by I speak |
+| Speech recognition: legacy microphone and Quick/Normal subtitles | Voxtral Mini 4B Realtime 2602 Q4_K_M | Audio → automatically detected source text |
 | Speech recognition: optional Groups subtitles | VibeVoice ASR Streaming 1.5B or 7B | Mixed audio → text attributed to temporary voices |
 | Translation | Selected local GGUF translator | Source text → chosen language |
 | Optional voice recognition | Compatible sherpa-onnx voice-embedding model | Clear audio sample → fingerprint for matching |
@@ -16,6 +17,8 @@ Fingerprint-based voice recognition does not translate, identify a VRChat accoun
 The automatic-setup CAM++ artifact is size/hash pinned. The current optional voice-model download button uses HTTPS and completeness checks, but does not provide the same per-artifact pinned SHA-256 verification as the translation catalog. Imported ONNX files are user-selected artifacts. Do not treat every optional voice model as independently verified just because it appears in the picker.
 
 ## Translation catalog
+
+Home shows the commonly used translator cards with plain explanations. **All models and downloads** opens the full inventory. Choose the recognizer separately from the translator: better recognition helps the source words, while a different translator changes how those words are rendered. Preparing a model only downloads/verifies files; the model loads when the corresponding feature starts.
 
 Sizes below are approximate **download sizes in decimal GB/MB**, not peak RAM or VRAM. Context buffers, compute workspaces and simultaneous speech engines also need memory. Catalog downloads are pinned by revision, expected size and SHA-256. Imported models must match the expected model/architecture; compatible architecture alone cannot prove that an imported file contains the same fine-tuning or prompt template.
 
@@ -34,7 +37,7 @@ Upstream model information: [Tencent Hy-MT2](https://huggingface.co/tencent/Hy-M
 
 ## Prompt and language adapters
 
-Hy-MT2 uses its dedicated user-task translation prompt rather than the generic general-purpose system prompt. Generic Qwen translation disables thinking and requests only the translation. Additional microphone targets reuse the selected model and glossary through sequential single-target requests; they do not load an additional model for each language.
+Hy-MT2 uses its dedicated user-task translation prompt rather than the generic general-purpose system prompt. Generic Qwen translation disables thinking and requests only the translation. Up to four microphone targets reuse the selected model and glossary through sequential single-target requests; they do not load an additional model for each language. Extra outputs still need compute time and share the same 144-character chatbox budget.
 
 TranslateGemma uses a managed text-only wrapper that renders the translation task's explicit source/target fields. External arbitrary templates are refused for this adapter. Its managed context is 2,048 tokens with output reservation; source input is capped at 1,024 UTF-8 bytes. Oversized source fails visibly rather than silently translating a clipped sentence. Liquid uses explicit English/Japanese task prompts. Dedicated Liquid/TranslateGemma adapters do not receive generic conversation context/glossary or Qwen reasoning toggles.
 
@@ -56,13 +59,23 @@ Built-in translation uses pinned `llama.cpp` server release **b11401** on native
 
 The managed server uses a 4,096-token context (2,048 for TranslateGemma), one parallel slot, four processing/batch threads, batch 128, microbatch 64, automatic flash attention, and reasoning off. GPU backends request GPU layer offload; actual supported residency remains a runtime/hardware matter. These are implementation defaults, not all exposed dashboard knobs.
 
-## Speech runtime
+## Speech runtimes
+
+### Native Windows: new-install microphone default
+
+The microphone's native option uses [NVIDIA NeMo-Speech.cpp](https://github.com/NVIDIA/NeMo-Speech.cpp) with **Nemotron 3.5 ASR Streaming 0.6B**. Its current Windows Vulkan runtime is about 19.3 MB and the Q8_0 speech model about 742 MB. Downloads use an exact runtime release, model revision, expected size and SHA-256. This path does not require WSL or a separate speech application.
+
+**I speak** supplies the native recognizer's source language. Chinese, English, Japanese and Korean are among the exposed choices; Automatic is available too. Availability is not a language-specific accuracy or in-game latency guarantee. Native speech and the selected translator still consume resources alongside VRChat.
+
+Existing settings without a recognizer field remain on Voxtral. Changing to native is a visible choice, not a silent migration that replaces a working engine. A retained explicit source language for an old Voxtral/TranslateGemma pairing is a translation hint only; it does not condition Voxtral recognition.
+
+### Legacy Voxtral and normal subtitles
 
 SayWhat? uses [MrShitFox/voxtral.cpp](https://github.com/MrShitFox/voxtral.cpp), pinned to commit `3d1ed513debc88b4a383ad83e0cd0bcb84889a60` with application-local changes. The model is the **Realtime** variant, not offline Voxtral Mini. Its Q4_K_M download is about 2.90 GB.
 
-Speech runs under WSL2 Ubuntu. Automatic setup installs/builds the speech component after consent; NVIDIA setup selects the managed CUDA path where supported, while other/manual configurations can use registered supported backends. Native Windows translation acceleration and WSL speech acceleration are **separate choices**. A Windows Vulkan translator working does not prove that WSL Vulkan speech works.
+This engine runs under WSL2 Ubuntu. Setup installs/builds its speech component after consent; NVIDIA setup selects the managed CUDA path where supported, while other/manual configurations can use registered supported backends. These extra requirements apply to this selected engine or optional subtitles, not to the default native microphone route. Native Windows translation acceleration and WSL speech acceleration are **separate choices**. A Windows Vulkan translator working does not prove that WSL Vulkan speech works.
 
-Running both directions needs independent recognition services: microphone Voxtral plus incoming Voxtral or VibeVoice. Model file size understates their live memory requirements. Normal Stop/Quit releases app-owned instances; it does not remove cached weights.
+Running both directions needs independent recognition services: the selected microphone recognizer plus incoming Voxtral or VibeVoice. Optional subtitle preparation is separate from initial own-voice setup. Model file size understates live memory requirements. Normal Stop/Quit releases app-owned instances; it does not remove cached weights.
 
 ### Optional Groups runtime
 

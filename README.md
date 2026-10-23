@@ -1,6 +1,6 @@
 # SayWhat?
 
-Voice translation for VRChat on Windows. Translate your microphone into VRChat chat, or read other players’ voices in a separate subtitle window. Use either feature on its own or both together.
+Translate your voice into VRChat chat on Windows. Choose the language you speak, choose what your friends should read, and press Start. Other people’s voice translations remain available as a separate, optional subtitle window.
 
 **[Download SayWhat?](https://saywhat.pages.dev/#download)** · [Website](https://saywhat.pages.dev/) · [Release notes](https://github.com/z2six/saywhat/releases) · [Help](SUPPORT.md)
 
@@ -9,16 +9,20 @@ Want to understand what runs on your PC or tune a specific setting? Read the [te
 ## Get started
 
 1. Download and run the Windows installer.
-2. Open SayWhat? and follow its setup screens to choose languages, a theme and a translator. Review the downloads, then prepare translation.
+2. Open SayWhat? and choose your spoken language and one to four translation languages. Keep the recommended models or choose another card, review the downloads, then prepare translation.
 3. Enable **OSC → Enabled** in VRChat’s Action Menu.
-4. Start your voice translation, subtitles, or both in SayWhat?.
+4. On Home, choose **Start translating my voice**.
 
-No separate LM Studio or FoxTrans installation is needed. Setup may ask for Windows administrator permission or a restart while preparing speech recognition.
+No separate LM Studio or FoxTrans installation is needed. The default own-voice recognizer runs directly on Windows; WSL is not required for that path. Additional speech modes can need Windows components, permission or a restart. Setup explains those changes before preparation. It does not start listening automatically.
+
+Your spoken language, output languages, recognizer, translator and microphone are visible on **Home**. Click to change them without searching through Settings. Model cards explain the choices and offer downloads when needed. Theme selection is optional, and setup can be repeated from **Settings → Run setup again**.
 
 ## What it does
 
-- Translates your voice into one language, with optional second and third languages.
-- Shows translated VRChat voices in a movable subtitle window.
+- Translates your voice into one to four languages. Additional outputs share the same short VRChat message and add processing time; long messages may be shortened.
+- Lets you choose a continuous recognizer and a separate translation model. Native Nemotron can use your chosen spoken language; existing Voxtral setups retain automatic speech-language detection.
+- Offers a 1.2-second starting pause and optional early messages so friends can read while you keep speaking. Both are easy to change on Home.
+- Optionally shows translated voices from VRChat or another chosen application in a movable subtitle window. Prepare and start subtitles separately when you want them; they are not needed for your microphone translation.
 - Saves names and photos in **People**, with translation counts and clear voice examples. People without a photo get locally generated artwork based on their first confirmed voice example. Choose a picture file or paste an image to override it. Smaller pictures appear beside subtitles.
 - Optionally suggests familiar people as **Maybe [name]** beside subtitles. Confirm with ✓, reject with ✕, or choose a different person. Clear reviewed examples improve later matching; automatic guesses never teach themselves. People shows confirmed and rejected review counts.
 - Offers an optional **Groups** speech model that returns separate attributed text for multiple voices. It can help with overlapping conversation, but does not produce isolated recordings or guarantee that every voice is recovered.
