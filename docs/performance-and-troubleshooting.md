@@ -37,6 +37,12 @@ Larger translation models can improve a phrase but still be slower despite fitti
 
 Normal matching now runs alongside translation rather than delaying text until an identity result arrives. Groups is a different trade-off: attributed multi-voice recognition with roughly 3.5 seconds of first-decode audio buffering, plus inference and translation time. Its optional 7B speech model adds download/memory requirements and is not a proven latency improvement. Switch back to Normal if this delay or resource pressure is unsuitable; save tuned preferences as a custom profile.
 
+## “Nothing appears after starting my voice”
+
+With **Pause when my VRChat mic is muted** on (the default), SayWhat waits for a verified microphone mute state before capturing. Older versions could wait indefinitely when VRChat's log was empty. Version 0.2.2 discovers the current status endpoint without relying on that log and retries if it starts late. A visible waiting message explains this state. If needed, mute and unmute once inside VRChat; also check **OSC → Enabled** there.
+
+The Home checkbox can turn mute-following off. This means SayWhat may capture and send translations even while VRChat itself is muted; it is not a troubleshooting action that should be enabled silently. Translation still stops when VRChat closes.
+
 ## “Typing dots, but no new chat”
 
 The typing indicator is a processing state, not proof of a successful translation or delivered chat packet. Possible reasons include:
