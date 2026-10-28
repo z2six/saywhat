@@ -14,7 +14,7 @@ Click **I speak**, a target-language chip, a speech-model card or a translator c
 
 Pause and early-message changes apply without reloading the speech/translation models. Language or microphone changes may briefly pause new capture while the current sentence finishes, then reconnect it with compatible weights still loaded. Model changes ask for missing downloads before switching; a shared translator change can pause both active directions after confirmation. Stopped features stay stopped when saving choices.
 
-The optional subtitle card has its own source, target, preparation and Start action. Its settings do not need to be configured before using your own voice.
+The optional subtitle card has its own source, target, preparation and Start action. **Speech model & language** opens **They speak**, target and recognition-model choices. Choose **Download & apply** when files are missing, or **Apply subtitle choices** when ready. Its settings do not need to be configured before using your own voice.
 
 ## Translation profiles
 
@@ -22,11 +22,11 @@ Choose a profile at the top of **Settings**, then **Apply profile**. The subtitl
 
 | Preset | Incoming speech | Subtitle settling / stable punctuation | Voxtral lookahead | Familiar-voice matching |
 | --- | --- | --- | --- | --- |
-| Quick | Voxtral | 800 / 250 ms | 160 ms | Off |
-| Normal | Voxtral | 1,200 / 500 ms | 240 ms | On; optional and changeable |
+| Quick | Chosen non-Groups recognizer | 800 / 250 ms | 160 ms when using Voxtral | Off |
+| Normal | Chosen non-Groups recognizer | 1,200 / 500 ms | 240 ms when using Voxtral | On; optional and changeable |
 | Groups | VibeVoice streaming | Keeps current values | Uses the selected streaming model's chunk/lookahead, not the Voxtral value | Keeps the current on/off choice |
 
-Quick and Normal set the microphone final pause to 1,200 ms. Quick also selects Fast translation style. Presets do not replace chosen translation models, target/source languages or appearance. Groups changes the incoming speech engine only; your selected microphone recognizer is unchanged.
+Quick and Normal set the microphone final pause to 1,200 ms. Quick also selects Fast translation style. They preserve the selected subtitle recognizer and spoken language. Groups uses VibeVoice with automatic recognition and remembers the prior non-Groups recognizer/source; returning restores those choices. Translation models, targets and appearance are preserved. Your selected microphone recognizer is unchanged.
 
 **Save current settings as…** captures current app preferences, including models, languages, timing and appearance. It does not copy downloaded files, saved People, voice examples or one-time setup/help acknowledgments. Up to 64 custom profiles are allowed, with unique names of 1–60 characters. **Update saved profile** explicitly replaces its snapshot; changing settings does not silently overwrite it. Built-in presets cannot be renamed or deleted. Deleting an active custom profile keeps its current settings as unsaved custom settings.
 
@@ -36,7 +36,9 @@ Older settings migrate into **Current settings** without applying a new preset. 
 | --- | --- | --- |
 | `ActiveTranslationProfileId` | `normal` | `quick`, `normal`, `groups`, a custom ID, or unsaved `custom`. |
 | `CustomTranslationProfiles` | Empty list | Named settings snapshots, not model/audio copies. |
-| `IncomingSpeechEngine` | `voxtral` | `voxtral` for Quick/Normal; `vibevoice` for Groups. |
+| `IncomingSpeechEngine` | `voxtral` | `voxtral`, `nemotron`, `firered2-ctc` or `firered2-aed` for Quick/Normal; `vibevoice` for Groups. Updates preserve a working existing selection. |
+| `IncomingNormalSpeechEngine` | `voxtral` | Remembers the non-Groups recognizer when switching to Groups and back. |
+| `IncomingNormalSourceLanguage` | `Automatic` | Remembers that recognizer's spoken language when switching to Groups and back. |
 | `VibeVoiceModelId` | `microsoft/VibeVoice-ASR-Streaming-1.5B` | Optional 7B streaming checkpoint is also selectable under Groups model options. |
 | `VibeVoiceEndpoint` | `http://127.0.0.1:8082` | Loopback HTTP only; no credentials, query or fragment. |
 
@@ -49,7 +51,7 @@ Groups preparation requires explicit approval for extra model/runtime downloads.
 | Translate my voice to / `OwnVoiceTargetLanguage` | `Chinese` | Primary VRChat-chat target; Chinese output is Simplified Chinese. |
 | Translate their voices to / `IncomingTargetLanguage` | `English` | Subtitle target, independent of the microphone target. |
 | I speak / `OwnVoiceSourceLanguage` | `English` | Conditions native Nemotron recognition and the translator's source selection. Automatic is available for frequent language switching. Existing Voxtral setups retain automatic ASR; an explicit saved value is only a translation hint there. |
-| Incoming source / `IncomingSourceLanguage` | `Automatic` | Subtitle translation-source hint. Explicit sources are required by Liquid EN–JP and TranslateGemma adapters; this does not pin the incoming Voxtral audio recognizer. |
+| They speak / `IncomingSourceLanguage` | `Automatic` | Subtitle source, independent of I speak. Nemotron sends the chosen language to recognition; Any language sends `auto`. FireRed allows Chinese/English and uses that choice for compatibility and translation context, not a monolingual ASR token. Voxtral and Groups remain automatic at recognition. Specialized text translators may require an explicit source. |
 | Speech recognition / `OwnRecognitionEngine` | `nemotron` | Native Windows streaming recognition. `voxtral` retains the managed WSL path. An old configuration without this field migrates to Voxtral instead of silently replacing its working recognizer. |
 | Translate my voice into more languages / `OwnVoiceAdditionalLanguagesEnabled` | `false` | Enables up to three additional chat targets, not subtitle targets. Home's chips update this choice automatically. |
 | Extra targets / `OwnVoiceAdditionalTargetLanguages` | Empty list | At most three unique supported targets, excluding the primary: four outputs total. One line per successful translation in selected order; extra requests add latency and share the same chat-length budget. |
@@ -63,12 +65,14 @@ Groups preparation requires explicit approval for extra model/runtime downloads.
 
 Supported target names are Chinese, English, Japanese, Korean, Spanish, French, German, Portuguese, Russian and Thai. The catalog's model capabilities may reduce these choices. Thai can be the only chat output or one of up to four ordered outputs; it does not need another Hy-MT2 model download. Liquid remains English/Japanese only. **I speak** guides Nemotron recognition and currently offers the other nine languages, not Thai: the pinned recognizer is not ready to transcribe Thai speech out of the box. Voxtral still detects speech automatically. The advanced **Translation language hint** field for a legacy specialized translator does not change that. The interface explains incompatible model/language pairs rather than silently selecting a different language.
 
+For subtitles, **Any language** requires a compatible multilingual recognizer such as Nemotron. FireRedASR2 Fast and Accurate support Chinese and English, including switching between those languages; their picker deliberately does not offer Any language or Japanese/Korean. Choosing Chinese does not remove real English words from FireRed's transcript. Changing a spoken language refreshes the subtitle session so old buffered audio is not assigned to the new language; changing the incoming model does not change the microphone model. See [speech-model choices](models-and-runtimes.md#choose-a-subtitle-recognizer).
+
 ## Timing, microphone and playback
 
 | Setting / key | Default | Dashboard range / effect |
 | --- | --- | --- |
 | My voice: silence before finalizing / `OwnVoiceEndPauseMilliseconds` | `1200` ms | 900–3,500 ms, 100 ms UI steps. Shorter finalizes earlier but splits natural pauses; longer waits for more context. Actual PCM quiet must reach the threshold. |
-| Other voices: silence before finalizing / `IncomingSettleMilliseconds` | `1200` ms | 600–2,400 ms. Subtitle punctuation/soft limits may commit sooner; see [segmentation](architecture.md). |
+| Other voices: silence before finalizing / `IncomingSettleMilliseconds` | `1200` ms | 600–2,400 ms. Continuous subtitle punctuation/soft limits may commit sooner; FireRed uses quiet time or its bounded section limit. See [segmentation](architecture.md). |
 | Stable subtitle punctuation / `SubtitlePreviewStableMilliseconds` | `500` ms | Stored range 150–1,200 ms; Quick sets 250 ms. Separate from the silence pause. |
 | Recognition lookahead / `RecognitionDelayMilliseconds` | `240` ms | 160, 240, 480 or 800 ms in the picker. Greater Voxtral lookahead adds recognition latency and may help accuracy; it is not the sentence-ending pause or VibeVoice chunk size. |
 | Show translations while I speak / `OwnVoiceSendEarlyPreviews` | `true` | Cumulative submitted chat previews followed by an authoritative final. Off means final-only and fewer speculative translator requests. It does not open/type into the chatbox editor. |
@@ -130,8 +134,8 @@ Setup/help bookkeeping keys are `FirstRunSetupCompleted`, `FirstRunIntroductionC
 | `OwnTranslatorBaseUrl` | `http://localhost:1234/v1` | External my-voice endpoint; managed startup replaces this with its planned loopback endpoint. |
 | `TranslatorBaseUrl` | `http://127.0.0.1:1234/v1` | External incoming endpoint when sharing is off. |
 | `OwnTranslatorModel`, `TranslatorModel` | `tencent/hy-mt2-1.8b` | OpenAI-compatible aliases; may differ from local GGUF filenames. Managed planning sets the catalog aliases. |
-| `DetectAnySourceLanguage` | `true` | Incoming automatic-language behavior. |
-| `SourceLanguages` | `[Chinese]` | Legacy allowed-language preference, relevant when automatic detection is disabled. It is not the translated target language. |
+| `DetectAnySourceLanguage` | `true` | Legacy text-prompt compatibility preference. Use They speak / `IncomingSourceLanguage` for current subtitle selection. This field does not itself configure an audio recognizer. |
+| `SourceLanguages` | `[Chinese]` | Legacy text-prompt allowed-language list. It is neither the subtitle target nor a language-forcing control for FireRed/Voxtral. |
 
 Advanced endpoints must be absolute loopback HTTP(S), without user-info credentials, query strings or fragments. Cloud URLs are refused. A model listed by `/models` is not sufficient if the server supports downloaded-but-unloaded listings: SayWhat? checks known local residency or a positive health acknowledgment rather than knowingly triggering an external just-in-time loader.
 

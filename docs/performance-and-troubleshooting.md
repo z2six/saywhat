@@ -63,13 +63,30 @@ The source can fail before translation: wrong capture route, VRChat moved to ano
 
 The incoming service logs captured versus sent bytes, audio levels/gain, transcript counts, voice/transcript ages, backlog and recovery attempts. This distinguishes no audio, audio without meaningful recognition, and text waiting on translation. Speech/device workers are supervised and reconnect after failure, but recurring recovery means a problem still exists. Version 0.1.23 rearms bounded retries after a cooldown and keeps an active warning until useful recognition text returns; empty output, duplicate snapshots and decoder-reset messages do not establish recovery.
 
-Queues are intentionally bounded. The Voxtral incoming audio backlog retains recent speech and drops stale chunks. The eight-item translation queue keeps committed sentences with backpressure and a visible catching-up state; obsolete draft revisions can be skipped. The separate identity queue may discard old optional matching work without discarding its translation. Groups buffering also reports overload rather than silently accumulating unbounded audio. These bounds cannot make an overloaded pipeline keep up or restore audio already lost.
+Queues are intentionally bounded. Continuous incoming audio retains recent speech and drops stale chunks. FireRed's section queue keeps at most three finished sections and the newest draft; an overload warning reports skipped old sections. The eight-item translation queue keeps committed sentences with backpressure and a visible catching-up state; obsolete draft revisions can be skipped. The separate identity queue may discard old optional matching work without discarding its translation. Groups buffering also reports overload rather than silently accumulating unbounded audio. These bounds cannot make an overloaded pipeline keep up or restore audio already lost.
+
+If FireRed is falling behind, compare **FireRedASR2 · Fast** against **Accurate** before shortening every pause. Accurate has an extra decoder and costs more processing. This implementation uses CPU, so free GPU memory alone is not evidence that it can decode faster. Its short-section waits, computation and text translation are separate costs. Normal/Quick source choices are remembered when returning from Groups; switching to Normal does not silently discard a chosen FireRed/Nemotron model.
+
+## “Chinese subtitles use the wrong words”
+
+1. On **Home**, choose **Speech model & language** on the subtitle card.
+2. Under **They speak**, choose **Chinese**. Choose **FireRedASR2 · Fast** as a Chinese/English specialist, or compare **Accurate** if Fast misses important words.
+3. Choose **Download & apply**, or **Apply subtitle choices** if the files are ready. Preparing files keeps stopped subtitles stopped; choose Start when needed.
+4. Compare the source words with the English translation. Wrong source words need recognition work; a correct Chinese transcript with poor English wording points to the translator.
+
+FireRedASR2 is bilingual. Selecting Chinese chooses compatible recognition and translation context, but does not force a hidden Chinese-only decoding token. Real English words in the conversation are still valid. For a multilingual room, choose **Any language** with **Nemotron** instead. Its explicit Chinese selection reaches the recognizer itself when you know the conversation's language. Choosing an incorrect forced language can make results worse.
+
+FireRed's upstream system is called [FireRedASR2S](https://github.com/FireRedTeam/FireRedASR2S). The [CTC/AED models used here](https://k2-fsa.github.io/sherpa/onnx/FireRedAsr/pretrained.html) do not separate overlapping voices. Use the optional Groups route to compare attributed multi-voice recognition, accepting its additional buffering and different model. Person matching only attaches familiar names; it cannot reconstruct words missing from the recognition transcript.
+
+Subtitle model/source choices do not change **I speak** or the microphone recognizer. No separate speech application is needed for FireRed or Nemotron subtitles, and their preparation does not require setting up the legacy WSL speech component.
 
 ## “Wrong language or poor word choice”
 
 Check the **direction's target language**, not the app's interface language. My voice and subtitles have independent targets. Check whether a shared specialized model supports **both** selected directions. Liquid EN–JP cannot translate Chinese; TranslateGemma requires explicit source selection and a compatible managed template.
 
 For your microphone, **I speak** and the two model roles are directly on Home. Nemotron uses the chosen language for recognition; Automatic is useful when you switch languages. Voxtral remains automatic at the speech stage, even if an older configuration has an explicit translation hint. Do not assume switching a translator also changes the recognizer.
+
+For subtitles, **They speak** and the recognition model are under **Home → Speech model & language**. Choose a source supported by the speech model. FireRed is Chinese/English only; a translator supporting Japanese or Korean does not extend its audio-recognition languages. Existing Voxtral selections remain automatic until you deliberately choose another recognizer.
 
 Inspect source recognition separately from translation. A glossary such as a product-name mapping helps only if a relevant recognizable source term is present; it cannot correct missing audio or restore words that were never transcribed. Wrong-script subtitle output can be rejected and retried, adding delay. A larger translator is only a plausible remedy when the source transcript is already useful.
 

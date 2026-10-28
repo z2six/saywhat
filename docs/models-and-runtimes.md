@@ -7,7 +7,8 @@
 | Task | Current component | Input → output |
 | --- | --- | --- |
 | Speech recognition: microphone default | Nemotron 3.5 ASR Streaming 0.6B, Q8_0, native Windows | Audio → source text, guided by I speak |
-| Speech recognition: legacy microphone and Quick/Normal subtitles | Voxtral Mini 4B Realtime 2602 Q4_K_M | Audio → automatically detected source text |
+| Speech recognition: Quick/Normal subtitles | Selectable Nemotron, FireRedASR2 Fast/Accurate, or legacy Voxtral | Playback audio → source text |
+| Speech recognition: legacy microphone | Voxtral Mini 4B Realtime 2602 Q4_K_M | Audio → automatically detected source text |
 | Speech recognition: optional Groups subtitles | VibeVoice ASR Streaming 1.5B or 7B | Mixed audio → text attributed to temporary voices |
 | Translation | Selected local GGUF translator | Source text → chosen language |
 | Optional voice recognition | Compatible sherpa-onnx voice-embedding model | Clear audio sample → fingerprint for matching |
@@ -61,21 +62,47 @@ The managed server uses a 4,096-token context (2,048 for TranslateGemma), one pa
 
 ## Speech runtimes
 
+### Choose a subtitle recognizer
+
+On **Home**, choose **Speech model & language** on the subtitle card. Set **They speak** and the subtitle target, choose a speech model, then **Download & apply**. If its files are already prepared, the button reads **Apply subtitle choices**. Preparing files does not start subtitles; use their Start button when ready. These choices do not replace the microphone recognizer or its language.
+
+| Subtitle speech choice | Input languages | Local runtime | Approximate speech-model download |
+| --- | --- | --- | --- |
+| Nemotron | Automatic or an explicit supported language, including Chinese, English, Japanese and Korean | Native Windows Vulkan | 742 MB |
+| FireRedASR2 · Fast (`firered2-ctc`) | Chinese or English selection; bilingual speech is supported | Native Windows CPU, two processing threads | 776 MB |
+| FireRedASR2 · Accurate (`firered2-aed`) | Chinese or English selection; bilingual speech is supported | Native Windows CPU, two processing threads | 1.23 GB |
+| Voxtral | Any language through automatic detection | Managed WSL2 speech component | 2.90 GB |
+| VibeVoice | Automatic detection in Groups | Managed WSL2 Groups component | See Groups below |
+
+For **Any language**, choose a compatible multilingual model such as Nemotron. FireRed's Chinese/English recognition is not arbitrary-language detection; it is unavailable for Japanese/Korean input or the Any language choice. Its explicit source setting selects a compatible specialist and supplies context to text translation. It does **not** insert an unsupported language-forcing token into FireRed. Chinese speech containing English words is still decoded bilingually.
+
+The app preserves existing Voxtral subtitle selections on update. Choosing a different recognizer is explicit. Normal and Quick remember the selected non-Groups recognizer and source language; switching to Groups uses VibeVoice, and returning restores those choices. Custom profiles can store a complete alternative configuration.
+
+### FireRedASR2: Chinese/English subtitle options
+
+[FireRedASR2S](https://github.com/FireRedTeam/FireRedASR2S) is the upstream system name. SayWhat? uses its second-generation recognition models through [sherpa-onnx's documented CTC and AED conversions](https://k2-fsa.github.io/sherpa/onnx/FireRedAsr/pretrained.html). These are segment recognizers, not a stateful streaming decoder. The app continuously captures playback and processes bounded growing sections to provide live subtitles.
+
+Fast uses the CTC branch. Accurate adds an attention decoder and needs more computation; its name does not guarantee better results on every voice. Both are int8 ONNX conversions, downloaded from pinned revisions with expected file sizes and SHA-256 verification. They run in the app on CPU with two processing threads; no Python, WSL, separate server or additional GPU model is needed for this route. Downloaded weights still consume system memory when loaded.
+
+Changing the FireRed source language does not force its recognizer into a monolingual mode: the [upstream recognition API](https://github.com/FireRedTeam/FireRedASR2S/blob/main/fireredasr2s/fireredasr2/asr.py) exposes no such language/prompt parameter. The Chinese/English choice remains useful for selecting the right model and the translator's source context. Neither FireRed variant identifies saved People or extracts separate voices from simultaneous speech; those are distinct tasks.
+
+Short audio sections, recognition computation, text translation and display all contribute to delay. A speech-model download size or a single offline decode timing is not an in-game latency estimate. Compare Fast and Accurate on the voices you actually hear before choosing the larger option.
+
 ### Native Windows: new-install microphone default
 
-The microphone's native option uses [NVIDIA NeMo-Speech.cpp](https://github.com/NVIDIA/NeMo-Speech.cpp) with **Nemotron 3.5 ASR Streaming 0.6B**. Its current Windows Vulkan runtime is about 19.3 MB and the Q8_0 speech model about 742 MB. Downloads use an exact runtime release, model revision, expected size and SHA-256. This path does not require WSL or a separate speech application.
+The microphone's native option, also selectable independently for subtitles, uses [NVIDIA NeMo-Speech.cpp](https://github.com/NVIDIA/NeMo-Speech.cpp) with **Nemotron 3.5 ASR Streaming 0.6B**. Its current Windows Vulkan runtime is about 19.3 MB and the Q8_0 speech model about 742 MB. Downloads use an exact runtime release, model revision, expected size and SHA-256. This path does not require WSL or a separate speech application.
 
 **I speak** supplies the native recognizer's source language. Chinese, English, Japanese and Korean are among the exposed choices; Automatic is available too. Availability is not a language-specific accuracy or in-game latency guarantee. Native speech and the selected translator still consume resources alongside VRChat.
 
 Existing settings without a recognizer field remain on Voxtral. Changing to native is a visible choice, not a silent migration that replaces a working engine. A retained explicit source language for an old Voxtral/TranslateGemma pairing is a translation hint only; it does not condition Voxtral recognition.
 
-### Legacy Voxtral and normal subtitles
+### Legacy Voxtral
 
 SayWhat? uses [MrShitFox/voxtral.cpp](https://github.com/MrShitFox/voxtral.cpp), pinned to commit `3d1ed513debc88b4a383ad83e0cd0bcb84889a60` with application-local changes. The model is the **Realtime** variant, not offline Voxtral Mini. Its Q4_K_M download is about 2.90 GB.
 
-This engine runs under WSL2 Ubuntu. Setup installs/builds its speech component after consent; NVIDIA setup selects the managed CUDA path where supported, while other/manual configurations can use registered supported backends. These extra requirements apply to this selected engine or optional subtitles, not to the default native microphone route. Native Windows translation acceleration and WSL speech acceleration are **separate choices**. A Windows Vulkan translator working does not prove that WSL Vulkan speech works.
+This engine runs under WSL2 Ubuntu. Setup installs/builds its speech component after consent; NVIDIA setup selects the managed CUDA path where supported, while other/manual configurations can use registered supported backends. These extra requirements apply to this selected engine and Groups, not to native Nemotron or FireRed subtitles. Native Windows translation acceleration and WSL speech acceleration are **separate choices**. A Windows Vulkan translator working does not prove that WSL Vulkan speech works.
 
-Running both directions needs independent recognition services: the selected microphone recognizer plus incoming Voxtral or VibeVoice. Optional subtitle preparation is separate from initial own-voice setup. Model file size understates live memory requirements. Normal Stop/Quit releases app-owned instances; it does not remove cached weights.
+Running both directions needs independent recognition state: the selected microphone recognizer plus the selected incoming recognizer. Selecting Nemotron for both uses independent service instances, although their downloaded files are reused. FireRed inference runs inside the subtitle service. Optional subtitle preparation is separate from initial own-voice setup. Model file size understates live memory requirements. Normal Stop/Quit releases app-owned instances; it does not remove cached weights.
 
 ### Optional Groups runtime
 
