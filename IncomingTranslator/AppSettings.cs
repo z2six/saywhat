@@ -298,6 +298,11 @@ internal static partial class SettingsStore
 
     public static void Save(AppSettings settings) => Save(settings, applyingProfile: false);
 
+    // Home explicitly applies a staged person-recognition choice. Keep all the
+    // other independently saved window/privacy preferences protected.
+    internal static void SaveExplicitSpeakerRecognitionSelection(AppSettings settings) =>
+        Save(settings, applyingProfile: false, preserveSpeakerRecognition: false);
+
     // A deliberate profile selection must apply its editable preferences. Normal
     // saves retain the stale-window protections used by live overlay controls.
     internal static void SaveTranslationProfileSelection(AppSettings settings) => Save(settings, applyingProfile: true);
@@ -312,7 +317,7 @@ internal static partial class SettingsStore
         });
     }
 
-    private static void Save(AppSettings settings, bool applyingProfile)
+    private static void Save(AppSettings settings, bool applyingProfile, bool preserveSpeakerRecognition = true)
     {
         lock (SettingsGate)
         {
@@ -327,7 +332,7 @@ internal static partial class SettingsStore
                     var latest = JsonNode.Parse(File.ReadAllText(AppPaths.SettingsPath)) as JsonObject;
                     if (!applyingProfile && latest?[nameof(AppSettings.SubtitlesAlwaysOnTop)] is JsonValue pin && pin.TryGetValue<bool>(out bool pinned))
                         settings.SubtitlesAlwaysOnTop = pinned;
-                    if (!applyingProfile && latest?[nameof(AppSettings.UseAiSpeakerRecognition)] is JsonValue recognition && recognition.TryGetValue<bool>(out bool enabled))
+                    if (!applyingProfile && preserveSpeakerRecognition && latest?[nameof(AppSettings.UseAiSpeakerRecognition)] is JsonValue recognition && recognition.TryGetValue<bool>(out bool enabled))
                         settings.UseAiSpeakerRecognition = enabled;
                     if (!applyingProfile && latest?[nameof(AppSettings.UiLanguage)] is JsonValue language && language.TryGetValue<string>(out string? code))
                         settings.UiLanguage = UiLanguagePreference.Normalize(code);

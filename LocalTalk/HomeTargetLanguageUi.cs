@@ -120,18 +120,12 @@ internal sealed partial class MainWindow
         {
             language = AppSettings.CanonicalTranslationLanguage(language)
                 ?? throw new ModelSelectionUserException("Choose a language supported by the selected model.");
-            if (_preview)
-            {
-                if (!TranslationModelCapabilities.SupportedTargets(HomeTranslationAlias(_settings, incoming),
-                    incoming ? _settings.IncomingSourceLanguage : _settings.OwnVoiceSourceLanguage).Contains(language))
-                    throw new ModelSelectionUserException("Choose a language supported by the selected model.");
-            }
-            else
-            {
-                AppSettings saved = SettingsStore.SaveHomeTargetLanguagePreference(incoming, language);
-                language = incoming ? saved.IncomingTargetLanguage : saved.OwnVoiceTargetLanguage;
-                _savedSetupSelection = SetupSelection.Capture(saved);
-            }
+            // A Home language choice is a draft until its explicit Apply action.
+            // Validate against the visible model draft, never save a different
+            // persisted selection as a side effect of choosing a language.
+            if (!TranslationModelCapabilities.SupportedTargets(HomeTranslationAlias(_settings, incoming),
+                incoming ? _settings.IncomingSourceLanguage : _settings.OwnVoiceSourceLanguage).Contains(language))
+                throw new ModelSelectionUserException("Choose a language supported by the selected model.");
             if (incoming) _settings.IncomingTargetLanguage = language;
             else
             {
@@ -141,8 +135,8 @@ internal sealed partial class MainWindow
             }
             CloseHomeTargetLanguagePicker();
             Navigate("Home");
-            UiLocalization.SetText(_status, "Translation language saved.");
-            RefreshSaveState(reloadSaved: !_preview);
+            UiLocalization.SetText(_status, "Unsaved changes");
+            RefreshSaveState();
             return true;
         }
         catch (Exception error)

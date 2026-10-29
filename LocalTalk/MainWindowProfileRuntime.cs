@@ -75,10 +75,15 @@ internal sealed partial class MainWindow
         await ApplyTranslationSettingsAsync(candidate, applyingProfile: true);
     }
 
-    private async Task ApplyTranslationSettingsAsync(AppSettings candidate, bool applyingProfile)
+    private async Task ApplyTranslationSettingsAsync(AppSettings candidate, bool applyingProfile, bool applySpeakerRecognition = false)
     {
         if (_preview || _busy || _closing) return;
         AppSettings previous = SettingsStore.Load();
+        candidate = candidate.Copy();
+        // Only an explicit recognition edit may replace an independently saved
+        // on/off choice. Preserve it before validation and restart planning too.
+        if (!applyingProfile && !applySpeakerRecognition)
+            candidate.UseAiSpeakerRecognition = previous.UseAiSpeakerRecognition;
         try
         {
             ValidateTranslationSettingsForWindows(candidate, _runtime.IncomingRunning, SubtitleWindowsVersion);
@@ -114,7 +119,7 @@ internal sealed partial class MainWindow
             await PrepareTranslationProfileAssetsAsync(candidate, token);
             token.ThrowIfCancellationRequested();
             TranslationProfiles.CopyInto(candidate, _settings);
-            try { await ApplySettingsCoreAsync(own, incoming, token, applyingProfile, previous); }
+            try { await ApplySettingsCoreAsync(own, incoming, token, applyingProfile, previous, applySpeakerRecognition); }
             catch
             {
                 // Preserve the user's draft when preparation/commit never completed;

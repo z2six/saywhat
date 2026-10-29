@@ -3,6 +3,18 @@
 Installers, full notes and matching source archives are on
 [GitHub Releases](https://github.com/z2six/saywhat/releases).
 
+## 0.2.10
+
+- Home choices now stay selected without switching or reloading models until
+  you choose Apply. Languages, models, microphone and message timing can be
+  changed together.
+- Added a clear My voice apply action and an explicit Apply & start action for
+  pending choices when voice translation is stopped.
+- Made Home’s optional person-recognition switch part of the subtitle draft;
+  ordinary Settings and People controls retain their explicit immediate actions.
+- Kept cancelled choices available for retry and preserved independent drafts
+  and live overlay preferences during scoped applies.
+
 ## 0.2.9
 
 - Clarified that optional person recognition uses a separate small CPU model,

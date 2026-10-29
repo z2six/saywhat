@@ -4,7 +4,10 @@
 
 Subtitles translate the voices you hear. They are optional and start separately
 from your microphone-to-VRChat translation. On **Home**, choose what to listen to,
-the spoken language, subtitle language and speech model, then start subtitles.
+the spoken language, subtitle language and models, then choose **Apply subtitle
+choices** (or **Download & apply**). Start subtitles when ready. These choices,
+including Home's person-recognition toggle, stay pending until you apply them;
+they do not restart models while you select options.
 
 By default, subtitles wait for a completed sentence or bounded section. **Show
 early translations** is optional: it can display a translation before the sentence

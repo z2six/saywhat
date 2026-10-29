@@ -64,6 +64,8 @@ The recommended starting model is **Hy-MT2 1.8B**, chosen to leave more room for
 
 Start and stop translation from the dashboard. Detailed audio, model and troubleshooting options are under **Advanced**.
 
+Home choices stay pending while you edit. Use **Apply changes** or **Download & apply** on your voice card, and **Apply subtitle choices** on the subtitle card. **Apply & start** can save pending own-voice choices and start when stopped. Home's mute-following and person-recognition checkboxes are staged too. **Save & apply** elsewhere saves all pending choices; Start/Stop remain direct actions. Appearance and interface-language changes keep their immediate behavior.
+
 The interface-language picker is at the bottom of the sidebar, above the version number. Changes apply without restarting translation. This does not change either translation language or load a model. Existing saved interface choices are kept on updates unless an explicitly chosen installer launch applies a new choice. Shared installations provide a default for new profiles without editing other users' settings.
 
 - **Home**: start your voice, subtitles or both. **Stop all** stops translation and releases the app's own models without closing VRChat.

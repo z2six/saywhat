@@ -14,7 +14,7 @@ internal sealed partial class MainWindow
         var page = Page("");
         var voice = new StackPanel();
         var heading = new DockPanel { LastChildFill = true };
-        _ownVoiceTourTarget = VoiceFirstButton(_runtime.OwnRunning ? "Stop my voice" : "Start translating my voice",
+        _ownVoiceTourTarget = VoiceFirstButton(_runtime.OwnRunning ? "Stop my voice" : HasPendingHomeOwnVoiceChoices() ? "Apply & start" : "Start translating my voice",
             async (_, _) => await ToggleVoiceFirstOwnAsync(), primary: true);
         _ownVoiceTourTarget.Name = "OwnVoiceStartButton";
         _ownVoiceTourTarget.MinWidth = 190;
@@ -111,11 +111,11 @@ internal sealed partial class MainWindow
         {
             int value = milliseconds;
             string seconds = (milliseconds / 1000d).ToString("0.0", System.Globalization.CultureInfo.CurrentUICulture) + " s";
-            var choice = VoiceFirstButton(seconds, async (_, _) =>
+            var choice = VoiceFirstButton(seconds, (_, _) =>
             {
                 if (!CanEditVoiceFirst()) return;
                 _settings.OwnVoiceEndPauseMilliseconds = value;
-                await ApplyVoiceFirstUiChangeAsync();
+                RefreshHomeOwnVoiceChoices();
             }, literal: true);
             choice.Name = "HomePause" + milliseconds;
             choice.Tag = value; choice.MinHeight = 30; choice.Padding = new Thickness(9, 5, 9, 5);
@@ -141,6 +141,7 @@ internal sealed partial class MainWindow
         previews.Unchecked += async (_, _) => await SetVoiceFirstEarlyAsync(false);
         voice.Children.Add(previews);
         voice.Children.Add(VoiceFirstLabel("On: chat updates as you speak. Off: send only after the pause.", 11, ModernTheme.Muted));
+        AppendHomeOwnVoiceApply(voice);
         var ownCard = ModernTheme.Card(voice); ownCard.Name = "HomeOwnVoiceCard";
         ownCard.Background = ModernTheme.Hero; ownCard.BorderBrush = ModernTheme.HeroStroke;
         ownCard.Padding = new Thickness(20); page.Children.Add(ownCard);
@@ -178,11 +179,11 @@ internal sealed partial class MainWindow
         {
             string value = language;
             bool supported = recognizer.SupportsSource(language);
-            var button = VoiceFirstButton(UiText.T(language), async (_, _) =>
+            var button = VoiceFirstButton(UiText.T(language), (_, _) =>
             {
                 if (!CanEditVoiceFirst() || !recognizer.SupportsSource(value)) return;
                 _settings.OwnVoiceSourceLanguage = value;
-                await ApplyVoiceFirstUiChangeAsync(requireOwnRestart: true);
+                RefreshHomeOwnVoiceChoices();
             }, literal: true);
             button.Tag = value;
             button.Background = value == _settings.OwnVoiceSourceLanguage ? ModernTheme.Selection : ModernTheme.Raised;
@@ -207,10 +208,10 @@ internal sealed partial class MainWindow
             string value = language;
             bool selected = current.Contains(value);
             int index = current.ToList().IndexOf(value);
-            var button = VoiceFirstButton((selected ? (index + 1) + " · " : "+ ") + UiText.T(value), async (_, _) =>
+            var button = VoiceFirstButton((selected ? (index + 1) + " · " : "+ ") + UiText.T(value), (_, _) =>
             {
                 if (!CanEditVoiceFirst() || !ToggleVoiceFirstTarget(_settings, value)) return;
-                await ApplyVoiceFirstUiChangeAsync(requireOwnRestart: true);
+                RefreshHomeOwnVoiceChoices();
             }, literal: true);
             button.Tag = value; button.Background = selected ? ModernTheme.Selection : ModernTheme.Raised;
             button.BorderBrush = selected ? ModernTheme.Accent : ModernTheme.Stroke;
@@ -294,11 +295,11 @@ internal sealed partial class MainWindow
             SelectedItem = choices.First(choice => choice.Id == _settings.OwnMicrophoneDeviceId),
             IsEnabled = CanEditVoiceFirst(), MinHeight = 34, Margin = new Thickness(0, 0, 0, 6)
         };
-        picker.SelectionChanged += async (_, _) =>
+        picker.SelectionChanged += (_, _) =>
         {
             if (!CanEditVoiceFirst() || picker.SelectedItem is not VoiceFirstMicrophoneChoice choice) return;
             _settings.OwnMicrophoneDeviceId = choice.Id;
-            await ApplyVoiceFirstUiChangeAsync(requireOwnRestart: true);
+            RefreshHomeOwnVoiceChoices();
         };
         UiLocalization.Literal(picker); AutomationProperties.SetName(picker, VoiceFirstText.T("Microphone"));
         return picker;
@@ -308,46 +309,85 @@ internal sealed partial class MainWindow
 
     private bool CanEditVoiceFirst() => !_busy && !_closing;
 
-    private async Task ApplyVoiceFirstUiChangeAsync(bool requireOwnRestart = false)
+    private void RefreshHomeOwnVoiceChoices()
     {
         RefreshSaveState();
-        if (_preview) { Navigate("Home"); return; }
-        await ApplyVoiceFirstChangeAsync(requireOwnRestart);
+        if (!_closing && _page == "Home") Navigate("Home");
     }
 
-    private async Task SetVoiceFirstEarlyAsync(bool value)
+    private Task SetVoiceFirstEarlyAsync(bool value)
     {
-        if (!CanEditVoiceFirst()) return;
+        if (!CanEditVoiceFirst()) return Task.CompletedTask;
         _settings.OwnVoiceSendEarlyPreviews = value;
-        await ApplyVoiceFirstUiChangeAsync();
+        RefreshHomeOwnVoiceChoices();
+        return Task.CompletedTask;
     }
 
-    private async Task SetVoiceFirstFollowVrchatMuteAsync(bool value)
+    private Task SetVoiceFirstFollowVrchatMuteAsync(bool value)
     {
-        if (!CanEditVoiceFirst()) return;
+        if (!CanEditVoiceFirst()) return Task.CompletedTask;
         _settings.OwnVoicePauseWhenVrchatMuted = value;
-        await ApplyVoiceFirstUiChangeAsync();
+        RefreshHomeOwnVoiceChoices();
+        return Task.CompletedTask;
     }
 
-    private async Task SelectVoiceFirstRecognitionAsync(string id)
+    private Task SelectVoiceFirstRecognitionAsync(string id)
     {
-        if (!CanEditVoiceFirst() || !OwnRecognitionCatalog.Choices.Any(choice => choice.Id == id && choice.SupportsSource(_settings.OwnVoiceSourceLanguage))) return;
+        if (!CanEditVoiceFirst() || !OwnRecognitionCatalog.Choices.Any(choice => choice.Id == id && choice.SupportsSource(_settings.OwnVoiceSourceLanguage))) return Task.CompletedTask;
         _settings.OwnRecognitionEngine = id;
-        RefreshSaveState();
-        if (_preview) { Navigate("Home"); return; }
-        await ApplyVoiceFirstModelChangeAsync();
+        RefreshHomeOwnVoiceChoices();
+        return Task.CompletedTask;
     }
 
-    private async Task SelectVoiceFirstTranslationAsync(string id)
+    private Task SelectVoiceFirstTranslationAsync(string id)
     {
-        if (!CanEditVoiceFirst()) return;
+        if (!CanEditVoiceFirst()) return Task.CompletedTask;
         ProvisionModelChoice? choice = LocalTalkProvisioner.ModelCatalog.FirstOrDefault(model => model.Id == id && model.Role == ProvisionModelRole.Translation);
-        if (choice is null || TranslationModelCapabilities.Validate(choice.ApiAlias, _settings.OwnVoiceSourceLanguage, _settings.EffectiveOwnVoiceTargetLanguages()) is not null) return;
+        if (choice is null || TranslationModelCapabilities.Validate(choice.ApiAlias, _settings.OwnVoiceSourceLanguage, _settings.EffectiveOwnVoiceTargetLanguages()) is not null) return Task.CompletedTask;
         _settings.UseManagedTranslator = true;
         _settings.OwnManagedModelId = id;
-        RefreshSaveState();
-        if (_preview) { Navigate("Home"); return; }
-        await ApplyVoiceFirstModelChangeAsync();
+        RefreshHomeOwnVoiceChoices();
+        return Task.CompletedTask;
+    }
+
+    private bool HasPendingHomeOwnVoiceChoices()
+    {
+        AppSettings saved = HomeOwnVoiceSavedSettings();
+        return !TranslationProfiles.ConfigurationEquals(VoiceFirstCandidate(saved, saved, includeModels: true),
+            VoiceFirstCandidate(saved, _settings, includeModels: true));
+    }
+
+    private AppSettings HomeOwnVoiceSavedSettings()
+    {
+        try { return ReadVoiceFirstSavedSettings(); }
+        catch (Exception error) when (error is System.IO.IOException or UnauthorizedAccessException or System.Text.Json.JsonException or ArgumentException)
+        { return _saveStateAppliedSettings?.Copy() ?? _settings.Copy(); }
+    }
+
+    private void AppendHomeOwnVoiceApply(StackPanel voice)
+    {
+        bool changed = HasPendingHomeOwnVoiceChoices();
+        bool download = false;
+        if (changed)
+        {
+            try
+            {
+                AppSettings candidate = VoiceFirstCandidate(HomeOwnVoiceSavedSettings(), _settings, includeModels: true);
+                download = MissingVoiceFirstDownloadBytes(candidate) > 0 ||
+                    candidate.OwnRecognitionEngine == "voxtral" && _provisioner.SpeechRegistration is null;
+            }
+            catch (ArgumentException) { /* Apply reports the exact incompatible model/language selection. */ }
+        }
+        var state = VoiceFirstLabel(changed ? "Not applied yet" : "Current selection", 12, changed ? ModernTheme.Warning : ModernTheme.Good);
+        state.Name = "HomeOwnVoiceSelectionState"; voice.Children.Add(state);
+        var apply = VoiceFirstButton(download ? "Download & apply" : "Apply changes", async (_, _) => await ApplyVoiceFirstModelChangeAsync());
+        apply.Name = "ApplyHomeOwnVoiceChoicesButton"; apply.IsEnabled = CanEditVoiceFirst() && changed;
+        apply.Background = apply.IsEnabled ? ModernTheme.Accent : ModernTheme.Raised;
+        apply.Foreground = apply.IsEnabled ? ModernTheme.Ink : ModernTheme.Muted;
+        voice.Children.Add(apply);
+        voice.Children.Add(VoiceFirstLabel(_runtime.OwnRunning
+            ? "Choose everything first, then apply once. Your current translation keeps running until you apply."
+            : "Choose everything first, then apply once. Applying does not start your microphone.", 11, ModernTheme.Muted));
     }
 
     private async Task ToggleVoiceFirstOwnAsync()

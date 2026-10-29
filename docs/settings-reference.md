@@ -10,11 +10,13 @@ The persisted application settings file is `vrchat-translation-settings.json` in
 
 ## Everyday voice controls on Home
 
-Click **I speak**, a target-language chip, a speech-model card or a translator card directly. Model choices show short explanations instead of hiding their names in an unlabeled dropdown. The microphone follows the Windows default unless you select another device.
+Choose **I speak**, target-language chips, a speech-model card or a translator card directly. These edits stay pending together; clicking a choice does not save it, download a model or restart translation. The microphone follows the Windows default unless you select another device.
 
-Pause and early-message changes apply without reloading the speech/translation models. Language or microphone changes may briefly pause new capture while the current sentence finishes, then reconnect it with compatible weights still loaded. Model changes ask for missing downloads before switching; a shared translator change can pause both active directions after confirmation. Stopped features stay stopped when saving choices.
+Use the own-voice card's **Apply changes**, or **Download & apply** when files are missing. When stopped, **Apply & start** can explicitly save pending own-voice choices and begin translation. **Start** and **Stop** remain direct actions. There is no timed auto-apply while you select settings.
 
-The optional subtitle card has its own source, target, preparation and Start action. **Speech model & language** opens **They speak**, target and recognition-model choices. Choose **Download & apply** when files are missing, or **Apply subtitle choices** when ready. Its settings do not need to be configured before using your own voice.
+After applying, timing, early-message and mute-following changes can retain the loaded models. Language or microphone changes may briefly pause capture; model changes prepare missing files before switching. A shared translator change can pause both active directions after confirmation. Applying choices alone keeps stopped features stopped.
+
+The optional subtitle card has its own **Apply subtitle choices** and Start actions. Its source, target, models, timing and person-recognition toggle are staged separately from microphone choices. Use **Download & apply** when files are missing. These settings do not need to be configured before using your own voice. **Save & apply** elsewhere in the app applies all pending drafts; the per-card Home actions apply only that direction's choices. Appearance, interface-language and direct recognition switches outside Home keep their immediate behavior.
 
 ## Translation profiles
 
@@ -53,7 +55,7 @@ Groups preparation requires explicit approval for extra model/runtime downloads.
 | I speak / `OwnVoiceSourceLanguage` | `English` | Conditions native Nemotron recognition and the translator's source selection. Automatic is available for frequent language switching. Existing Voxtral setups retain automatic ASR; an explicit saved value is only a translation hint there. |
 | They speak / `IncomingSourceLanguage` | `Automatic` | Subtitle source, independent of I speak. Nemotron sends the chosen language to recognition; Any language sends `auto`. FireRed allows Chinese/English and uses that choice for compatibility and translation context, not a monolingual ASR token. Voxtral and Groups remain automatic at recognition. Specialized text translators may require an explicit source. |
 | Speech recognition / `OwnRecognitionEngine` | `nemotron` | Native Windows streaming recognition. `voxtral` retains the managed WSL path. An old configuration without this field migrates to Voxtral instead of silently replacing its working recognizer. |
-| Translate my voice into more languages / `OwnVoiceAdditionalLanguagesEnabled` | `false` | Enables up to three additional chat targets, not subtitle targets. Home's chips update this choice automatically. |
+| Translate my voice into more languages / `OwnVoiceAdditionalLanguagesEnabled` | `false` | Enables up to three additional chat targets, not subtitle targets. Home's chips stage the ordered choices until you apply them. |
 | Extra targets / `OwnVoiceAdditionalTargetLanguages` | Empty list | At most three unique supported targets, excluding the primary: four outputs total. One line per successful translation in selected order; extra requests add latency and share the same chat-length budget. |
 | Use the same model for both directions / `ShareTranslationModel` | `true` | One loaded model/endpoint for both directions. No shared conversation history. |
 | Built-in translator / `UseManagedTranslator` | `true` in packaged app | Managed local runtime and downloads. Advanced external mode requires an already-running loopback server. |
@@ -102,7 +104,7 @@ hallucinated Chinese may pass. It is not a guarantee of audio-language detection
 | Show early translations / `IncomingSendEarlyPreviews` | `false` | Off translates completed subtitle sections. Opting in can show and revise a translation before its section is finished. This is independent of microphone preview delivery. |
 | Microphone / `OwnMicrophoneDeviceId` | `default` | Follows the Windows default capture device. The picker can save another microphone's unique display name; ambiguous or missing devices are not silently replaced by an unrelated one. |
 | Finish captured speech after muting / `FinishCapturedSentenceOnMute` | `true` | New mic capture stops immediately; already-captured work may finish with one authorized final. False discards unfinished work. |
-| Pause when my VRChat mic is muted / `OwnVoicePauseWhenVrchatMuted` | `true` | Home checkbox; applies live without reloading models. On follows verified VRChat mute state and keeps capture closed while state is unknown. Off explicitly allows SayWhat to capture and send translations while your VRChat mic is muted. Capture still stops when VRChat closes. Finish-captured-speech behavior applies when following mute is on. |
+| Pause when my VRChat mic is muted / `OwnVoicePauseWhenVrchatMuted` | `true` | Home stages this with the other own-voice choices. **Apply changes** updates it without reloading models. On follows verified VRChat mute state and keeps capture closed while state is unknown. Off explicitly allows capture and translated chat while the VRChat mic is muted. Capture still stops when VRChat closes. Finish-captured-speech behavior applies when following mute is on. |
 | Listen to / `IncomingAudioMode` | `vrchat` after normalization | `vrchat`, `application` or `desktop`. Choose an application with the searchable picker, or explicitly opt into All playback. A selected app closing pauses that capture rather than falling back to other apps. |
 | Selected application / `IncomingApplicationPath`, `IncomingApplicationName` | Empty | Saves the chosen executable and display label, not a permanent process ID. An updated executable path may require selecting the application again. |
 | Just one person / `IncomingSinglePerson`, `IncomingPersonId` | `false`, empty | Assigns subtitles to a selected saved person and bypasses automatic fingerprint matching. It does not teach a voice example by itself. |
@@ -118,7 +120,7 @@ These pauses exclude subsequent recognition-final drain, translator queue/comput
 
 | Setting / key | Default | Range / behavior |
 | --- | --- | --- |
-| Voice recognition / `UseAiSpeakerRecognition` | `true` | Optional local CPU identity model; loading is deferred until subtitles need a clear speech sample. Background matching does not block translation. Off unloads it and retains People. Translation/manual labeling remain available, including Groups session labels. |
+| Voice recognition / `UseAiSpeakerRecognition` | `true` | Optional local CPU identity model; loading is deferred until subtitles need a clear speech sample. The Home toggle is staged until **Apply subtitle choices**. Direct Settings/People switches remain immediate. Background matching does not block translation. Off unloads the model and retains People; translation/manual labeling remain available. |
 | Voice recognition model / `SpeakerModelPath` | Managed CAM++ Mandarin ONNX | Choose CAM++ or ERes2Net in the UI, download it, or import a compatible ONNX embedding model. Arbitrary ONNX is not necessarily compatible. |
 | Match threshold / `SpeakerMatchThreshold` | `0.50` | Dashboard/recognizer 0.35–0.85. Higher is stricter and leaves more voices unidentified; lower may merge different people. It is cosine similarity, not an accuracy probability. |
 | Unnamed voice profile limit / `MaxSpeakerProfiles` | `2` | 2–8. Caps anonymous automatically learned identities; it does **not** cap all saved People. Increasing it can create more false identities. |

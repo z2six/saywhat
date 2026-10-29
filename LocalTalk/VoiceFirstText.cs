@@ -24,6 +24,12 @@ internal static class VoiceFirstText
         var values = new Dictionary<string, string[]>(StringComparer.Ordinal);
         void Add(string english, string chinese, string japanese, string korean) => values.Add(english, [chinese, japanese, korean]);
         Add("Start translating my voice", "开始翻译我的语音", "自分の音声の翻訳を開始", "내 음성 번역 시작");
+        Add("Apply & start", "应用并开始", "適用して開始", "적용 후 시작");
+        Add("Apply changes", "应用更改", "変更を適用", "변경 사항 적용");
+        Add("Not applied yet", "尚未应用", "まだ適用していません", "아직 적용되지 않음");
+        Add("Current selection", "当前设置", "現在の設定", "현재 설정");
+        Add("Choose everything first, then apply once. Your current translation keeps running until you apply.", "可以先选好所有设置，再一次应用。应用前，当前翻译会继续运行。", "先に設定を選び、まとめて適用できます。適用するまでは現在の設定で翻訳を続けます。", "설정을 모두 고른 뒤 한 번에 적용하세요. 적용하기 전까지는 현재 설정으로 번역을 계속합니다.");
+        Add("Choose everything first, then apply once. Applying does not start your microphone.", "可以先选好所有设置，再一次应用。应用设置不会启动麦克风。", "先に設定を選び、まとめて適用できます。適用してもマイクは開始しません。", "설정을 모두 고른 뒤 한 번에 적용하세요. 적용해도 마이크는 시작되지 않습니다.");
         Add("Translate into VRChat chat", "翻译到 VRChat 聊天", "VRChat のチャットに翻訳", "VRChat 채팅으로 번역");
         Add("I speak", "我说的语言", "自分が話す言語", "내가 말하는 언어");
         Add("Translation language hint", "翻译语言提示", "翻訳用の言語ヒント", "번역용 언어 힌트");

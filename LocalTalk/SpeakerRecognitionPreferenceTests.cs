@@ -38,6 +38,36 @@ internal static class SpeakerRecognitionPreferenceTests
             SettingsStore.Save(stale);
             Check(!SettingsStore.Load().UseAiSpeakerRecognition && !stale.UseAiSpeakerRecognition,
                 "An older startup/settings snapshot cannot re-enable recognition after Stop.");
+            AppSettings staged = SettingsStore.Load(); staged.UseAiSpeakerRecognition = true;
+            bool latestPin = !staged.SubtitlesAlwaysOnTop;
+            string latestLanguage = staged.UiLanguage == "ko" ? "ja" : "ko";
+            AppSettings latestAppearance = staged.Copy();
+            latestAppearance.UiThemeId = AppearanceTheme.Presets.First(theme => theme.Id != staged.UiThemeId).Id;
+            SettingsStore.SaveSubtitlePinPreference(latestPin);
+            SettingsStore.SaveUiLanguagePreference(latestLanguage);
+            SettingsStore.SaveAppearancePreference(latestAppearance);
+            SettingsStore.SaveExplicitSpeakerRecognitionSelection(staged);
+            AppSettings applied = SettingsStore.Load();
+            Check(applied.UseAiSpeakerRecognition && staged.UseAiSpeakerRecognition,
+                "Explicit Home Apply commits an enabled recognition choice instead of restoring its old saved value.");
+            Check(applied.SubtitlesAlwaysOnTop == latestPin && applied.UiLanguage == latestLanguage &&
+                applied.UiThemeId == latestAppearance.UiThemeId,
+                "Explicit recognition apply preserves independently changed pin, interface language and theme.");
+            Check(applied.OwnVoiceTargetLanguage == original.OwnVoiceTargetLanguage &&
+                applied.IncomingTargetLanguage == original.IncomingTargetLanguage,
+                "Explicit recognition apply keeps unchanged translation choices.");
+            staged = applied.Copy(); staged.UseAiSpeakerRecognition = false;
+            SettingsStore.SaveExplicitSpeakerRecognitionSelection(staged);
+            Check(!SettingsStore.Load().UseAiSpeakerRecognition, "Explicit Home Apply can also turn recognition off.");
+            byte[] beforeFailedApply = File.ReadAllBytes(AppPaths.SettingsPath);
+            AppSettings failedDraft = SettingsStore.Load(); failedDraft.UseAiSpeakerRecognition = true;
+            bool applyDenied = false;
+            using (File.Open(AppPaths.SettingsPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                try { SettingsStore.SaveExplicitSpeakerRecognitionSelection(failedDraft); }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException) { applyDenied = true; }
+            Check(applyDenied && !SettingsStore.Load().UseAiSpeakerRecognition &&
+                File.ReadAllBytes(AppPaths.SettingsPath).SequenceEqual(beforeFailedApply),
+                "Failed explicit apply keeps the previous complete saved settings intact.");
             SettingsStore.SaveSpeakerRecognitionPreference(true);
             Check(SettingsStore.Load().UseAiSpeakerRecognition, "Recognition can be re-enabled without modifying translation files.");
             bool denied = false;
@@ -48,6 +78,9 @@ internal static class SpeakerRecognitionPreferenceTests
         }
         finally
         {
+            SettingsStore.SaveSubtitlePinPreference(original.SubtitlesAlwaysOnTop);
+            SettingsStore.SaveUiLanguagePreference(original.UiLanguage);
+            SettingsStore.SaveAppearancePreference(original);
             SettingsStore.SaveSpeakerRecognitionPreference(original.UseAiSpeakerRecognition);
             SettingsStore.Save(original);
         }

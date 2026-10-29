@@ -33,6 +33,8 @@ Use several realistic conversational phrases, not a single “hello.” Word cho
 5. Finished-sentence translation is the default in both directions. Optionally try **Show translations while I’m still speaking** for earlier VRChat chat, or **Show early translations** for subtitles. Each can revise wording as more speech arrives and add speculative translator work; leave it off if that is distracting or costly. Earlier output is not a guarantee of faster final translation.
 6. If you also need subtitles, share one translator and consider **Quick** in Settings for one-to-one conversation. Quick skips familiar-voice matching and shortens subtitle waits/lookahead. Turn optional matching off if its extra CPU work is unwanted; that is distinct from unloading the GPU speech/translation models.
 
+Make the Home changes you want, then choose **Apply changes** on your voice card or **Apply subtitle choices** on the subtitle card. Editing several choices does not apply them one by one. **Download & apply** prepares missing files; **Apply & start** can save pending own-voice choices and start them when stopped. Home's person-recognition and mute-following checkboxes also wait for their card's Apply action.
+
 Larger translation models can improve a phrase but still be slower despite fitting in VRAM. Reducing idle caches or loading two models does not increase GPU compute capacity. Test in the same crowded world and with the same VRChat graphics settings before drawing conclusions.
 
 Normal matching now runs alongside translation rather than delaying text until an identity result arrives. Groups is a different trade-off: attributed multi-voice recognition with roughly 3.5 seconds of first-decode audio buffering, plus inference and translation time. Its optional 7B speech model adds download/memory requirements and is not a proven latency improvement. Switch back to Normal if this delay or resource pressure is unsuitable; save tuned preferences as a custom profile.
@@ -41,7 +43,7 @@ Normal matching now runs alongside translation rather than delaying text until a
 
 With **Pause when my VRChat mic is muted** on (the default), SayWhat waits for a verified microphone mute state before capturing. Older versions could wait indefinitely when VRChat's log was empty. Version 0.2.2 discovers the current status endpoint without relying on that log and retries if it starts late. A visible waiting message explains this state. If needed, mute and unmute once inside VRChat; also check **OSC → Enabled** there.
 
-The Home checkbox can turn mute-following off. This means SayWhat may capture and send translations even while VRChat itself is muted; it is not a troubleshooting action that should be enabled silently. Translation still stops when VRChat closes.
+To turn mute-following off, change the Home checkbox and select **Apply changes**. SayWhat may then capture and send translations even while VRChat itself is muted; editing the checkbox alone does not change the running translator. Translation still stops when VRChat closes.
 
 ## “Typing dots, but no new chat”
 
@@ -92,7 +94,7 @@ For subtitles, **They speak** and the recognition model are under **Home → Spe
 
 Inspect source recognition separately from translation. A glossary such as a product-name mapping helps only if a relevant recognizable source term is present; it cannot correct missing audio or restore words that were never transcribed. Wrong-script subtitle output can be rejected and retried, adding delay. A larger translator is only a plausible remedy when the source transcript is already useful.
 
-Language and microphone changes may briefly hold new capture while an already captured sentence finishes. A model change may need a download before it switches; the current translation can continue while files prepare. Watch the status in the app rather than clicking repeatedly. If subtitles share that translator, changing it can pause both directions after confirmation.
+After you apply, language and microphone changes may briefly hold capture while an already captured sentence finishes. A model change may need a download before switching; the current translation can continue while files prepare. Watch the status in the app rather than clicking repeatedly. If subtitles share that translator, applying its replacement can pause both directions after confirmation.
 
 ## Useful diagnostics
 

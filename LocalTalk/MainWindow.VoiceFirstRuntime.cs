@@ -2,62 +2,16 @@ namespace IncomingTranslator;
 
 internal sealed partial class MainWindow
 {
-    private CancellationTokenSource? _voiceFirstDebounce;
-    private long _voiceFirstChangeVersion;
-
-    // Home's everyday controls are scoped saves, not an implicit Save all for
-    // unrelated drafts on Advanced pages. Rapid clicks coalesce into one update.
-    private async Task ApplyVoiceFirstChangeAsync(bool requireOwnRestart = false)
-    {
-        if (_preview || _closing || _busy) return;
-        long version = ++_voiceFirstChangeVersion;
-        _voiceFirstDebounce?.Cancel();
-        using var debounce = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
-        _voiceFirstDebounce = debounce;
-        if (_page == "Home") Navigate("Home");
-        try
-        {
-            await Task.Delay(250, debounce.Token);
-            if (version != _voiceFirstChangeVersion || _closing || _busy) return;
-            AppSettings previous = ReadVoiceFirstSavedSettings();
-            // A model draft selected on another page is already visible on
-            // Home. Prepare it explicitly rather than showing that draft while
-            // quietly applying the language to a different, saved recognizer.
-            if (VoiceFirstOwnModelDraftDiffers(previous, _settings))
-            { await ApplyVoiceFirstModelChangeAsync(); return; }
-            AppSettings candidate = VoiceFirstCandidate(previous, _settings, includeModels: false);
-            ValidateVoiceFirstOwnSelection(candidate);
-            if (TranslationProfiles.ConfigurationEquals(candidate, previous)) { CompleteVoiceFirstSave(previous); return; }
-            bool applied = false;
-            await RunTask(async token =>
-            {
-                await _runtime.ApplyOwnSettingsAsync(candidate, token, ProvisionProgress());
-                CompleteVoiceFirstSave(candidate);
-                applied = true;
-            }, "Applying voice settings", "Settings applied.");
-            if (!applied) RestoreVoiceFirstChoices(previous, includeModels: false);
-        }
-        catch (OperationCanceledException) when (debounce.IsCancellationRequested) { }
-        catch (Exception error)
-        {
-            try { RestoreVoiceFirstChoices(ReadVoiceFirstSavedSettings(), includeModels: false); }
-            catch { /* Keep the visible draft if the saved file itself is unavailable. */ }
-            Error("Apply voice settings", error);
-        }
-        finally
-        {
-            if (ReferenceEquals(_voiceFirstDebounce, debounce)) _voiceFirstDebounce = null;
-        }
-    }
-
+    // Own Home choices remain a draft until its Apply button or Start is used.
+    // This scoped path never commits unrelated incoming or Advanced drafts.
     private async Task ApplyVoiceFirstModelChangeAsync(bool startOwn = false)
     {
         if (_preview || _busy || _closing) return;
-        ++_voiceFirstChangeVersion; _voiceFirstDebounce?.Cancel();
         AppSettings previous;
         try { previous = ReadVoiceFirstSavedSettings(); }
         catch (Exception error) { Error("Read voice settings", error); return; }
-        AppSettings candidate = VoiceFirstCandidate(previous, _settings, includeModels: true);
+        AppSettings draftBefore = _settings.Copy();
+        AppSettings candidate = VoiceFirstCandidate(previous, draftBefore, includeModels: true);
         bool applied = false;
         try
         {
@@ -95,6 +49,14 @@ internal sealed partial class MainWindow
                 }
                 else await PrepareVoiceFirstOwnAssetsAsync(candidate, token);
                 token.ThrowIfCancellationRequested();
+                // Downloads can take time. Keep independently saved appearance,
+                // incoming choices and other untouched preferences current.
+                AppSettings latest = ReadVoiceFirstSavedSettings();
+                candidate = SettingsSaveState.Rebase(candidate, previous, latest);
+                previous = latest;
+                ValidateVoiceFirstOwnSelection(candidate);
+                sharedChange = VoiceFirstSharedTranslatorChanged(previous, candidate);
+                if (_runtime.IncomingRunning && sharedChange) _ = RuntimeController.BuildPlan(candidate, incoming: true);
                 if (_runtime.IncomingRunning && sharedChange)
                     await ApplyVoiceFirstSharedModelAsync(previous, candidate, token);
                 else await _runtime.ApplyOwnSettingsAsync(candidate, token, ProvisionProgress());
@@ -109,7 +71,17 @@ internal sealed partial class MainWindow
         catch (Exception error) { Error("Change voice model", error); }
         finally
         {
-            if (!applied) RestoreVoiceFirstChoices(previous, includeModels: true);
+            if (!applied)
+            {
+                try
+                {
+                    AppSettings latest = ReadVoiceFirstSavedSettings();
+                    TranslationProfiles.CopyInto(VoiceFirstDraftAfterApplyAttempt(draftBefore, previous, latest), _settings);
+                }
+                catch { /* Keep the user's draft if saved state cannot be read reliably. */ }
+                RefreshSaveState(reloadSaved: true);
+                if (!_busy && !_closing && _page == "Home") Navigate("Home");
+            }
         }
     }
 
@@ -249,8 +221,21 @@ internal sealed partial class MainWindow
         return result;
     }
 
-    private AppSettings ReadVoiceFirstSavedSettings() => File.Exists(AppPaths.SettingsPath)
-        ? SettingsStore.ReadSettings(File.ReadAllText(AppPaths.SettingsPath)) : _saveStateAppliedSettings?.Copy() ?? new AppSettings();
+    private AppSettings ReadVoiceFirstSavedSettings() => _preview
+        ? _saveStateAppliedSettings?.Copy() ?? _settings.Copy()
+        : File.Exists(AppPaths.SettingsPath) ? SettingsStore.ReadSettings(File.ReadAllText(AppPaths.SettingsPath))
+            : _saveStateAppliedSettings?.Copy() ?? new AppSettings();
+
+    internal static AppSettings VoiceFirstDraftAfterApplyAttempt(AppSettings draft, AppSettings previous, AppSettings latest)
+    {
+        AppSettings preserved = SettingsSaveState.Rebase(draft, previous, latest);
+        // Consent/preparation failures leave the applied own choices unchanged:
+        // keep the whole own draft so the user can retry or adjust it. If a later
+        // failure did commit settings, show that known own configuration instead.
+        bool committedOwnChange = !TranslationProfiles.ConfigurationEquals(VoiceFirstCandidate(previous, previous, includeModels: true),
+            VoiceFirstCandidate(previous, latest, includeModels: true));
+        return committedOwnChange ? VoiceFirstCandidate(preserved, latest, includeModels: true) : preserved;
+    }
 
     private void CompleteVoiceFirstSave(AppSettings applied)
     {
@@ -324,11 +309,4 @@ internal sealed partial class MainWindow
             RuntimeProfiles.UsesSpeakerRecognition(candidate) && !File.Exists(candidate.SpeakerModelPath);
     }
 
-    private void RestoreVoiceFirstChoices(AppSettings previous, bool includeModels)
-    {
-        AppSettings restored = VoiceFirstCandidate(_settings, previous, includeModels);
-        TranslationProfiles.CopyInto(restored, _settings);
-        RefreshSaveState(reloadSaved: true);
-        if (!_busy && !_closing && _page == "Home") Navigate("Home");
-    }
 }

@@ -1535,13 +1535,13 @@ internal sealed partial class MainWindow : Window
         }, "Finish setup", "Setup choices saved. Choose Start on Home when you are ready.");
     }
 
-    private void Persist(bool applyingProfile = false)
+    private void Persist(bool applyingProfile = false, bool applySpeakerRecognition = false)
     {
         AppSettings latest = SettingsStore.Load();
         if (!applyingProfile)
         {
             _settings.SubtitlesAlwaysOnTop = latest.SubtitlesAlwaysOnTop;
-            _settings.UseAiSpeakerRecognition = latest.UseAiSpeakerRecognition;
+            if (!applySpeakerRecognition) _settings.UseAiSpeakerRecognition = latest.UseAiSpeakerRecognition;
         }
         _settings.DetectAnySourceLanguage = _settings.IncomingSourceLanguage == "Automatic";
         if (!_settings.DetectAnySourceLanguage) _settings.SourceLanguages = [_settings.IncomingSourceLanguage];
@@ -1559,6 +1559,7 @@ internal sealed partial class MainWindow : Window
             if (_settings.ShareTranslationModel) { _settings.TranslatorModel = _settings.OwnTranslatorModel; _settings.TranslatorBaseUrl = _settings.OwnTranslatorBaseUrl; }
         }
         if (applyingProfile) SettingsStore.SaveTranslationProfileSelection(_settings);
+        else if (applySpeakerRecognition) SettingsStore.SaveExplicitSpeakerRecognitionSelection(_settings);
         else SettingsStore.Save(_settings);
         DesktopLog.Write("Settings saved. Targets: my voice=" + string.Join("/",_settings.EffectiveOwnVoiceTargetLanguages()) + "; incoming=" + _settings.IncomingTargetLanguage + "; shared=" + _settings.ShareTranslationModel);
         _savedSetupSelection = SetupSelection.Capture(_settings);
@@ -1581,10 +1582,12 @@ internal sealed partial class MainWindow : Window
             RefreshSaveState(reloadSaved: true);
             return;
         }
-        await ApplyTranslationSettingsAsync(_settings.Copy(), applyingProfile: false);
+        await ApplyTranslationSettingsAsync(_settings.Copy(), applyingProfile: false,
+            applySpeakerRecognition: _saveStateAppliedSettings is not null &&
+                _settings.UseAiSpeakerRecognition != _saveStateAppliedSettings.UseAiSpeakerRecognition);
     }
 
-    private async Task ApplySettingsCoreAsync(bool own, bool incoming, CancellationToken token, bool applyingProfile = false, AppSettings? previousSettings = null)
+    private async Task ApplySettingsCoreAsync(bool own, bool incoming, CancellationToken token, bool applyingProfile = false, AppSettings? previousSettings = null, bool applySpeakerRecognition = false)
     {
         AppSettings previous = previousSettings?.Copy() ?? SettingsStore.Load();
         SettingsRuntimeChanges changes = SettingsRuntimeChanges.Between(previous, _settings,
@@ -1610,7 +1613,7 @@ internal sealed partial class MainWindow : Window
             token.ThrowIfCancellationRequested();
             TaskStage("Saving your settings", null, ++step, count);
             await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Background);
-            token.ThrowIfCancellationRequested(); Persist(applyingProfile);
+            token.ThrowIfCancellationRequested(); Persist(applyingProfile, applySpeakerRecognition);
             if (applyIncoming && !sharedRestart)
                 await _runtime.SwitchIncomingProfileAsync(_settings.Copy(), OpenOptions, token, RuntimeTaskProgress(++step, count), OpenSpeakerSettings, ApplyTranslationProfileAsync);
             if (restartOwn || sharedRestart)

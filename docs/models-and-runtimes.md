@@ -48,7 +48,7 @@ The subtitle **Careful** style permits 192 output tokens and a 22-second request
 
 Sharing is recommended because one model is loaded once and used by both directions. Each request still carries its own task/context. Sharing does not blend microphone text into incoming subtitles. The managed server has one inference slot, so simultaneous directions compete for compute/queue time.
 
-Turning sharing off runs two server instances, normally on ports 1235 and 1236. Even selecting the **same** model separately duplicates residency. Two instances on one GPU do not create twice the hardware throughput, and can hurt VRChat frame time. Separate selection is useful when genuinely different language pairs or quality requirements justify it, not as a way to isolate people.
+With sharing off, running both directions uses two server instances, normally on ports 1235 and 1236. Even using the **same** model separately duplicates residency. Home choices wait for their Apply action; selecting a card alone does not load another model. Two instances on one GPU do not create twice the hardware throughput, and can hurt VRChat frame time. Separate selection is useful when different language pairs or quality requirements justify it, not as a way to isolate people.
 
 ## Translation acceleration
 
@@ -64,7 +64,7 @@ The managed server uses a 4,096-token context (2,048 for TranslateGemma), one pa
 
 ### Choose a subtitle recognizer
 
-On **Home**, choose **Speech model & language** on the subtitle card. Set **They speak** and the subtitle target, choose a speech model, then **Download & apply**. If its files are already prepared, the button reads **Apply subtitle choices**. Preparing files does not start subtitles; use their Start button when ready. These choices do not replace the microphone recognizer or its language.
+On **Home**, set **They speak**, the subtitle target and speech model on the subtitle card. These choices stay pending until **Download & apply**, or **Apply subtitle choices** when files are ready. Preparing files does not start subtitles; use their Start button when ready. These choices do not replace the microphone recognizer or its language.
 
 | Subtitle speech choice | Input languages | Local runtime | Approximate speech-model download |
 | --- | --- | --- | --- |

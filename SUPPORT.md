@@ -4,9 +4,9 @@ Open **Help** in the app’s sidebar for setup and troubleshooting, or use the [
 
 ## Get a first translation working
 
-For your own voice, choose **I speak** and the output language or languages on Home, prepare the selected models, then choose **Start translating my voice**. Enable **OSC → Enabled** in VRChat’s Action Menu. With **Pause when my VRChat mic is muted** enabled, unmute in VRChat before speaking.
+For your own voice, choose **I speak** and the output languages on Home, then **Apply changes** or **Download & apply**. When stopped, **Apply & start** can save pending own-voice choices and begin translation. Enable **OSC → Enabled** in VRChat’s Action Menu. With **Pause when my VRChat mic is muted** enabled, unmute before speaking; changing that checkbox also needs Apply.
 
-For other people’s voices, prepare and start **live subtitles** separately. **Speech model & language** on Home lets you select what they speak and which model recognizes it. For Chinese → English, choose Chinese with FireRedASR2 Fast or Accurate, and keep the subtitle language set to English. For automatic detection or other supported languages, choose a multilingual recognizer such as Nemotron. [Model and language details](docs/models-and-runtimes.md).
+For other people’s voices, choose and apply **live subtitle** settings separately, then start subtitles. Home's person-recognition checkbox is included in **Apply subtitle choices**. For Chinese → English, choose Chinese with FireRedASR2 Fast or Accurate and an English subtitle target. For automatic detection or other supported languages, choose a multilingual recognizer such as Nemotron. [Model and language details](docs/models-and-runtimes.md).
 
 You do not need subtitles running to translate your own microphone.
 

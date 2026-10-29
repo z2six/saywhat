@@ -34,6 +34,7 @@ internal sealed partial class MainWindow
         candidate.IncomingSettleMilliseconds = draft.IncomingSettleMilliseconds;
         candidate.IncomingSendEarlyPreviews = draft.IncomingSendEarlyPreviews;
         candidate.IncomingChineseOnly = draft.IncomingChineseOnly;
+        candidate.UseAiSpeakerRecognition = draft.UseAiSpeakerRecognition;
         // Profile selection here changes only the incoming recognizer. In
         // particular, it must not apply a preset's global recognition delay.
         if (draft.IncomingSpeechEngine == "vibevoice") candidate.ActiveTranslationProfileId = TranslationProfiles.GroupsId;
@@ -295,11 +296,11 @@ internal sealed partial class MainWindow
             body.Children.Add(SubtitleSpeechLabel("All subtitles use this name. Automatic person recognition is skipped, and this choice does not teach a voice example.", 12, ModernTheme.Muted));
         }
         bool quick = _settings.ActiveTranslationProfileId == TranslationProfiles.QuickId;
-        var recognition = HomeSubtitleCheck("Recognize saved people by their voices", _settings.UseAiSpeakerRecognition, async (_, _) =>
+        var recognition = HomeSubtitleCheck("Recognize saved people by their voices", _settings.UseAiSpeakerRecognition, (_, _) =>
         {
             if (!CanEditSubtitleSpeech() || _settings.IncomingSinglePerson || _settings.ActiveTranslationProfileId == TranslationProfiles.QuickId) return;
-            if (_preview) { _settings.UseAiSpeakerRecognition = !_settings.UseAiSpeakerRecognition; RefreshHomeSubtitleChoices(); }
-            else { await ChangeSpeakerRecognitionAsync(!_settings.UseAiSpeakerRecognition); if (!_closing && _page == "Home") Navigate("Home"); }
+            _settings.UseAiSpeakerRecognition = !_settings.UseAiSpeakerRecognition;
+            RefreshHomeSubtitleChoices();
         });
         recognition.Name = "HomeSubtitlePersonRecognitionToggle"; recognition.IsEnabled = CanEditSubtitleSpeech() && !_settings.IncomingSinglePerson && !quick;
         body.Children.Add(recognition);
@@ -341,10 +342,15 @@ internal sealed partial class MainWindow
     private async Task ApplyHomeSubtitleChoicesAsync()
     {
         if (_preview || !CanEditSubtitleSpeech()) return;
-        AppSettings saved = SettingsStore.Load(), draft = _settings.Copy();
-        try { IncomingCaptureCapabilities.Validate(HomeSubtitleCandidate(saved, draft), SubtitleWindowsVersion); }
+        AppSettings saved = SettingsStore.Load();
+        AppSettings baseline = _saveStateAppliedSettings?.Copy() ?? saved.Copy();
+        AppSettings selected = _settings.Copy();
+        bool recognitionChosen = selected.UseAiSpeakerRecognition != baseline.UseAiSpeakerRecognition;
+        AppSettings draft = SettingsSaveState.Rebase(selected, baseline, saved);
+        AppSettings candidate = HomeSubtitleCandidate(saved, draft);
+        try { IncomingCaptureCapabilities.Validate(candidate, SubtitleWindowsVersion); }
         catch (IncomingListeningSelectionException error) { Error("Apply subtitle choices", error); return; }
-        await ApplyTranslationSettingsAsync(HomeSubtitleCandidate(saved, draft), applyingProfile: false);
+        await ApplyTranslationSettingsAsync(candidate, applyingProfile: false, applySpeakerRecognition: recognitionChosen);
         TranslationProfiles.CopyInto(SettingsSaveState.Rebase(draft, saved, SettingsStore.Load()), _settings);
         RefreshSaveState(reloadSaved: true); if (!_closing) Navigate(_page);
     }

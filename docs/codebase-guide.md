@@ -42,8 +42,8 @@ applies the chatbox's short-message limits. Multiple target languages divide tha
 same display budget and add translation work.
 
 Mute status and the decision to follow it are separate. By default the controller
-keeps capture closed until it has verified VRChat's status. The Home preference
-can explicitly allow translation while VRChat's microphone is muted. Speech
+keeps capture closed until it has verified VRChat's status. After applying the Home preference,
+the user can explicitly allow translation while VRChat's microphone is muted. Speech
 captured before muting can finish according to its separate preference. A game
 exit or reconfiguration freeze still prevents new capture.
 
@@ -51,7 +51,7 @@ Start reading:
 
 | Responsibility | Source |
 |---|---|
-| Home controls and immediate own-voice choices | [VoiceFirstHome.cs](../LocalTalk/VoiceFirstHome.cs), [MainWindow.VoiceFirstRuntime.cs](../LocalTalk/MainWindow.VoiceFirstRuntime.cs) |
+| Home drafts, per-card apply and explicit own-voice startup | [VoiceFirstHome.cs](../LocalTalk/VoiceFirstHome.cs), [MainWindow.VoiceFirstRuntime.cs](../LocalTalk/MainWindow.VoiceFirstRuntime.cs) |
 | Feature startup, process ownership, shared translator planning and shutdown | [RuntimeController.cs](../LocalTalk/RuntimeController.cs) |
 | Mute/presence discovery, capture policy and drain coordination | [FoxTrans-VRChatMuteSync.ps1](../FoxTrans-VRChatMuteSync.ps1) |
 | Headless capture and per-turn scheduling | [FoxTransLocalHost/Program.cs](../FoxTransLocalHost/Program.cs) |

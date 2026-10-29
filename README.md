@@ -30,7 +30,9 @@ Windows 10 compatibility is a **preview and has not been verified on a real Wind
 
 Subtitles are prepared and started separately from your microphone translator. Normal and Quick use your selected subtitle recognizer; Groups uses the optional VibeVoice path. Identifying a familiar voice does **not** isolate every person’s audio or guarantee that all overlapping words are recovered. [How people and Groups work](docs/people-and-voice-recognition.md).
 
-By default, microphone capture pauses when your VRChat mic is muted. **Pause when my VRChat mic is muted** on Home changes that behavior. New settings translate completed sentences in both directions; early translations are an optional choice for each. Your timing and early-message controls are also on Home.
+Home edits stay pending until you choose the card's **Apply changes**, **Download & apply** or **Apply subtitle choices**. When stopped, **Apply & start** can save own-voice choices and start translation. Start and Stop remain direct actions.
+
+By default, microphone capture pauses when your VRChat mic is muted. Change **Pause when my VRChat mic is muted** on Home and apply it to alter that behavior. New settings translate completed sentences in both directions; early translations are an optional choice for each. Your timing and early-message controls are also on Home.
 
 ## Privacy
 

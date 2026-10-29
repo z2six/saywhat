@@ -51,15 +51,26 @@ internal static class HomeSubtitleUiTests
             draft.IncomingSettleMilliseconds = 1800; draft.IncomingAudioMode = "application";
             draft.IncomingApplicationPath = @"C:\Synthetic\Discord.exe"; draft.IncomingApplicationName = "Discord";
             draft.IncomingSinglePerson = true; draft.IncomingPersonId = "synthetic-person";
+            draft.UseAiSpeakerRecognition = true;
             AppSettings candidate = MainWindow.HomeSubtitleCandidate(saved, draft);
             Check(candidate.IncomingSpeechEngine == "firered2-ctc" && candidate.IncomingTargetLanguage == "Japanese" &&
                 candidate.IncomingSettleMilliseconds == 1800 && candidate.IncomingAudioMode == "application" &&
-                candidate.IncomingApplicationPath == draft.IncomingApplicationPath && candidate.IncomingSinglePerson && candidate.IncomingPersonId == "synthetic-person",
-                "scoped apply includes recognizer, languages, pause, source and assigned person");
+                candidate.IncomingApplicationPath == draft.IncomingApplicationPath && candidate.IncomingSinglePerson && candidate.IncomingPersonId == "synthetic-person" && candidate.UseAiSpeakerRecognition,
+                "scoped apply includes recognizer, languages, pause, source, assigned person and staged recognition");
             Check(candidate.OwnManagedModelId == saved.OwnManagedModelId && candidate.OwnVoiceSourceLanguage == saved.OwnVoiceSourceLanguage &&
                 candidate.OwnVoiceTargetLanguage == saved.OwnVoiceTargetLanguage && candidate.OwnVoiceEndPauseMilliseconds == saved.OwnVoiceEndPauseMilliseconds &&
                 candidate.OwnMicrophoneDeviceId == saved.OwnMicrophoneDeviceId && candidate.OwnVoicePauseWhenVrchatMuted == saved.OwnVoicePauseWhenVrchatMuted,
                 "subtitle apply cannot commit unrelated microphone edits");
+            var staleHome = saved.Copy(); staleHome.IncomingSettleMilliseconds = 1800;
+            var externallyChanged = saved.Copy(); externallyChanged.UseAiSpeakerRecognition = true;
+            AppSettings rebasedHome = SettingsSaveState.Rebase(staleHome, saved, externallyChanged);
+            AppSettings latestCandidate = MainWindow.HomeSubtitleCandidate(externallyChanged, rebasedHome);
+            Check(latestCandidate.UseAiSpeakerRecognition && latestCandidate.IncomingSettleMilliseconds == 1800,
+                "applying a timing draft inherits a newer untouched recognition switch");
+            var deliberate = externallyChanged.Copy(); deliberate.UseAiSpeakerRecognition = false;
+            Check(!MainWindow.HomeSubtitleCandidate(externallyChanged,
+                SettingsSaveState.Rebase(deliberate, externallyChanged, externallyChanged)).UseAiSpeakerRecognition,
+                "an explicit recognition draft survives rebasing for Apply");
             var changes = SettingsRuntimeChanges.Between(saved, candidate);
             Check(!changes.OwnChanged && changes.IncomingChanged && !changes.SharedTranslatorChanged,
                 "incoming-only changes leave the working microphone and shared translator alone");
@@ -68,7 +79,7 @@ internal static class HomeSubtitleUiTests
                 ownStart.IncomingSpeechEngine == saved.IncomingSpeechEngine && ownStart.IncomingTargetLanguage == saved.IncomingTargetLanguage &&
                 ownStart.IncomingSettleMilliseconds == saved.IncomingSettleMilliseconds && ownStart.IncomingAudioMode == saved.IncomingAudioMode &&
                 ownStart.IncomingApplicationPath == saved.IncomingApplicationPath && ownStart.IncomingPersonId == saved.IncomingPersonId &&
-                ownStart.ShareTranslationModel == saved.ShareTranslationModel,
+                ownStart.ShareTranslationModel == saved.ShareTranslationModel && ownStart.UseAiSpeakerRecognition == saved.UseAiSpeakerRecognition,
                 "the own Start preparation snapshot leaves subtitle drafts and sharing unapplied");
             candidate = saved.Copy();
             Check(MainWindow.StageHomeSubtitleTranslator(candidate, "hy-mt2-7b-q4_k_m") && !candidate.ShareTranslationModel &&
@@ -135,6 +146,18 @@ internal static class HomeSubtitleUiTests
                     "optional subtitle controls do not disable own-voice start");
             }
             UiText.Language = "en"; window.Navigate("Home");
+            Nodes(window).OfType<CheckBox>().Single(check => check.Name == "HomeSubtitlePersonRecognitionToggle")
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(settings.UseAiSpeakerRecognition &&
+                !((AppSettings)Field("_saveStateAppliedSettings").GetValue(window)!).UseAiSpeakerRecognition &&
+                !runtime.OwnRunning && !runtime.IncomingRunning &&
+                MainWindow.HomeSubtitleCandidate(saved, settings).UseAiSpeakerRecognition,
+                "person recognition is an unapplied subtitle draft with no save or runtime action");
+            Check(Nodes(window).OfType<Button>().Single(button => button.Name == "ApplyHomeSubtitleChoicesButton").IsEnabled,
+                "a staged recognition choice enables the subtitle Apply action");
+            Nodes(window).OfType<CheckBox>().Single(check => check.Name == "HomeSubtitlePersonRecognitionToggle")
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(!settings.UseAiSpeakerRecognition, "another recognition click revises the draft before applying");
             Nodes(window).OfType<CheckBox>().Single(check => check.Name == "SubtitleChineseOnlyToggle")
                 .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(settings.IncomingChineseOnly && settings.OwnVoiceSourceLanguage == saved.OwnVoiceSourceLanguage &&

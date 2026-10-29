@@ -92,8 +92,9 @@ validated low-end real-time hardware minimum. The identity extractor performs
 no GPU inference; this does not apply to the separate speech or translation
 models, which depend on their selected runtime.
 
-Turn **Recognize saved people by their voices** off on Home, or use the optional
-voice recognition section in Settings. It blocks queued identity work and unloads
+On Home, clear **Recognize saved people by their voices**, then choose **Apply
+subtitle choices**. The optional voice-recognition switches in Settings/People
+remain direct controls. Once applied, disabling recognition blocks queued identity work and unloads
 the extractor after any in-progress native call finishes, while keeping saved
 people and examples. Transcription and translation continue. **Just one person**
 can assign a selected name without running identity matching at all.
