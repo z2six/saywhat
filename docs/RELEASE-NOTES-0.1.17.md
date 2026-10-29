@@ -14,6 +14,6 @@ The 1.2-second finishing-pause defaults, Help section and first-launch introduct
 
 This installer is unsigned. Isolated checks cover the protected temporary-folder permissions and data-choice handling; full fresh-PC installation and uninstall across different Windows accounts still need testing. Installing does not start models.
 
-The matching **SayWhat-Corresponding-Source.zip**, complete ZIP, licenses and checksums accompany this release. GitHub’s automatic “Source code” archives are not the application source.
+The matching **SayWhat-Corresponding-Source.zip**, complete ZIP, licenses and checksums accompany this release. GitHub’s automatic “Source code” archives for this historical release tag contain the earlier documentation repository; use its matching source asset for the application. Current development source is now browsable on the repository’s main branch.
 
 SayWhat?’s original contributions use GPL-3.0-only; third-party components and models retain their own terms.

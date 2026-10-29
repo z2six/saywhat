@@ -39,7 +39,7 @@ internal static class HomeTargetLanguageUiTests
         string languageBefore = UiText.Language;
         bool busyBefore = (bool)WindowField("_busy").GetValue(window)!;
         bool closingBefore = (bool)WindowField("_closing").GetValue(window)!;
-        Button IncomingHomeButton() => Nodes(window).OfType<Button>().Single(button => button.Name == "HomeIncomingTargetLanguageButton");
+        Button[] IncomingHomeChoices() => Nodes(window).OfType<Button>().Where(button => button.Name == "HomeSubtitleTargetChoice").ToArray();
         static Button[] Options(Border menu) => Nodes(menu).OfType<Button>().Where(button => button.Tag is string).ToArray();
         static string[] Targets(Border menu) => Options(menu).Select(button => (string)button.Tag).ToArray();
         void GuardState(bool busy, bool closing, bool own, bool incoming)
@@ -70,8 +70,8 @@ internal static class HomeTargetLanguageUiTests
                     bool expected = !busy && !closing && !(direction ? incoming : own);
                     Check(MainWindow.CanChangeHomeTargetLanguage(direction, busy, closing, own, incoming) == expected,
                         "pure guard depends on only that direction plus busy/closing: " + mask + "/" + direction);
-                    if (direction) Check(IncomingHomeButton().IsEnabled == expected,
-                        "subtitle quick picker follows its independent direction guard: " + mask);
+                    if (direction) Check(IncomingHomeChoices().All(button => button.IsEnabled == (!busy && !closing)),
+                        "subtitle chips stage choices without interrupting a running direction: " + mask);
                     else Check(Nodes(window).OfType<WrapPanel>().Any(panel => panel.Name == "HomeTargetLanguageChoices"),
                         "own voice presents visible multi-language chips rather than the retired popup: " + mask);
                     if (!expected)
@@ -106,8 +106,8 @@ internal static class HomeTargetLanguageUiTests
                 UiText.Language = ui; window.Navigate("Home");
                 Check(Nodes(window).OfType<WrapPanel>().Single(panel => panel.Name == "HomeTargetLanguageChoices").Children.OfType<Button>()
                     .All(button => AutomationProperties.GetName(button).StartsWith(UiText.T("Translate my voice to") + ": ", StringComparison.Ordinal)) &&
-                    AutomationProperties.GetName(IncomingHomeButton()) == UiText.T("Translate their voices to"),
-                    "visible own chips and subtitle picker follow the selected interface language: " + ui);
+                    IncomingHomeChoices().All(button => AutomationProperties.GetName(button).StartsWith(UiText.T("Translate their voices to") + ": ", StringComparison.Ordinal)),
+                    "visible own and subtitle chips follow the selected interface language: " + ui);
                 Border menu = window.CreateHomeTargetLanguageMenu(true);
                 Check(menu.CornerRadius.TopLeft > 0 && menu.Background is not null &&
                     Nodes(menu).OfType<ScrollViewer>().Single().MaxHeight == 280 &&

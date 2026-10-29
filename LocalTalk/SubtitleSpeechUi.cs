@@ -62,16 +62,19 @@ internal sealed partial class MainWindow
 
     private bool CanEditSubtitleSpeech() => !_busy && !_closing;
 
-    private Border CreateSubtitleSpeechCard()
+    private Border CreateSubtitleSpeechCard(bool onHome = false)
     {
         var body = new StackPanel { Name = "SubtitleSpeechSettings" };
-        body.Children.Add(SubtitleSpeechLabel("Subtitle speech recognition", 21));
-        body.Children.Add(SubtitleSpeechLabel("Choose what people are speaking and the model that hears their words. Your microphone settings stay unchanged.", 12, ModernTheme.Muted));
+        if (!onHome)
+        {
+            body.Children.Add(SubtitleSpeechLabel("Subtitle speech recognition", 21));
+            body.Children.Add(SubtitleSpeechLabel("Choose what people are speaking and the model that hears their words. Your microphone settings stay unchanged.", 12, ModernTheme.Muted));
+        }
         if (_settings.IncomingSpeechEngine == "vibevoice")
             body.Children.Add(SubtitleSpeechLabel("Groups uses VibeVoice and detects the language automatically. Choosing a model or a specific language below returns to Normal subtitles.", 12, ModernTheme.Warning));
         body.Children.Add(SubtitleSpeechLabel("They speak", 14));
         var languages = new WrapPanel { Name = "SubtitleSpokenLanguageChoices", Margin = new Thickness(0, 0, 0, 8) };
-        string alias = TranslationAlias(incoming: true);
+        string alias = onHome ? HomeTranslationAlias(HomeSubtitleSelection(), incoming: true) : TranslationAlias(incoming: true);
         foreach (string language in SubtitleSourceChoices)
         {
             string choice = language;
@@ -95,24 +98,29 @@ internal sealed partial class MainWindow
         }
         body.Children.Add(languages);
         body.Children.Add(SubtitleSpeechLabel("Choose a language when you know it. Any language uses a multilingual recognizer and may mistake short or unclear speech.", 12, ModernTheme.Muted));
+        if (onHome) AppendHomeSubtitleTargets(body);
         body.Children.Add(SubtitleSpeechLabel("Speech model", 14));
         var models = new System.Windows.Controls.Primitives.UniformGrid { Name = "SubtitleSpeechModelChoices", Columns = 2 };
         foreach (var model in IncomingRecognitionCatalog.Choices.Where(choice => choice.Id != "vibevoice"))
         {
             string id = model.Id;
+            var proposed = _settings.Copy(); StageSubtitleSpeechEngine(proposed, id);
+            bool compatible = !onHome || TranslationModelCapabilities.Validate(alias, proposed.IncomingSourceLanguage, [proposed.IncomingTargetLanguage]) is null;
             var copy = new StackPanel();
             copy.Children.Add(SubtitleSpeechLabel(model.Name, 15));
             copy.Children.Add(SubtitleSpeechLabel(model.Description, 12, ModernTheme.Muted));
             var button = SubtitleSpeechButton("", (_, _) =>
             {
-                if (!CanEditSubtitleSpeech()) return;
+                if (!CanEditSubtitleSpeech() || !compatible) return;
                 StageSubtitleSpeechEngine(_settings, id);
                 RefreshSaveState(); Navigate(_page);
             });
             button.Name = "SubtitleSpeechModelChoice"; button.Tag = id; button.Content = copy;
             button.HorizontalContentAlignment = HorizontalAlignment.Stretch; button.VerticalContentAlignment = VerticalAlignment.Top;
             button.Padding = new Thickness(12); button.MinHeight = 76;
-            button.IsEnabled = CanEditSubtitleSpeech();
+            button.IsEnabled = CanEditSubtitleSpeech() && compatible;
+            if (!compatible) button.ToolTip = SubtitleSpeechText.T("Choose compatible languages or another translator first.");
+            ToolTipService.SetShowOnDisabled(button, true);
             button.Background = id == _settings.IncomingSpeechEngine ? ModernTheme.Selection : ModernTheme.Raised;
             button.BorderBrush = id == _settings.IncomingSpeechEngine ? ModernTheme.Accent : ModernTheme.Stroke;
             AutomationProperties.SetName(button, SubtitleSpeechText.T("Speech model") + ": " + SubtitleSpeechText.T(model.Name));
@@ -123,6 +131,12 @@ internal sealed partial class MainWindow
             body.Children.Add(SubtitleSpeechLabel("FireRedASR2 recognizes Chinese and English. The selected language guides translation; FireRed can still recognize English words in Chinese speech. It processes short audio sections rather than updating every word.", 12, ModernTheme.Muted));
         else if (_settings.IncomingSpeechEngine == "voxtral")
             body.Children.Add(SubtitleSpeechLabel("Voxtral detects the language itself. Choose Nemotron or FireRedASR2 to select a spoken language.", 12, ModernTheme.Muted));
+
+        if (onHome)
+        {
+            AppendHomeSubtitleConfiguration(body);
+            return new Border { Name = "HomeSubtitleControls", Child = body };
+        }
 
         AppSettings saved = _preview ? _saveStateAppliedSettings?.Copy() ?? _settings.Copy() : SettingsStore.Load();
         bool changed = !SameSubtitleSpeechSelection(saved, _settings);

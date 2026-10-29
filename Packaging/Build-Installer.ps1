@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '0.2.3',
+    [string]$Version = '0.2.4',
     [string]$CompilerPath,
     [switch]$SkipPublish,
     [string]$AppPublishDirectory,
@@ -173,7 +173,7 @@ foreach ($launcher in @('Start-SayWhat.bat','Start-LocalTalk.bat')) {
     Copy-Item -LiteralPath (Join-Path $projectRoot $launcher) -Destination $sourceRoot
 }
 Copy-Item -LiteralPath (Join-Path $projectRoot 'LICENSE') -Destination $sourceRoot
-foreach ($document in @('README.md','CONTRIBUTING.md','SECURITY.md','SOURCE-PROVENANCE.md','SayWhat.sln','.gitignore','.gitattributes')) {
+foreach ($document in @('README.md','CONTRIBUTING.md','SECURITY.md','SUPPORT.md','CHANGELOG.md','SOURCE-PROVENANCE.md','SayWhat.sln','.gitignore','.gitattributes')) {
     Copy-Item -LiteralPath (Join-Path $projectRoot $document) -Destination $sourceRoot
 }
 $nativeSourceConvenience = Join-Path $sourceRoot 'FoxTransLocalHost\Native'
@@ -191,6 +191,7 @@ try {
         'LocalTalk/SubtitleSpeechUi.cs','LocalTalk/SubtitleSpeechText.cs','LocalTalk/SubtitleSpeechUiTests.cs',
         'IncomingTranslator/IncomingRecognitionCatalog.cs','IncomingTranslator/IncomingNativeSpeech.cs','LocalTalk/IncomingNativeSpeechTests.cs',
         'LocalTalk/VoiceFirstHome.cs','LocalTalk/VoiceFirstText.cs','LocalTalk/VoiceFirstHomeUiTests.cs',
+        'LocalTalk/HomeSubtitleControls.cs','LocalTalk/HomeSubtitleUiTests.cs',
         'FoxTransSource/FoxTrans/Providers/NemotronTranscriber.cs','FoxTransLocalHost/NativeSpeechTests.cs',
         'LocalTalk/RuntimeProfiles.cs','LocalTalk/VibeVoiceRuntime.cs','LocalTalk/MainWindowProfileRuntime.cs',
         'LocalTalk/TranslationProfilesUi.cs','IncomingTranslator/TranslationProfiles.cs',
@@ -220,7 +221,9 @@ try {
         'Packaging/scripts/manage-install-data.ps1','Start-SayWhat.bat',
         'Packaging/Build-Installer.ps1','Packaging/scripts/run-voxtral.sh',
         'Packaging/Export-Release.ps1','Packaging/Test-ReleaseLicenses.ps1','Packaging/Release-Distribution.md',
-        'eng/Build.ps1','eng/Prepare-Packaging.ps1','docs/development.md',
+        'eng/Build.ps1','eng/Prepare-Packaging.ps1','eng/Check-PublicSource.mjs','docs/development.md','docs/codebase-guide.md',
+        'Website/public/index.html','Website/public/assets/person-ari.svg','Website/public/assets/person-mina.svg',
+        '.github/workflows/ci.yml','README.md','CONTRIBUTING.md','SECURITY.md','SUPPORT.md','CHANGELOG.md','SOURCE-PROVENANCE.md',
         'LocalTalk/AppUpdateChecker.cs','LocalTalk/AppUpdateInstaller.cs',
         'LocalTalk/VrchatOscConnection.cs','LocalTalk/VrchatOscConnectionTests.cs',
         'FoxTransSource/FoxTrans/Providers/TranslationModelCapabilities.cs',

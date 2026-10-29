@@ -1124,7 +1124,9 @@ internal sealed partial class MainWindow : Window
     private StackPanel ModelsPage()
     {
         var page = Page("Download a model, or reuse one you already have.");
-        ProvisionInventory inventory = _provisioner.InspectLocal();
+        // Unshown UI checks must not inspect the real user's registry, WSL
+        // registrations, or external model folders merely to render a page.
+        ProvisionInventory inventory = _preview ? new([], [], [], []) : _provisioner.InspectLocal();
         foreach (ProvisionModelChoice model in LocalTalkProvisioner.ModelCatalog.OrderBy(model => model.Role == ProvisionModelRole.Speech ? 1 : model.ApiAlias.Contains("hy-mt", StringComparison.OrdinalIgnoreCase) ? 0 : 2))
         {
             var card = Section(model.Name, model.Role == ProvisionModelRole.Speech ? "Recognizes speech while someone is speaking"
@@ -1442,7 +1444,7 @@ internal sealed partial class MainWindow : Window
         var speech = Section("2 · Realtime speech engine", "Existing users can register the installed WSL server. Fresh installations can install WSL and build the pinned speech runtime here, with separate confirmations.");
         WslSpeechRegistration? registered = _provisioner.SpeechRegistration;
         speech.Children.Add(ModernTheme.Label(registered is null ? "No speech engine registered" : $"{registered.Distribution} · {registered.Backend}\n{registered.ServerPath}\n{registered.ModelPath}", 12, registered is null ? ModernTheme.Warning : ModernTheme.Good));
-        ProvisionInventory inventory = _provisioner.InspectLocal();
+        ProvisionInventory inventory = _preview ? new([], [], [], []) : _provisioner.InspectLocal();
         var distro = Select(inventory.WslDistributions.Count > 0 ? inventory.WslDistributions : new[] { "Ubuntu-24.04" }, registered?.Distribution ?? inventory.WslDistributions.FirstOrDefault() ?? "Ubuntu-24.04", _ => { });
         speech.Children.Add(Field("WSL distribution", distro));
         var server = Input(registered?.ServerPath ?? "/opt/voxtral.cpp/build-server-cuda3/voxtral-server");

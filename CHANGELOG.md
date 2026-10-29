@@ -3,14 +3,24 @@
 Installers, full notes and matching source archives are on
 [GitHub Releases](https://github.com/z2six/saywhat/releases).
 
+## 0.2.4
+
+- Added full live subtitle controls directly to Home: spoken and subtitle
+  languages, speech and translation models, audio source, finishing pause and
+  person matching. Pending changes have one explicit apply/download action.
+- Kept subtitle changes separate from microphone choices, with model/language
+  compatibility checks and clear feedback during preparation.
+- Published the application source and technical guides; release source archives
+  now include the developer build tools, website and documentation.
+
 ## Repository source migration
 
 - Published the application, capture host, native C dependencies, installer and
   website source in the repository under the existing GPLv3 project license.
 - Added a clean source-build script, read-only CI, staged-source safety checks,
   a Visual Studio solution, conceptual code guide and contribution documentation.
-- Preserved existing release history and binaries. This repository change does
-  not install or publish a different app version; 0.2.3 remains the current preview.
+- Preserved existing release history and binaries. Source publication does not
+  change the bytes of historical installers or their paired source archives.
 
 ## 0.2.3
 

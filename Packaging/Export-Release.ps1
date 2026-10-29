@@ -115,6 +115,16 @@ if ([version]($Version -split '-', 2)[0] -ge [version]'0.2.3') {
         'LocalTalk/FireRedIncomingSpeech.cs','LocalTalk/FireRedSpeechTests.cs',
         'LocalTalk/SubtitleSpeechUi.cs','LocalTalk/SubtitleSpeechText.cs','LocalTalk/SubtitleSpeechUiTests.cs')
 }
+if ([version]($Version -split '-', 2)[0] -ge [version]'0.2.4') {
+    $requiredSource += @('LocalTalk/HomeSubtitleControls.cs','LocalTalk/HomeSubtitleUiTests.cs',
+        'eng/Build.ps1','eng/Prepare-Packaging.ps1','eng/Check-PublicSource.mjs',
+        'docs/development.md','docs/codebase-guide.md','README.md','CONTRIBUTING.md','SECURITY.md','SUPPORT.md',
+        'CHANGELOG.md','SOURCE-PROVENANCE.md','SayWhat.sln','.github/workflows/ci.yml',
+        'Website/public/index.html','Website/public/assets/person-ari.svg','Website/public/assets/person-mina.svg')
+}
+$reviewedWebsiteImages = @('Website/public/favicon.svg','Website/public/favicon.ico',
+    'Website/public/assets/person-ari.svg','Website/public/assets/person-mina.svg',
+    'Website/public/assets/saywhat-icon-256.png','Website/public/assets/saywhat-lockup.png')
 $archive = [IO.Compression.ZipFile]::OpenRead($sourceZip)
 $sha = [Security.Cryptography.SHA256]::Create()
 $sourceInventory = [Collections.Generic.List[object]]::new()
@@ -133,6 +143,7 @@ try {
             -not (Test-Path -LiteralPath $original -PathType Leaf)) { throw ('Invalid/unmatched staged-source path: ' + $name) }
         if ($name -match '[.](png|jpg|jpeg|gif|webp|ico|svg)$' -and
             $name -notin @('LocalTalk/Assets/SayWhat.ico','LocalTalk/Assets/saywhat-mark.png','LocalTalk/Assets/saywhat-icon-256.png','LocalTalk/Assets/saywhat-lockup.png') -and
+            $name -notin $reviewedWebsiteImages -and
             $name -notmatch '^FoxTransSource/(brand/|FoxTrans[.]Desktop/Assets/).+[.](png|svg|ico)$') { throw ('Unreviewed source image: ' + $name) }
         $stream = $entry.Open()
         try { $hash = [Convert]::ToHexString($sha.ComputeHash($stream)).ToLowerInvariant() } finally { $stream.Dispose() }
@@ -263,9 +274,10 @@ Local speech translation for VRChat on Windows 11 x64.
 Run SayWhat-$Version-Setup.exe. Setup offers installation for you or all users.
 Then open SayWhat?, choose the language you speak and your translation languages,
 and prepare the recommended models. Start on Home translates your own voice.
-The default recognizer runs directly on Windows; a supported GPU is recommended.
-Optional subtitles and the alternative Voxtral recognizer use an app-owned
-Ubuntu environment and may need administrator approval, WSL2 and a restart.
+Nemotron and FireRedASR2 recognition run directly on Windows; a supported GPU is
+recommended for translation. The alternative Voxtral recognizer and Groups
+subtitles use an app-owned Ubuntu environment and may need administrator
+approval, WSL2 and a restart.
 No separate FoxTrans, LM Studio/Bionic or .NET installation is required.
 
 Your microphone can translate into up to four languages in VRChat chat. Other

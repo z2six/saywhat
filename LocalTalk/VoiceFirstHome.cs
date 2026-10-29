@@ -252,12 +252,11 @@ internal sealed partial class MainWindow
         var copy = new StackPanel(); copy.Children.Add(VoiceFirstHeading("Optional · live subtitles", 21));
         copy.Children.Add(VoiceFirstLabel("Read other people’s translated speech in a separate window.", 12, ModernTheme.Muted));
         row.Children.Add(copy); incoming.Children.Add(row);
-        var choices = new Grid(); choices.ColumnDefinitions.Add(new ColumnDefinition()); choices.ColumnDefinitions.Add(new ColumnDefinition());
-        var language = CreateHomeTargetLanguageButton(incoming: true); language.FontSize = 12;
-        language.Margin = new Thickness(0, 0, 8, 0); choices.Children.Add(language);
-        var listening = CreateHomeListeningButton(compactSource: true); listening.Margin = new Thickness(8, 0, 0, 0);
-        Grid.SetColumn(listening, 1); choices.Children.Add(listening); incoming.Children.Add(choices);
-        incoming.Children.Add(CreateHomeSubtitleSpeechSummary());
+        _subtitlesTourTarget.IsEnabled = CanEditSubtitleSpeech() && (_runtime.IncomingRunning || !HasPendingHomeSubtitleChoices());
+        if (!_runtime.IncomingRunning && HasPendingHomeSubtitleChoices())
+            _subtitlesTourTarget.ToolTip = SubtitleSpeechText.T("Apply your subtitle choices below before starting.");
+        ToolTipService.SetShowOnDisabled(_subtitlesTourTarget, true);
+        incoming.Children.Add(CreateSubtitleSpeechCard(onHome: true));
         var card = ModernTheme.Card(incoming); card.Name = "HomeSubtitlesCard"; card.Padding = new Thickness(18);
         return card;
     }
@@ -352,10 +351,16 @@ internal sealed partial class MainWindow
     {
         if (_busy || _closing || _preview) return;
         if (!_runtime.OwnRunning && !_settings.FirstRunSetupCompleted) { OpenGuidedSetup(firstRun: true); return; }
+        if (!_runtime.OwnRunning)
+        {
+            // Preparing and saving through the own-voice path keeps every
+            // unapplied subtitle choice staged, even when both cards are open.
+            await ApplyVoiceFirstModelChangeAsync(startOwn: true);
+            return;
+        }
         await RunTask(async token =>
         {
-            if (_runtime.OwnRunning) { TaskStage("Stopping your voice translator"); await _runtime.StopOwnAsync(); }
-            else { TaskStage("Saving your settings"); Persist(); await _runtime.StartOwnAsync(_settings.Copy(), token, ProvisionProgress()); }
+            TaskStage("Stopping your voice translator"); await _runtime.StopOwnAsync();
         }, "Voice translation");
     }
 

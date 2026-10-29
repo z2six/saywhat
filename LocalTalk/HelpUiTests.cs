@@ -54,7 +54,8 @@ internal static class HelpUiTests
                 "subtitle help explains the selected application picker instead of the removed VRChat-only checkbox");
             HelpTopic chineseHelp = HelpUi.Topics.Single(topic => topic.Id == "chinese-subtitles");
             Check(chineseHelp.Pages.SequenceEqual(new[] { "Home", "Listening" }) &&
-                chineseHelp.Description.Contains("Speech model & language", StringComparison.Ordinal) &&
+                chineseHelp.Description.Contains("Optional · live subtitles", StringComparison.Ordinal) &&
+                chineseHelp.Description.Contains("Languages, translators, listening source and sentence timing are all on this card.", StringComparison.Ordinal) &&
                 chineseHelp.Description.Contains("Under They speak, choose Chinese", StringComparison.Ordinal) &&
                 chineseHelp.Description.Contains("FireRedASR2 · Fast or FireRedASR2 · Accurate", StringComparison.Ordinal) &&
                 chineseHelp.Description.Contains("Download & apply, or Apply subtitle choices", StringComparison.Ordinal) &&

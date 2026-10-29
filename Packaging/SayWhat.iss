@@ -5,7 +5,7 @@
   #define OutputDir SourcePath + "dist"
 #endif
 #ifndef Version
-  #define Version "0.2.3"
+  #define Version "0.2.4"
 #endif
 #define DataActionHash GetSHA256OfFile(PayloadDir + "\provisioning\manage-install-data.ps1")
 

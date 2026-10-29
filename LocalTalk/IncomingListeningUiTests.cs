@@ -71,7 +71,8 @@ internal static class IncomingListeningUiTests
                 window.Navigate("Home");
                 bool expected = !busy && !closing && !running;
                 Check(MainWindow.CanChangeIncomingListening(busy, closing, running) == expected, "source guard: " + mask);
-                Check(Nodes(window).OfType<Button>().Single(button => button.Name == "HomeListeningSourceButton").IsEnabled == expected, "Home source selector guard: " + mask);
+                Check(Nodes(window).OfType<Button>().Where(button => button.Name == "HomeSubtitleAudioSourceChoice").All(button => button.IsEnabled == (!busy && !closing)),
+                    "Home audio choices permit staging while subtitles keep running: " + mask);
                 window.Navigate("Listening");
                 Check(Nodes(window).OfType<ComboBox>().Single(combo => combo.Name == "IncomingListeningModePicker").IsEnabled == expected &&
                     Nodes(window).OfType<CheckBox>().Single(check => check.Name == "IncomingSinglePersonToggle").IsEnabled == expected, "page choices guard: " + mask);

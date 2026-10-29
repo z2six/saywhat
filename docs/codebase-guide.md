@@ -180,6 +180,14 @@ built-ins/custom snapshots; the UI's pending-versus-saved state is in
 writes prevent a stale subtitle window from overwriting newer model or language
 choices elsewhere.
 
+Home exposes the microphone and subtitle choices in separate panels.
+[HomeSubtitleControls.cs](../LocalTalk/HomeSubtitleControls.cs) builds an incoming-only
+candidate from the saved state and the pending subtitle choices, prepares missing
+files, then uses the same runtime planner as Settings. The Home apply action
+does not copy unrelated microphone edits into saved settings. A shared translator
+still follows the normal compatibility and active-runtime checks, since changing
+that shared resource can affect both features.
+
 ## Why queues, timestamps and ownership matter
 
 - Audio, text and identity work have different costs. Keeping them independent

@@ -15,7 +15,7 @@ Setup and the next explicit speech start hide the verified app-managed speech en
 
 ## Technical documentation
 
-The [documentation index](README.md) now covers architecture, local protocols, all persisted settings, models/runtimes, People/voice examples, performance/recovery, storage/privacy and installation/update/shutdown. The public repository contains documentation, not the app's source tree or website deployment tooling.
+The [documentation index](README.md) covers architecture, local protocols, all persisted settings, models/runtimes, People/voice examples, performance/recovery, storage/privacy and installation/update/shutdown. At this historical release, the public repository contained documentation rather than the app's source tree. Current development source and website source are now browsable on the repository’s main branch.
 
 [Voice-model research](voice-model-research.md) compares identification, streaming voice tracking and actual overlapping-audio separation candidates. It distinguishes proposals from installed features. No new voice model was enabled, and live separation is not introduced in this release.
 

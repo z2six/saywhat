@@ -69,6 +69,7 @@ internal static class DesktopTests
             checks+=VoiceFirstHomeUiTests.Run(window, directory);
             checks+=IncomingListeningUiTests.Run(window, directory);
             checks+=SubtitleSpeechUiTests.Run(window, directory);
+            checks+=HomeSubtitleUiTests.Run(window, directory);
             checks+=SaveStateUiTests.Run(window);
             checks+=SpecializedTranslationModelTests.Run(directory);
             checks+=Task.Run(() => TimingDefaultsTests.RunAsync(directory)).GetAwaiter().GetResult();

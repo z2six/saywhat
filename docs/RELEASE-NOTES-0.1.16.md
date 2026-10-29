@@ -15,6 +15,6 @@ If setup cannot safely verify the Windows account, or you use a custom data fold
 
 This installer is unsigned. Settings, interface and data-cleanup checks use isolated test files; full all-users installation and uninstall with different Windows accounts still need testing. No models are started by installing the app or reading Help.
 
-The Windows installer, complete ZIP, matching **SayWhat-Corresponding-Source.zip**, licenses and checksums accompany this release. GitHub’s automatic “Source code” archives are not the application source.
+The Windows installer, complete ZIP, matching **SayWhat-Corresponding-Source.zip**, licenses and checksums accompany this release. GitHub’s automatic “Source code” archives for this historical release tag contain the earlier documentation repository; use its matching source asset for the application. Current development source is now browsable on the repository’s main branch.
 
 SayWhat?’s original contributions use GPL-3.0-only; third-party components and models retain their own terms.

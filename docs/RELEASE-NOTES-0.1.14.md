@@ -14,4 +14,4 @@ Early messages are spaced by at least 1.5 seconds. You can turn them off in Sett
 
 This installer is unsigned. Fresh-PC installation, hardware compatibility, live accuracy and long-session performance still need testing. Optional speaker recognition can confuse music or overlapping voices; it does not separate simultaneous speakers.
 
-The installer, complete ZIP, matching **SayWhat-Corresponding-Source.zip**, licenses and checksums are provided together. GitHub’s automatic “Source code” archives are not the application source. SayWhat?’s original contributions use GPL-3.0-only; third-party terms remain separate.
+The installer, complete ZIP, matching **SayWhat-Corresponding-Source.zip**, licenses and checksums are provided together. GitHub’s automatic “Source code” archives for this historical release tag contain the earlier documentation repository; use its matching source asset for the application. Current development source is now browsable on the repository’s main branch. SayWhat?’s original contributions use GPL-3.0-only; third-party terms remain separate.

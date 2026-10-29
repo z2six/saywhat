@@ -11,10 +11,10 @@ internal static class IncomingRecognitionCatalog
 {
     public static IReadOnlyList<IncomingRecognitionChoice> Choices { get; } = Array.AsReadOnly(new[]
     {
-        new IncomingRecognitionChoice("firered2-aed", "FireRedASR2 · Accurate", "Chinese and English. Uses an extra decoding step for difficult speech."),
+        new IncomingRecognitionChoice("firered2-aed", "FireRedASR2 · Accurate", "Chinese and English. More processing to help with difficult speech."),
         new IncomingRecognitionChoice("firered2-ctc", "FireRedASR2 · Fast", "Chinese and English. Lighter recognition for quicker subtitles."),
         new IncomingRecognitionChoice("nemotron", "Nemotron", "Multilingual streaming recognition. Choose a language or let it detect one."),
-        new IncomingRecognitionChoice("voxtral", "Voxtral", "The previous continuous recognizer. Detects the language automatically."),
+        new IncomingRecognitionChoice("voxtral", "Voxtral", "Continuous multilingual recognition. Detects the language automatically."),
         new IncomingRecognitionChoice("vibevoice", "VibeVoice", "Groups recognition with separate voice labels. Adds buffering.")
     });
 

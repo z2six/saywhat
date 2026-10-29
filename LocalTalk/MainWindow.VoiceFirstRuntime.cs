@@ -50,7 +50,7 @@ internal sealed partial class MainWindow
         }
     }
 
-    private async Task ApplyVoiceFirstModelChangeAsync()
+    private async Task ApplyVoiceFirstModelChangeAsync(bool startOwn = false)
     {
         if (_preview || _busy || _closing) return;
         ++_voiceFirstChangeVersion; _voiceFirstDebounce?.Cancel();
@@ -99,6 +99,11 @@ internal sealed partial class MainWindow
                     await ApplyVoiceFirstSharedModelAsync(previous, candidate, token);
                 else await _runtime.ApplyOwnSettingsAsync(candidate, token, ProvisionProgress());
                 CompleteVoiceFirstSave(candidate); applied = true;
+                if (startOwn)
+                {
+                    TaskStage("Starting your voice translator");
+                    await _runtime.StartOwnAsync(candidate.Copy(), token, ProvisionProgress());
+                }
             }, "Preparing selected models", "Settings applied.");
         }
         catch (Exception error) { Error("Change voice model", error); }
