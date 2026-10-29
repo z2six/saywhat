@@ -9,6 +9,36 @@ namespace IncomingTranslator;
 // protocol. Both use the same bounded capture queue and subtitle publication.
 internal sealed partial class IncomingTranslationService
 {
+    // Decoder progress includes audio that produced no words. Keep this apart
+    // from the real-text timestamp used to attach a person's voice evidence.
+    private DateTimeOffset? _lastDecodedAudioEnd;
+
+    private void ObserveDecodedAudio(DateTimeOffset? audioEnd)
+    {
+        if (audioEnd is not DateTimeOffset acknowledged) return;
+        lock (_gate)
+            if (_lastDecodedAudioEnd is null || acknowledged > _lastDecodedAudioEnd.Value)
+                _lastDecodedAudioEnd = acknowledged;
+    }
+
+    private void ResetDecodedAudioPosition()
+    {
+        lock (_gate) _lastDecodedAudioEnd = null;
+    }
+
+    private async Task ObserveNativeSubtitleUpdateAsync(NativeSubtitleUpdate update)
+    {
+        // A sent-audio offset is retained on the protocol result for legacy
+        // display compatibility, but cannot prove that inference reached it.
+        DateTimeOffset? audioEnd = update.VerifiedAudioEndMilliseconds is long verified
+            ? _sentAudioTimeline.Map(verified) : null;
+        ObserveDecodedAudio(audioEnd);
+        if (update.Text is not string text) return;
+        Interlocked.Increment(ref _transcriptEvents);
+        _lastTranscriptAt = DateTimeOffset.UtcNow;
+        await ObserveTranscriptAsync(text, audioEnd);
+    }
+
     internal static object NativeSubtitleConfiguration(string sourceLanguage) => new
     {
         type = "session.update",
@@ -103,12 +133,7 @@ internal sealed partial class IncomingTranslationService
                 NativeSubtitleUpdate update = transcript.Observe(message, Interlocked.Read(ref samplesSent) / 16,
                     Volatile.Read(ref commitRequested) != 0);
                 Interlocked.Exchange(ref _lastDecoderProgressTicks, DateTimeOffset.UtcNow.UtcTicks);
-                if (update.Text is string text)
-                {
-                    Interlocked.Increment(ref _transcriptEvents);
-                    _lastTranscriptAt = DateTimeOffset.UtcNow;
-                    await ObserveTranscriptAsync(text, _sentAudioTimeline.Map(update.AudioEndMilliseconds));
-                }
+                await ObserveNativeSubtitleUpdateAsync(update);
                 if (update.Completed) return;
             }
         }
@@ -119,6 +144,7 @@ internal sealed partial class IncomingTranslationService
     private void InitializeNativeSubtitleSession()
     {
         ResetTranscriptState();
+        ResetDecodedAudioPosition();
         _sessionStartedAt = DateTimeOffset.UtcNow;
         _audioTimelineStart = _sessionStartedAt;
         _sentAudioTimeline.Reset();
@@ -155,7 +181,8 @@ internal sealed partial class IncomingTranslationService
     }
 }
 
-internal readonly record struct NativeSubtitleUpdate(string? Text, long AudioEndMilliseconds, bool Completed);
+internal readonly record struct NativeSubtitleUpdate(string? Text, long AudioEndMilliseconds, bool Completed,
+    long? VerifiedAudioEndMilliseconds = null);
 
 // Pure protocol state, also exercised without a socket, audio or model. Empty
 // processing deltas prove decoder activity but are never treated as new words.
@@ -176,36 +203,50 @@ internal sealed class NativeSubtitleTranscript
     {
         if (message.ValueKind != JsonValueKind.Object || !message.TryGetProperty("type", out JsonElement typeValue) ||
             typeValue.ValueKind != JsonValueKind.String) throw new InvalidDataException("Invalid subtitle recognition event.");
-        long audioEnd = Math.Max(0, sentAudioMilliseconds);
+        long sentAudioEnd = Math.Max(0, sentAudioMilliseconds);
+        long audioEnd = sentAudioEnd;
+        long? verifiedAudioEnd = null;
         if (message.TryGetProperty("audio_processed", out JsonElement processed) && processed.ValueKind == JsonValueKind.Number &&
             processed.TryGetDouble(out double seconds) && double.IsFinite(seconds) && seconds >= 0)
-            audioEnd = (long)Math.Clamp(seconds * 1000, 0, audioEnd);
+        {
+            double milliseconds = seconds * 1000;
+            audioEnd = milliseconds >= sentAudioEnd ? sentAudioEnd : (long)milliseconds;
+            // Tolerate sub-millisecond JSON/float rounding at the sent boundary,
+            // but reject impossible future cursors as verified decoder proof.
+            if (double.IsFinite(milliseconds) && milliseconds <= (double)sentAudioEnd + 1)
+                verifiedAudioEnd = audioEnd;
+        }
         audioEnd = _lastAudioEnd = Math.Max(_lastAudioEnd, audioEnd);
         string type = typeValue.GetString()!;
         if (type == "conversation.item.input_audio_transcription.delta")
         {
             string delta = Text("delta");
-            if (delta.Length == 0) return new(null, audioEnd, false);
+            if (delta.Length == 0) return new(null, audioEnd, false, verifiedAudioEnd);
             _partial += delta;
             CheckSize();
-            return new(_confirmed + _partial, audioEnd, false);
+            return new(VisibleText(), audioEnd, false, verifiedAudioEnd);
         }
         if (type == "conversation.item.input_audio_transcription.completed")
         {
-            _confirmed += Text("transcript");
+            _confirmed += RecognitionTextFilter.CleanControlOnly(Text("transcript"));
             _partial = "";
             _finalAfterCommit |= commitRequested;
             CheckSize();
-            return new(_confirmed, audioEnd, false);
+            return new(VisibleText(), audioEnd, false, verifiedAudioEnd);
         }
         if (type == "input_audio_buffer.committed" && commitRequested && _finalAfterCommit)
-            return new(_confirmed, audioEnd, true);
+            return new(VisibleText(), audioEnd, true, verifiedAudioEnd);
         throw new InvalidDataException(type == "error"
             ? "The local subtitle recognizer rejected the request. Check the selected spoken language."
             : "The local subtitle recognizer reset or ended without a verified final transcript.");
 
         string Text(string name) => message.TryGetProperty(name, out JsonElement value) && value.ValueKind == JsonValueKind.String
             ? value.GetString()! : throw new InvalidDataException("The recognition event is missing required text.");
+        string? VisibleText()
+        {
+            string text = _confirmed + RecognitionTextFilter.CleanControlOnly(_partial);
+            return text.Length == 0 ? null : text;
+        }
         void CheckSize()
         {
             if (_confirmed.Length + _partial.Length > 16384)

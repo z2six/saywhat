@@ -32,6 +32,7 @@ internal sealed partial class MainWindow
         candidate.IncomingSinglePerson = draft.IncomingSinglePerson;
         candidate.IncomingPersonId = draft.IncomingPersonId;
         candidate.IncomingSettleMilliseconds = draft.IncomingSettleMilliseconds;
+        candidate.IncomingSendEarlyPreviews = draft.IncomingSendEarlyPreviews;
         // Profile selection here changes only the incoming recognizer. In
         // particular, it must not apply a preset's global recognition delay.
         if (draft.IncomingSpeechEngine == "vibevoice") candidate.ActiveTranslationProfileId = TranslationProfiles.GroupsId;
@@ -214,6 +215,10 @@ internal sealed partial class MainWindow
         if (!new[] { 900, 1200, 1800, 2400 }.Contains(_settings.IncomingSettleMilliseconds))
             body.Children.Add(ModernTheme.Label(VoiceFirstText.Format("Current wait: {0:0.0} s", _settings.IncomingSettleMilliseconds / 1000d), 12, ModernTheme.Muted, localize: false));
 
+        var early = HomeSubtitleCheck("Show early translations", _settings.IncomingSendEarlyPreviews, (_, _) =>
+        { if (CanEditSubtitleSpeech()) { _settings.IncomingSendEarlyPreviews = !_settings.IncomingSendEarlyPreviews; RefreshHomeSubtitleChoices(); } });
+        early.Name = "HomeSubtitleEarlyTranslationsToggle"; body.Children.Add(early);
+        body.Children.Add(SubtitleSpeechLabel("Show a translation before the sentence is finished. It may change as more words arrive.", 12, ModernTheme.Muted));
         AppendHomeSubtitlePeople(body);
         AppSettings saved = HomeSubtitleSavedSettings();
         bool changed = !TranslationProfiles.ConfigurationEquals(saved, HomeSubtitleCandidate(saved, _settings));

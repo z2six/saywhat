@@ -26,7 +26,7 @@ Choose a profile at the top of **Settings**, then **Apply profile**. The subtitl
 | Normal | Chosen non-Groups recognizer | 1,200 / 500 ms | 240 ms when using Voxtral | On; optional and changeable |
 | Groups | VibeVoice streaming | Keeps current values | Uses the selected streaming model's chunk/lookahead, not the Voxtral value | Keeps the current on/off choice |
 
-Quick and Normal set the microphone final pause to 1,200 ms. Quick also selects Fast translation style. They preserve the selected subtitle recognizer and spoken language. Groups uses VibeVoice with automatic recognition and remembers the prior non-Groups recognizer/source; returning restores those choices. Translation models, targets and appearance are preserved. Your selected microphone recognizer is unchanged.
+Quick and Normal set the microphone final pause to 1,200 ms. Quick also selects Fast translation style. They preserve the selected subtitle recognizer and spoken language. Groups uses VibeVoice with automatic recognition and remembers the prior non-Groups recognizer/source; returning restores those choices. Translation models, targets, appearance and explicit early-translation choices are preserved. A fresh configuration starts final-only in every built-in profile. Your selected microphone recognizer is unchanged.
 
 **Save current settings as…** captures current app preferences, including models, languages, timing and appearance. It does not copy downloaded files, saved People, voice examples or one-time setup/help acknowledgments. Up to 64 custom profiles are allowed, with unique names of 1–60 characters. **Update saved profile** explicitly replaces its snapshot; changing settings does not silently overwrite it. Built-in presets cannot be renamed or deleted. Deleting an active custom profile keeps its current settings as unsaved custom settings.
 
@@ -73,9 +73,10 @@ For subtitles, **Any language** requires a compatible multilingual recognizer su
 | --- | --- | --- |
 | My voice: silence before finalizing / `OwnVoiceEndPauseMilliseconds` | `1200` ms | 900–3,500 ms, 100 ms UI steps. Shorter finalizes earlier but splits natural pauses; longer waits for more context. Actual PCM quiet must reach the threshold. |
 | Other voices: silence before finalizing / `IncomingSettleMilliseconds` | `1200` ms | 600–2,400 ms. Continuous subtitle punctuation/soft limits may commit sooner; FireRed uses quiet time or its bounded section limit. See [segmentation](architecture.md). |
-| Stable subtitle punctuation / `SubtitlePreviewStableMilliseconds` | `500` ms | Stored range 150–1,200 ms; Quick sets 250 ms. Separate from the silence pause. |
+| Stable subtitle punctuation / `SubtitlePreviewStableMilliseconds` | `500` ms | Stored range 150–1,200 ms; Quick sets 250 ms. Controls punctuation/draft stability when early translations are enabled; final-only mode uses finishing-pause, finalization and bounded-section rules. |
 | Recognition lookahead / `RecognitionDelayMilliseconds` | `240` ms | 160, 240, 480 or 800 ms in the picker. Greater Voxtral lookahead adds recognition latency and may help accuracy; it is not the sentence-ending pause or VibeVoice chunk size. |
-| Show translations while I speak / `OwnVoiceSendEarlyPreviews` | `true` | Cumulative submitted chat previews followed by an authoritative final. Off means final-only and fewer speculative translator requests. It does not open/type into the chatbox editor. |
+| Show translations while I speak / `OwnVoiceSendEarlyPreviews` | `false` | Off waits for finished sentences. Opting in sends cumulative chat previews followed by an authoritative final; wording may change as more speech arrives. It does not open/type into the chatbox editor. |
+| Show early translations / `IncomingSendEarlyPreviews` | `false` | Off translates completed subtitle sections. Opting in can show and revise a translation before its section is finished. This is independent of microphone preview delivery. |
 | Microphone / `OwnMicrophoneDeviceId` | `default` | Follows the Windows default capture device. The picker can save another microphone's unique display name; ambiguous or missing devices are not silently replaced by an unrelated one. |
 | Finish captured speech after muting / `FinishCapturedSentenceOnMute` | `true` | New mic capture stops immediately; already-captured work may finish with one authorized final. False discards unfinished work. |
 | Pause when my VRChat mic is muted / `OwnVoicePauseWhenVrchatMuted` | `true` | Home checkbox; applies live without reloading models. On follows verified VRChat mute state and keeps capture closed while state is unknown. Off explicitly allows SayWhat to capture and send translations while your VRChat mic is muted. Capture still stops when VRChat closes. Finish-captured-speech behavior applies when following mute is on. |
@@ -86,7 +87,9 @@ For subtitles, **Any language** requires a compatible multilingual recognizer su
 | Playback device / `PlaybackDeviceId` | `auto-vrchat` | Relevant to the wider playback mode. Application capture selects the process instead of an unrelated desktop device. Changing capture choices may reconnect subtitles. |
 | Boost quiet speech / `NormalizeQuietPlayback` | `true` | Incoming recognition-only gain. Does not raise playback volume or alter the microphone. |
 
-These pauses exclude subsequent recognition-final drain, translator queue/computation, and output scheduling. **1.2 seconds is not an end-to-end delivery promise.** The old untouched 2,400 ms microphone default migrates to 1,200 ms when the newer early-preview preference is absent; customized saved pauses are not replaced just because the app updates.
+New settings wait for completed sentences in both directions. Recognition still listens continuously: final-only delivery does not stop listening between messages or wait for an entire conversation to end. Each early-translation option is an explicit opt-in; existing saved true/false choices are preserved. Built-in profile switches keep those choices, and custom profiles save them.
+
+These pauses exclude subsequent recognition-final drain, translator queue/computation, and output scheduling. **1.2 seconds is not an end-to-end delivery promise.** The old untouched 2,400 ms microphone default migrates to 1,200 ms when the newer early-preview preference is absent; customized saved pauses are not replaced just because the app updates. A missing preview flag defaults off and does not infer consent from an older profile.
 
 ## Optional voice recognition
 
@@ -103,12 +106,18 @@ No setting here separates audio waveforms. Reset unnamed voices preserves manual
 
 | Setting / key | Default | Behavior |
 | --- | --- | --- |
-| Layout / `OverlayMode` | `Sentence bubbles` | Independent committed subtitle bubbles. `Per-speaker history` groups by attribution; legacy `History` maps to this mode. The service also recognizes legacy `Latest sentence`. |
-| Visible history lines / `HistoryLinesPerSpeaker` | `12` | 3–40; limits visible retained entries, not ASR context/model memory. |
-| `VisibleSpeakerRows` | `8` | Legacy/display setting clamped to 2–12, relevant to grouped history. Not the saved-People limit. |
-| Always on top / `SubtitlesAlwaysOnTop` | `true` | Subtitle-window pin button toggles this immediately and saves it. Dashboard is not forced always on top. |
+| Layout / `OverlayMode` | `Sentence bubbles` | The compact overlay shows the latest three messages. Retained `Per-speaker history` groups the Transcript by attribution and shows up to three recent voices in the compact surface; legacy `History` maps to this mode. `Latest sentence` shows one compact message. Transcript retention stays bounded to 200 messages in every layout. |
+| Visible history lines / `HistoryLinesPerSpeaker` | `12` | Retained legacy preference, clamped to 3–40. It no longer controls compact display or Transcript retention, and never changes recognition context. |
+| `VisibleSpeakerRows` | `8` | Retained legacy preference, clamped to 2–12. It no longer controls Transcript retention and is not a saved-People limit. |
+| Always on top / `SubtitlesAlwaysOnTop` | `true` | The toolbar pin button saves this immediately for the compact toolbar and subtitle surface. Transcript and the dashboard are not forced always on top. |
+| Font size / `SubtitlesFontSize` | `16` | 12–30 device-independent pixels for translated text in the compact overlay and Transcript. Original text uses a smaller size. |
+| Bubble width / `SubtitlesBubbleWidth` | `420` | 240–900 device-independent pixels for the compact subtitle surface. |
+| Background / `SubtitlesBackgroundOpacity` | `0.65` | 0–1 opacity for compact bubble backplates. Text remains opaque. |
+| Original text / `SubtitlesShowOriginalText` | `true` | Show recognized source words above translations in the compact overlay and Transcript. Hiding them does not change recognition or translation. |
 
-The subtitle history scrolls to recent output. Closing the subtitle window stops that direction; it is not simply hiding an invisible playback recorder. A first-time help offer and the **?** button describe names/corrections without altering capture behavior.
+The compact subtitle body is click-through. **Logs** opens the separate interactive **Transcript** window, with selectable text, copying, name review and a **Follow latest** toggle. Closing Transcript hides that reading window; closing the compact subtitle toolbar stops incoming translation. A first-time help offer and **?** open the quick guide in Transcript without changing capture behavior.
+
+Appearance controls apply without restarting services. Their scoped save patches only the four appearance values, preserving microphone configuration and unrelated model/language preferences. Ordinary dashboard saves and built-in profile selections merge the newest saved live-window appearance rather than reverting it or treating it as an unsaved dashboard draft. Explicitly applying a custom profile can restore that profile's appearance. Invalid or nonfinite font/width/opacity values fall back to defaults, and finite out-of-range values clamp to the bounds above. [Subtitle controls](subtitles.md).
 
 ## App appearance, closing and updates
 

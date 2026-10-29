@@ -71,6 +71,25 @@ internal static class UiText
         void Add(string english, string chinese, string japanese, string korean) => values.Add(english, [chinese, japanese, korean]);
 
         // Navigation, short controls and accessible labels. Internal navigation keys remain English.
+        Add("Subtitle appearance", "字幕外观", "字幕の表示", "자막 모양");
+        Add("Couldn't show the overlay. Open Logs to read subtitles, or restart subtitles.", "无法显示悬浮字幕。请打开记录阅读字幕，或重新启动字幕。", "オーバーレイを表示できませんでした。「履歴」で字幕を読むか、字幕を再起動してください。", "오버레이를 표시하지 못했습니다. 기록에서 자막을 읽거나 자막을 다시 시작하세요.");
+        Add("Show early translations", "提前显示翻译", "途中の翻訳を表示", "말하는 중에 번역 표시");
+        Add("Show a translation before the sentence is finished. It may change as more words arrive.", "在句子说完前显示翻译。随着更多内容被识别，译文可能会改变。", "文を話し終える前に翻訳を表示します。続きを聞き取ると内容が変わることがあります。", "문장을 마치기 전에 번역을 표시합니다. 말을 더 인식하면 내용이 바뀔 수 있습니다.");
+        Add("Font size", "字号", "文字サイズ", "글자 크기");
+        Add("Bubble width", "气泡宽度", "吹き出しの幅", "말풍선 너비");
+        Add("Background", "背景", "背景", "배경");
+        Add("Background opacity", "背景不透明度", "背景の不透明度", "배경 불투명도");
+        Add("Original text", "原文", "原文", "원문");
+        Add("Show original text", "显示原文", "原文を表示", "원문 표시");
+        Add("Transcript", "字幕记录", "字幕の履歴", "자막 기록");
+        Add("Open transcript", "打开字幕记录", "字幕の履歴を開く", "자막 기록 열기");
+        Add("Close transcript", "关闭字幕记录", "字幕の履歴を閉じる", "자막 기록 닫기");
+        Add("Copy all", "全部复制", "すべてコピー", "모두 복사");
+        Add("Copy", "复制", "コピー", "복사");
+        Add("Follow latest", "跟随最新内容", "最新の字幕を追う", "최신 자막 따라가기");
+        Add("No subtitles yet.", "暂无字幕。", "字幕はまだありません。", "아직 자막이 없습니다.");
+        Add("Copied", "已复制", "コピーしました", "복사됨");
+        Add("Couldn't copy text. Try again.", "无法复制文字，请重试。", "文字をコピーできませんでした。もう一度お試しください。", "텍스트를 복사하지 못했습니다. 다시 시도하세요.");
         Add("Subtitle listening", "字幕收听", "字幕の聞き取り", "자막 듣기");
         Add("Choose listening source", "选择收听来源", "聞き取る音声を選択", "듣기 대상 선택");
         Add("Listening to {0}", "正在收听 {0}", "聞き取り対象：{0}", "듣기 대상: {0}");
@@ -561,6 +580,20 @@ internal static class UiText
         Add("See how to read translations and help the app recognize people.", "了解如何阅读译文，以及如何帮助应用识别说话的人。", "翻訳の読み方と、話した人をアプリが認識しやすくする方法を紹介します。", "번역을 읽는 방법과 앱이 사람을 알아보도록 돕는 방법을 알아보세요.");
         Add("Show guide", "查看简介", "案内を見る", "안내 보기");
         Add("Read translated voices", "阅读语音译文", "声の翻訳を読む", "음성 번역 읽기");
+        Add("Read recent subtitles", "阅读最近的字幕", "最近の字幕を読む", "최근 자막 읽기");
+        Add("By default, the overlay shows the latest three messages. Its bubbles let clicks pass through; drag or use controls from the toolbar.", "悬浮字幕默认显示最新三条消息。点击会穿过气泡；请用工具栏拖动或调整字幕。", "オーバーレイは初期設定で最新の3件を表示します。吹き出しへのクリックは下のウィンドウに届きます。移動や操作にはツールバーを使います。", "오버레이에는 기본적으로 최신 메시지 3개가 표시됩니다. 말풍선을 클릭하면 뒤의 창에 전달됩니다. 이동하거나 조절할 때는 도구 모음을 사용하세요.");
+        Add("Original text is what speech recognition heard; the translation appears below. Either step can make mistakes.", "原文是语音识别听到的内容，译文显示在下方。两个步骤都可能出错。", "原文は音声認識で聞き取った内容で、その下に翻訳が表示されます。どちらの段階でも間違いは起こります。", "원문은 음성 인식으로 들은 내용이며 아래에 번역이 표시됩니다. 어느 단계에서든 오류가 생길 수 있습니다.");
+        Add("Open the transcript", "打开字幕记录", "字幕の履歴を開く", "자막 기록 열기");
+        Add("Choose Logs for up to 200 recent messages in Transcript. Select text, use Copy all, or turn Follow latest on to keep up.", "点击“记录”可在“字幕记录”中查看最多200条最近消息。可以选择文字、全部复制，或开启“跟随最新内容”。", "「履歴」を選ぶと、字幕の履歴で最近の最大200件を読めます。文字の選択、「すべてコピー」、「最新の字幕を追う」が使えます。", "기록을 누르면 자막 기록에서 최근 메시지를 최대 200개 볼 수 있습니다. 텍스트를 선택하거나 모두 복사하고 최신 자막 따라가기를 켤 수 있습니다.");
+        Add("Use Select a person and the ✓ / ✕ buttons in Transcript to correct or review names.", "在“字幕记录”中使用“选择人物”和 ✓ / ✕ 按钮来更正或确认姓名。", "字幕の履歴の「人を選ぶ」と ✓ / ✕ ボタンで、名前を訂正したり候補を確認したりできます。", "자막 기록에서 사람 선택과 ✓ / ✕ 버튼으로 이름을 수정하거나 검토하세요.");
+        Add("Adjust the overlay", "调整悬浮字幕", "オーバーレイを調整", "오버레이 조절");
+        Add("Open Appearance on the toolbar to change Font size, Bubble width, Background and Original text. Changes save immediately.", "打开工具栏上的“外观”，可调整字号、气泡宽度、背景和原文显示。更改会立即保存。", "ツールバーの「外観」で文字サイズ、吹き出しの幅、背景、原文の表示を変更できます。変更はすぐに保存されます。", "도구 모음의 모양에서 글자 크기, 말풍선 너비, 배경과 원문 표시를 바꿀 수 있습니다. 변경 사항은 바로 저장됩니다.");
+        Add("The background starts at 65% opacity; text stays solid. Always on top controls whether the overlay stays in front.", "背景默认不透明度为65%，文字保持不透明。“始终置顶”决定字幕是否显示在其他窗口前面。", "背景の初期不透明度は65%で、文字は透けません。「最前面に表示」でほかのウィンドウより前に表示するかを選びます。", "배경은 기본적으로 불투명도 65%이며 글자는 투명해지지 않습니다. 항상 위에 표시로 다른 창보다 앞에 둘지 정할 수 있습니다.");
+        Add("Use Appearance or Transcript to switch Normal / Groups. Open Settings in Transcript; use ? for this guide.", "可在“外观”或“字幕记录”中切换“标准／多人”模式，在“字幕记录”中打开设置，或点击 ? 查看本指南。", "「外観」や字幕の履歴で「標準／グループ」を切り替えられます。設定は字幕の履歴から、この案内は ? から開けます。", "모양이나 자막 기록에서 일반 / 그룹을 전환하세요. 설정은 자막 기록에서, 이 안내는 ?에서 열 수 있습니다.");
+        Add("Normal uses your chosen speech model. Groups uses an extra local model to recognize separate voices; it adds delay and can still miss overlapping speech.", "标准模式使用你选择的语音模型。多人模式使用额外的本地模型来识别不同声音，会增加延迟，也可能漏掉重叠的讲话。", "標準では選んだ音声モデルを使います。グループでは追加のローカルモデルで声を区別します。遅延が増え、重なった発言を聞き逃すこともあります。", "일반은 선택한 음성 모델을 사용합니다. 그룹은 추가 로컬 모델로 여러 목소리를 구별합니다. 지연이 늘어나며 겹치는 말을 놓칠 수도 있습니다.");
+        Add("Maybe names are suggestions. ✓ confirms one; ✕ marks it unknown. Guesses never teach themselves.", "“可能是”的姓名只是建议。✓ 表示确认，✕ 改为未知人物。未经确认的猜测不会用于学习。", "「かも」の名前は候補です。✓ で確認し、✕ で不明にします。未確認の推測から声を覚えることはありません。", "‘아마’로 표시된 이름은 제안입니다. ✓로 확인하고 ✕로 알 수 없음으로 바꿉니다. 확인하지 않은 추측은 학습에 사용하지 않습니다.");
+        Add("Selecting a person can save a clear voice example. Mixed, short or old audio may only change the name. You can undo a review.", "选择人物可保存清晰的声音样本。混合、过短或过旧的音频可能只会更改姓名。确认或否定结果可以撤销。", "人を選ぶと、明瞭な声の例を保存できる場合があります。重なった声、短い声、古い音声では名前だけを変更することがあります。確認や否定は元に戻せます。", "사람을 선택하면 명확한 목소리 예시를 저장할 수 있습니다. 겹치거나 짧거나 오래된 음성은 이름만 바뀔 수 있습니다. 검토는 되돌릴 수 있습니다.");
+        Add("Logs", "记录", "履歴", "기록");
         Add("Other people's speech appears here as translated chat bubbles. New messages are added below.", "其他人的语音会以翻译后的聊天气泡显示在这里。新消息会添加在下方。", "相手の発言は、翻訳されたチャットの吹き出しとしてここに表示されます。新しいメッセージは下に追加されます。", "다른 사람의 말이 번역된 채팅 말풍선으로 여기에 표시됩니다. 새 메시지는 아래에 추가됩니다.");
         Add("Tell voices apart", "区分不同人的声音", "声を区別する", "목소리 구별하기");
         Add("Review a suggested name", "确认或否定识别建议", "名前の候補を確認", "이름 제안 검토");

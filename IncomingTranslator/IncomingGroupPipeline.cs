@@ -245,17 +245,17 @@ internal sealed partial class IncomingTranslationService
             foreach (GroupSentenceState state in _groupSentences.Values)
             {
                 state.Segments.StabilityMilliseconds = settings.SubtitlePreviewStableMilliseconds;
+                state.Segments.SendEarlyPreviews = settings.IncomingSendEarlyPreviews;
                 // Chunk cadence is not silence: do not finalize between VibeVoice's 2.9-second packets.
-                bool quiet = state.DecodedThrough is DateTimeOffset decodedThrough
-                    && _speakerTracker.LastVoiceLikeAt != DateTimeOffset.MinValue
-                    && now - _speakerTracker.LastVoiceLikeAt > TimeSpan.FromMilliseconds(settings.IncomingSettleMilliseconds)
-                    && decodedThrough >= _speakerTracker.LastVoiceLikeAt;
+                bool quiet = SubtitleSegmentation.HasAudioPause(now, _speakerTracker.LastVoiceLikeAt,
+                    state.DecodedThrough, TimeSpan.FromMilliseconds(settings.IncomingSettleMilliseconds));
                 // A later decoded chunk containing other voices (or silence) is
                 // evidence that this voice has stopped. Packet delivery time is not.
                 bool voiceAbsent = state.DecodedThrough is DateTimeOffset observedThrough
                     && state.LastVoiceDecodedThrough is DateTimeOffset lastVoiceThrough
                     && observedThrough - lastVoiceThrough >= TimeSpan.FromMilliseconds(settings.IncomingSettleMilliseconds);
-                while (state.Segments.TryTakeReady(now, final || quiet || voiceAbsent, TimeSpan.FromSeconds(10), out var segment))
+                while (state.Segments.TryTakeReady(now, final || quiet || voiceAbsent, TimeSpan.FromSeconds(10),
+                    out var segment, allowQuietCommit: false))
                 {
                     if (!state.Bubbles.TryGetValue(segment.SequenceIndex, out long id))
                         state.Bubbles[segment.SequenceIndex] = id = Interlocked.Increment(ref _nextUtteranceId);
@@ -423,6 +423,38 @@ internal sealed partial class IncomingTranslationService
             AudioEndMilliseconds = 5800, Segments = [new("1", "Another person has now started speaking")] }, CancellationToken.None).ConfigureAwait(false);
         Check(service._translations.Reader.TryRead(out TranslationRequest stoppedVoice) && stoppedVoice.Source == "Still talking" && stoppedVoice.IsCommitted,
             "a later decoded interval without a voice finalizes that voice without waiting for global room silence");
+
+        using var finalPolicyIdentifier = new AiSpeakerIdentifier(Path.Combine(directory, "final-policy-identities.json"), Path.Combine(directory, "final-policy-people.json"));
+        using var finalPolicyService = new IncomingTranslationService(new AppSettings
+            { IncomingSpeechEngine = "vibevoice", UseAiSpeakerRecognition = false },
+            (_, _) => Task.CompletedTask, _ => Task.CompletedTask, _ => Task.CompletedTask, finalPolicyIdentifier);
+        var punctuated = new GroupTranscriptChunk("offline-final-policy", 0, 0, 0, 2900,
+            [new("0", "This sentence has punctuation. The same person is continuing")]);
+        await finalPolicyService.ObserveGroupChunkAsync(punctuated, CancellationToken.None).ConfigureAwait(false);
+        GroupSentenceState pendingState = finalPolicyService._groupSentences.Values.Single();
+        pendingState.Segments.Reset();
+        pendingState.Segments.Observe(pendingState.Text, DateTimeOffset.UtcNow.AddSeconds(-2));
+        await finalPolicyService.SettleGroupSentencesAsync(CancellationToken.None).ConfigureAwait(false);
+        Check(finalPolicyService._translations.Reader.Count == 0 && !pendingState.Segments.SendEarlyPreviews,
+            "default Groups ignores stable punctuation and packet silence when no actual turn-ending evidence exists");
+        await finalPolicyService.FlushGroupSentencesAsync(CancellationToken.None).ConfigureAwait(false);
+        var finalPolicyRequests = new List<TranslationRequest>();
+        while (finalPolicyService._translations.Reader.TryRead(out TranslationRequest request)) finalPolicyRequests.Add(request);
+        Check(finalPolicyRequests.Count == 2 && finalPolicyRequests.All(request => request.IsCommitted) &&
+            string.Join(" ", finalPolicyRequests.Select(request => request.Source)) == punctuated.Segments.Single().Text &&
+            finalPolicyRequests.Select(request => request.UtteranceId).Distinct().Count() == 2,
+            "an actual Groups final releases the complete retained text in distinct finished sentence bubbles without loss");
+        AppSettings earlySettings = finalPolicyService.CurrentSettings(); earlySettings.IncomingSendEarlyPreviews = true;
+        finalPolicyService.UpdateSettings(earlySettings);
+        pendingState.Segments.Reset(); pendingState.Bubbles.Clear();
+        pendingState.Text = "Another sentence. This thought is still growing";
+        pendingState.Segments.Observe(pendingState.Text, DateTimeOffset.UtcNow.AddMilliseconds(-700));
+        await finalPolicyService.SettleGroupSentencesAsync(CancellationToken.None).ConfigureAwait(false);
+        Check(finalPolicyService._translations.Reader.TryRead(out TranslationRequest earlySentence) && earlySentence.Source == "Another sentence." &&
+            pendingState.Segments.SendEarlyPreviews && !finalPolicyService._captureRefreshNeeded,
+            "explicit early Groups mode can publish a stable sentence before a real pause, without a capture restart");
+        Check(finalPolicyIdentifier.ExtractorLoadAttempts == 0 && !finalPolicyIdentifier.IsModelLoaded,
+            "group final-policy fixtures never run inference or open an audio source");
         using var canceled = new CancellationTokenSource(); canceled.Cancel();
         bool canceledFlush = false;
         try { await service.FlushGroupSentencesAsync(canceled.Token).ConfigureAwait(false); }

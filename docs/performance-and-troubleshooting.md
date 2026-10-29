@@ -30,7 +30,7 @@ Use several realistic conversational phrases, not a single “hello.” Word cho
 2. Start with one output language and the smaller **Hy-MT2** translator card. Up to four outputs are supported, but extra languages use sequential translation requests, not free parallel work.
 3. Check **I speak** on Home. With native Nemotron, choosing your actual language can reduce recognition mix-ups. Legacy Voxtral continues detecting speech automatically; its translator hint does not pin ASR.
 4. Start with the default **1.2-second** pause. Home exposes shorter or longer waits: shorter can split a sentence, longer adds delay. Timing and early-message changes keep the compatible models loaded instead of unloading/reloading them.
-5. Try **Show translations while I’m still speaking** for earlier visible chat. If speculative translations add too much load, turn it off and compare final-only behavior. Earlier output is not a guarantee of faster final translation.
+5. Finished-sentence translation is the default in both directions. Optionally try **Show translations while I’m still speaking** for earlier VRChat chat, or **Show early translations** for subtitles. Each can revise wording as more speech arrives and add speculative translator work; leave it off if that is distracting or costly. Earlier output is not a guarantee of faster final translation.
 6. If you also need subtitles, share one translator and consider **Quick** in Settings for one-to-one conversation. Quick skips familiar-voice matching and shortens subtitle waits/lookahead. Turn optional matching off if its extra CPU work is unwanted; that is distinct from unloading the GPU speech/translation models.
 
 Larger translation models can improve a phrase but still be slower despite fitting in VRAM. Reducing idle caches or loading two models does not increase GPU compute capacity. Test in the same crowded world and with the same VRChat graphics settings before drawing conclusions.
@@ -72,7 +72,7 @@ If FireRed is falling behind, compare **FireRedASR2 · Fast** against **Accurate
 1. On **Home**, choose **Speech model & language** on the subtitle card.
 2. Under **They speak**, choose **Chinese**. Choose **FireRedASR2 · Fast** as a Chinese/English specialist, or compare **Accurate** if Fast misses important words.
 3. Choose **Download & apply**, or **Apply subtitle choices** if the files are ready. Preparing files keeps stopped subtitles stopped; choose Start when needed.
-4. Compare the source words with the English translation. Wrong source words need recognition work; a correct Chinese transcript with poor English wording points to the translator.
+4. Turn **Show original text** on in the overlay's **Appearance** controls. Compare the source words with the English translation, in the overlay or **Logs → Transcript**. Wrong source words need recognition work; a correct Chinese transcript with poor English wording points to the translator. Neither stage is a verified transcript.
 
 FireRedASR2 is bilingual. Selecting Chinese chooses compatible recognition and translation context, but does not force a hidden Chinese-only decoding token. Real English words in the conversation are still valid. For a multilingual room, choose **Any language** with **Nemotron** instead. Its explicit Chinese selection reaches the recognizer itself when you know the conversation's language. Choosing an incorrect forced language can make results worse.
 

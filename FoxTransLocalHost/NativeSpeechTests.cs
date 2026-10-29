@@ -66,6 +66,17 @@ internal static class NativeSpeechTests
             Check(failed && invalidAudioSocket.BinaryBytes == 0 && invalidAudioSocket.Commits == 0,
                 "native adapter rejects unsupported PCM before transmitting audio");
         }
+        foreach (string text in new[] { "SIL", "<sil>", "[Silence]", "SIL International" })
+        {
+            var controlSocket = new NativeSocket { PartialText = text, CompletedText = text };
+            await using var provider = new NemotronTranscriber(new("http://127.0.0.1:8080"), "auto", new NativeFactory(controlSocket));
+            var events = new List<StreamingTranscriptionEvent>();
+            await foreach (var item in provider.TranscribeAsync(Audio(), CancellationToken.None)) events.Add(item);
+            bool control = text != "SIL International";
+            Check(events.OfType<StreamingFinalTranscript>().Single().Text == (control ? "" : text) &&
+                events.OfType<StreamingPartialTranscript>().Count() == (control ? 0 : 1) && events[^1] is StreamingSessionCompleted,
+                "own Nemotron filters control-only words while preserving mixed speech and completion: " + text);
+        }
         using (var handler = new ReadinessHandler("{\"ready\":true}"))
         using (var http = new HttpClient(handler))
         {
@@ -121,6 +132,7 @@ internal static class NativeSpeechTests
         private readonly Channel<byte[]> _events = Channel.CreateUnbounded<byte[]>();
         public WebSocketState State { get; private set; }
         public string Failure = "";
+        public string PartialText = "partial source", CompletedText = "authoritative completed sentence";
         public string? Language;
         public int SampleRate, BinaryBytes, Commits;
         public Uri? Endpoint;
@@ -137,7 +149,7 @@ internal static class NativeSpeechTests
                 {
                     if (Failure == "invalid-json") _events.Writer.TryWrite(Encoding.UTF8.GetBytes("not json"));
                     else if (Failure == "server-error") Queue(new { type = "error", error = new { message = "private diagnostic", type = "invalid_request_error" } });
-                    else Queue(new { type = "conversation.item.input_audio_transcription.delta", delta = "partial source", audio_processed = 0.08 });
+                    else Queue(new { type = "conversation.item.input_audio_transcription.delta", delta = PartialText, audio_processed = 0.08 });
                 }
                 BinaryBytes += bytes.Length;
             }
@@ -152,7 +164,7 @@ internal static class NativeSpeechTests
                         Queue(new { type = "session.updated" }); break;
                     case "input_audio_buffer.commit":
                         Commits++;
-                        if (Failure != "missing-final") Queue(new { type = "conversation.item.input_audio_transcription.completed", transcript = "authoritative completed sentence", audio_processed = 0.1 });
+                        if (Failure != "missing-final") Queue(new { type = "conversation.item.input_audio_transcription.completed", transcript = CompletedText, audio_processed = 0.1 });
                         if (Failure == "missing-ack") _events.Writer.TryWrite([0]);
                         else Queue(new { type = "input_audio_buffer.committed" });
                         break;

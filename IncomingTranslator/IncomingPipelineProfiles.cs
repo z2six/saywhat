@@ -227,6 +227,9 @@ internal sealed partial class IncomingTranslationService
     private async Task QueueTranslationAsync(TranslationRequest request, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        // Live opt-out also covers drafts already produced by a decoder before
+        // its next settings snapshot. Finished sentences are never discarded.
+        if (!request.IsCommitted && !CurrentSettings().IncomingSendEarlyPreviews) return;
         if (!request.IsCommitted && IsSuperseded(request)) return;
         CancellationTokenSource? cancel = null;
         lock (_latestUtteranceRevisions)
@@ -261,7 +264,7 @@ internal sealed partial class IncomingTranslationService
         }
         var published = new List<TranslationDisplay>();
         using var identifier = new AiSpeakerIdentifier(Path.Combine(directory, "fingerprints.json"), Path.Combine(directory, "people.json"));
-        using var service = new IncomingTranslationService(new AppSettings(), (_, _) => Task.CompletedTask,
+        using var service = new IncomingTranslationService(new AppSettings { IncomingSendEarlyPreviews = true }, (_, _) => Task.CompletedTask,
             _ => Task.CompletedTask, display => { published.Add(display); return Task.CompletedTask; }, identifier);
         DateTimeOffset start = DateTimeOffset.UtcNow;
         long epoch = Interlocked.Read(ref service._speakerRecognitionEpoch);
@@ -325,6 +328,34 @@ internal sealed partial class IncomingTranslationService
         service._activeTranslationCancellation = finalCancellation;
         await service.QueueTranslationAsync(new("other draft", fallback, 50, start.AddSeconds(1)) { IsCommitted = false }, CancellationToken.None).ConfigureAwait(false);
         Check(!finalCancellation.IsCancellationRequested, "new previews never cancel a committed translation");
+
+        using var defaultIdentifier = new AiSpeakerIdentifier(Path.Combine(directory, "final-identities.json"), Path.Combine(directory, "final-people.json"));
+        using var finalOnlyService = new IncomingTranslationService(new AppSettings { UseAiSpeakerRecognition = false },
+            (_, _) => Task.CompletedTask, _ => Task.CompletedTask, _ => Task.CompletedTask, defaultIdentifier);
+        using var untouchedOperation = new CancellationTokenSource();
+        finalOnlyService._activeTranslation = draft;
+        finalOnlyService._activeTranslationCancellation = untouchedOperation;
+        await finalOnlyService.QueueTranslationAsync(draft with { At = start.AddSeconds(1) }, CancellationToken.None).ConfigureAwait(false);
+        Check(finalOnlyService._translations.Reader.Count == 0 && !untouchedOperation.IsCancellationRequested && finalOnlyService._translationQueueDrops == 0,
+            "the default queue rejects an unfinished revision before altering active work or reporting a backlog");
+        finalOnlyService._latestUtteranceRevisions[committed.UtteranceId] = start.AddSeconds(10);
+        await finalOnlyService.QueueTranslationAsync(committed, CancellationToken.None).ConfigureAwait(false);
+        Check(finalOnlyService._translations.Reader.TryRead(out TranslationRequest retainedFinal) && retainedFinal == committed,
+            "the final-only backstop never drops a finished sentence, including one older than a speculative watermark");
+        AppSettings optIn = finalOnlyService.CurrentSettings(); optIn.IncomingSendEarlyPreviews = true;
+        finalOnlyService.UpdateSettings(optIn);
+        await finalOnlyService.QueueTranslationAsync(draft with { UtteranceId = 70 }, CancellationToken.None).ConfigureAwait(false);
+        Check(finalOnlyService._translations.Reader.TryRead(out TranslationRequest permittedDraft) && !permittedDraft.IsCommitted &&
+            !finalOnlyService._captureRefreshNeeded && finalOnlyService._socket is null,
+            "an explicit live opt-in permits drafts without opening audio or restarting capture");
+        optIn.IncomingSendEarlyPreviews = false; finalOnlyService.UpdateSettings(optIn);
+        await finalOnlyService.QueueTranslationAsync(draft with { UtteranceId = 71 }, CancellationToken.None).ConfigureAwait(false);
+        await finalOnlyService.QueueTranslationAsync(committed with { UtteranceId = 71 }, CancellationToken.None).ConfigureAwait(false);
+        Check(finalOnlyService._translations.Reader.TryRead(out retainedFinal) && retainedFinal.IsCommitted && retainedFinal.UtteranceId == 71 &&
+            !finalOnlyService._translations.Reader.TryRead(out _),
+            "live opt-out immediately ignores new drafts while allowing the same sentence's final through");
+        Check(defaultIdentifier.ExtractorLoadAttempts == 0 && !defaultIdentifier.IsModelLoaded,
+            "final-only admission fixtures never load voice identification");
         Check(identifier.ExtractorLoadAttempts == 0 && !identifier.IsModelLoaded,
             "all pipeline fixtures avoided model loading, audio capture and network requests");
         Console.WriteLine($"PASS: {checks} incoming profile pipeline checks; synthetic metadata only, no models, capture or network.");

@@ -31,6 +31,7 @@ See [Contributing](../CONTRIBUTING.md) for changes and pull requests, and
 |---|---|
 | [Support](../SUPPORT.md) | Find the right next step or report a problem without sharing private conversations. |
 | [Install and updates](install-and-updates.md) | Installation scope, updates, removal and retained data. |
+| [Live subtitles](subtitles.md) | Compact overlay, appearance, original text, transcript, copying and name review. |
 | [Performance and troubleshooting](performance-and-troubleshooting.md) | Delayed messages, missing subtitles, OSC and model tradeoffs. |
 | [Privacy and storage](privacy-and-storage.md) | What stays local, where files live and what diagnostic logs can contain. |
 | [Licensing](licensing-and-contributing.md) | Project source, upstream attribution and separate model terms. |

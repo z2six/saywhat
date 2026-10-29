@@ -236,8 +236,9 @@ internal static class PersonAvatarTests
             DateTimeOffset now = DateTimeOffset.UtcNow;
             overlay.Publish(new("Alice Example", "Synthetic source", "Hello!", 91, now) { PersonId = alice.Id });
             overlay.Publish(new("Bob Friend", "Synthetic source", "How are you?", 92, now.AddSeconds(1)) { PersonId = bob.Id });
-            var content = (FrameworkElement)overlay.Content;
+            var content = overlay.CompactPreview;
             content.Measure(new Size(680, 480)); content.Arrange(new Rect(0, 0, 680, 480)); content.UpdateLayout();
+            overlay.TranscriptRoot.Measure(new Size(680, 480)); overlay.TranscriptRoot.Arrange(new Rect(0, 0, 680, 480)); overlay.TranscriptRoot.UpdateLayout();
             static IEnumerable<DependencyObject> Nodes(DependencyObject node)
             {
                 yield return node;
@@ -246,6 +247,8 @@ internal static class PersonAvatarTests
             }
             Check(Nodes(content).OfType<Image>().Any(image => image.Source is BitmapSource bitmap && bitmap.PixelWidth == 64),
                 "named subtitle bubbles show a small local profile thumbnail");
+            Check(Nodes(overlay.TranscriptRoot).OfType<Image>().Any(image => image.Source is BitmapSource bitmap && bitmap.PixelWidth == 64),
+                "the transcript keeps the same local profile thumbnail and correction controls");
             Check(Nodes(content).OfType<Image>().Any(image => ReferenceEquals(image.Source, GeneratedPersonAvatar.Resolve(bob))),
                 "a named person without a photo has generated artwork beside their translation");
             var preview = new RenderTargetBitmap(680, 480, 96, 96, PixelFormats.Pbgra32); preview.Render(content);

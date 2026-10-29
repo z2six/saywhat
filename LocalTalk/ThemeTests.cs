@@ -131,7 +131,7 @@ internal static class ThemeTests
                 foreach (var dialog in dialogs)
                 {
                     Check(!dialog.Window.IsLoaded && !dialog.Window.IsVisible, "every secondary window is an unshown fixture: " + dialog.Name);
-                    var body = (FrameworkElement)dialog.Window.Content;
+                    var body = dialog.Name == "subtitles" ? overlay.TranscriptRoot : (FrameworkElement)dialog.Window.Content;
                     Prepare(body, new Size(dialog.Window.Width, dialog.Height));
                     CheckTextContrast(body, AppearanceTheme.Background.Color, preset.Id + "/" + dialog.Name, Check);
                     Render(body, Path.Combine(directory, "themes", preset.Id + "-" + dialog.Name + ".png"), (int)dialog.Window.Width, dialog.Height);
@@ -140,13 +140,15 @@ internal static class ThemeTests
                 }
                 CheckControlTemplates(preset.Id, Check);
                 TranslationDisplay? entryBefore = overlay.HistoryEntry(fixture.UtteranceId);
-                TextBlock[] subtitlesBefore = Nodes((FrameworkElement)overlay.Content).OfType<TextBlock>().Where(label => label.Text == fixture.Translation).ToArray();
+                TextBlock[] subtitlesBefore = Nodes(overlay.CompactPreview).OfType<TextBlock>().Where(label => label.Text == fixture.Translation).ToArray();
                 Color before = AppearanceTheme.Text.Color;
                 AppSettings opposite = sample.Copy(); opposite.UiThemeId = AppearanceTheme.IsDark ? "paper" : "ink";
                 AppearanceTheme.Apply(opposite);
                 Check(AppearanceTheme.Text.Color != before, "changing between light and dark changes actual text color");
                 Check(overlay.HistoryEntry(fixture.UtteranceId) == entryBefore && overlay.HistoryEntryCount == 1, "a live theme change preserves existing subtitle history");
                 Check(subtitlesBefore.Length > 0 && subtitlesBefore.All(label => ReferenceEquals(label.Foreground, AppearanceTheme.Text)), "existing subtitle text retains the live semantic brush across theme changes");
+                Check(Nodes(overlay.TranscriptRoot).OfType<TextBox>().Any(label => label.Text == fixture.Translation && ReferenceEquals(label.Foreground, AppearanceTheme.Text)),
+                    "the copyable transcript retains the same live semantic text brush");
                 AppearanceTheme.Apply(sample);
                 foreach (var dialog in dialogs) dialog.Window.Close();
             }

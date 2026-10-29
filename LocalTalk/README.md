@@ -68,13 +68,13 @@ The interface-language picker is at the bottom of the sidebar, above the version
 
 - **Home**: start your voice, subtitles or both. **Stop all** stops translation and releases the app's own models without closing VRChat.
 - **Languages**: change the two translation languages independently, choose a concise or more careful style, and add names or special words. Select **Save & apply** to apply edits.
-- **Speakers**: start or stop AI voice recognition independently, and add names for people you talk to. Use **Who's speaking?** on a subtitle to assign the correct person.
+- **People**: add names and pictures for people you talk to. In the subtitle **Transcript**, use **Select a person** to assign the correct name; optional voice recognition can learn from suitable clear examples.
 - **Settings**: choose what the close button does.
 - **Advanced**: adjust sentence timing and audio, choose models, reuse an existing installation, measure translation delay or view troubleshooting details.
 
-Your microphone translation pauses when your VRChat microphone is muted. An already-captured sentence can still finish and send, unless you turn that option off in Advanced. With early translations enabled, cumulative messages can appear while you speak and the completed sentence follows. With the option off, only the completed sentence is sent. Neither mode repeatedly opens VRChat's chat input to write drafts.
+Your microphone translation pauses when your VRChat microphone is muted. An already-captured sentence can still finish and send, unless you turn that option off in Advanced. New settings translate completed sentences in both directions. Each direction has its own early-translation opt-in: microphone previews can send cumulative messages while you speak; subtitle previews can revise a bubble as more words arrive. Existing explicit choices are kept on updates. Neither mode repeatedly opens VRChat's chat input to write drafts.
 
-Subtitles normally capture only VRChat, not music or other Windows applications. Use **Always on top · On/Off** beside Settings to choose whether subtitles stay in front of other windows; the choice is remembered. Closing the subtitle window stops incoming translation while your own voice translation can continue.
+Subtitles normally capture only VRChat; another application or All playback can be selected explicitly. The compact overlay shows the latest three messages and lets clicks pass through its bubbles. Use its separate toolbar for dragging, **Appearance**, **Always on top**, **Logs** and the quick menu. Appearance changes save immediately; background opacity does not fade the text. **Logs** opens a normal **Transcript** window with up to 200 recent messages, selectable original/translated text, copy controls, name corrections and **Follow latest**. The transcript is separate from diagnostic logs. [Subtitle controls](../docs/subtitles.md).
 
 ## Update, reset or uninstall
 

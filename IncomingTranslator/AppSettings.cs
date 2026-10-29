@@ -31,6 +31,7 @@ internal sealed class AppSettings
     public string IncomingNormalSpeechEngine { get; set; } = "voxtral";
     public string IncomingNormalSourceLanguage { get; set; } = "Automatic";
     public int SubtitlePreviewStableMilliseconds { get; set; } = 500;
+    public bool IncomingSendEarlyPreviews { get; set; } = false;
     public string VibeVoiceModelId { get; set; } = "microsoft/VibeVoice-ASR-Streaming-1.5B";
     public string VibeVoiceEndpoint { get; set; } = "http://127.0.0.1:8082";
     public string IncomingTargetLanguage { get; set; } = "English";
@@ -49,7 +50,7 @@ internal sealed class AppSettings
     public int IncomingSettleMilliseconds { get; set; } = DefaultSentencePauseMilliseconds;
     public int RecognitionDelayMilliseconds { get; set; } = 240;
     public int OwnVoiceEndPauseMilliseconds { get; set; } = DefaultSentencePauseMilliseconds;
-    public bool OwnVoiceSendEarlyPreviews { get; set; } = true;
+    public bool OwnVoiceSendEarlyPreviews { get; set; } = false;
     public int VisibleSpeakerRows { get; set; } = 8;
     public string PlaybackDeviceId { get; set; } = "auto-vrchat";
     public bool NormalizeQuietPlayback { get; set; } = true;
@@ -75,6 +76,10 @@ internal sealed class AppSettings
     public bool SubtitleGuidePromptSeen { get; set; } = false;
     public string CloseButtonBehavior { get; set; } = "Ask";
     public bool SubtitlesAlwaysOnTop { get; set; } = true;
+    public double SubtitlesFontSize { get; set; } = 16;
+    public double SubtitlesBubbleWidth { get; set; } = 420;
+    public double SubtitlesBackgroundOpacity { get; set; } = .65;
+    public bool SubtitlesShowOriginalText { get; set; } = true;
     public bool CheckForUpdatesOnLaunch { get; set; } = true;
 
     public AppSettings Copy() => new()
@@ -98,6 +103,7 @@ internal sealed class AppSettings
         IncomingNormalSpeechEngine = IncomingNormalSpeechEngine,
         IncomingNormalSourceLanguage = IncomingNormalSourceLanguage,
         SubtitlePreviewStableMilliseconds = SubtitlePreviewStableMilliseconds,
+        IncomingSendEarlyPreviews = IncomingSendEarlyPreviews,
         VibeVoiceModelId = VibeVoiceModelId,
         VibeVoiceEndpoint = VibeVoiceEndpoint,
         IncomingTargetLanguage = IncomingTargetLanguage,
@@ -141,6 +147,10 @@ internal sealed class AppSettings
         SubtitleGuidePromptSeen = SubtitleGuidePromptSeen,
         CloseButtonBehavior = CloseButtonBehavior,
         SubtitlesAlwaysOnTop = SubtitlesAlwaysOnTop,
+        SubtitlesFontSize = SubtitlesFontSize,
+        SubtitlesBubbleWidth = SubtitlesBubbleWidth,
+        SubtitlesBackgroundOpacity = SubtitlesBackgroundOpacity,
+        SubtitlesShowOriginalText = SubtitlesShowOriginalText,
         CheckForUpdatesOnLaunch = CheckForUpdatesOnLaunch
     };
 
@@ -284,8 +294,8 @@ internal static partial class SettingsStore
         {
             settings.OwnVoiceAdditionalTargetLanguages = settings.NormalizedOwnVoiceAdditionalLanguages();
             Directory.CreateDirectory(AppPaths.Root);
-            // This preference belongs to the live subtitle window. A later save from a
-            // dashboard/startup snapshot must not undo a pin toggle made while it was waiting.
+            // Live-window preferences may have changed since the dashboard snapshot.
+            // An explicit profile application may replace them; an ordinary save must not.
             if (File.Exists(AppPaths.SettingsPath))
             {
                 try
@@ -302,6 +312,7 @@ internal static partial class SettingsStore
                     if (latest?[nameof(AppSettings.SubtitleGuidePromptSeen)] is JsonValue guide && guide.TryGetValue<bool>(out bool guideSeen))
                         settings.SubtitleGuidePromptSeen = guideSeen;
                     if (!applyingProfile && latest is not null) PreserveAppearance(settings, latest);
+                    if (!applyingProfile && latest is not null) PreserveSubtitleAppearance(settings, latest);
                 }
                 catch (JsonException) { /* Preserve the existing explicit settings-repair path. */ }
             }
@@ -317,6 +328,46 @@ internal static partial class SettingsStore
     internal static void SaveUiLanguagePreference(string value) => SavePreference(nameof(AppSettings.UiLanguage), JsonValue.Create(UiLanguagePreference.Normalize(value))!);
     internal static void SaveFirstRunIntroductionPreference(bool value) => SaveBooleanPreference(nameof(AppSettings.FirstRunIntroductionCompleted), value);
     internal static void SaveSubtitleGuidePromptPreference(bool value) => SaveBooleanPreference(nameof(AppSettings.SubtitleGuidePromptSeen), value);
+
+    internal static void SaveSubtitleAppearancePreference(AppSettings settings)
+    {
+        var appearance = settings.Copy();
+        NormalizeSubtitleAppearance(appearance);
+        SavePreferences(new Dictionary<string, JsonNode>
+        {
+            [nameof(AppSettings.SubtitlesFontSize)] = JsonValue.Create(appearance.SubtitlesFontSize)!,
+            [nameof(AppSettings.SubtitlesBubbleWidth)] = JsonValue.Create(appearance.SubtitlesBubbleWidth)!,
+            [nameof(AppSettings.SubtitlesBackgroundOpacity)] = JsonValue.Create(appearance.SubtitlesBackgroundOpacity)!,
+            [nameof(AppSettings.SubtitlesShowOriginalText)] = JsonValue.Create(appearance.SubtitlesShowOriginalText)!
+        });
+    }
+
+    private static void PreserveSubtitleAppearance(AppSettings settings, JsonObject document)
+    {
+        if (document[nameof(AppSettings.SubtitlesFontSize)] is JsonValue font && font.TryGetValue<double>(out double fontSize))
+            settings.SubtitlesFontSize = fontSize;
+        if (document[nameof(AppSettings.SubtitlesBubbleWidth)] is JsonValue width && width.TryGetValue<double>(out double bubbleWidth))
+            settings.SubtitlesBubbleWidth = bubbleWidth;
+        if (document[nameof(AppSettings.SubtitlesBackgroundOpacity)] is JsonValue opacity && opacity.TryGetValue<double>(out double backgroundOpacity))
+            settings.SubtitlesBackgroundOpacity = backgroundOpacity;
+        if (document[nameof(AppSettings.SubtitlesShowOriginalText)] is JsonValue original && original.TryGetValue<bool>(out bool showOriginal))
+            settings.SubtitlesShowOriginalText = showOriginal;
+    }
+
+    internal static void NormalizeSubtitleAppearance(AppSettings settings)
+    {
+        settings.SubtitlesFontSize = double.IsFinite(settings.SubtitlesFontSize) ? Math.Clamp(settings.SubtitlesFontSize, 12, 30) : 16;
+        settings.SubtitlesBubbleWidth = double.IsFinite(settings.SubtitlesBubbleWidth) ? Math.Clamp(settings.SubtitlesBubbleWidth, 240, 900) : 420;
+        settings.SubtitlesBackgroundOpacity = double.IsFinite(settings.SubtitlesBackgroundOpacity) ? Math.Clamp(settings.SubtitlesBackgroundOpacity, 0, 1) : .65;
+    }
+
+    internal static void CopySubtitleAppearance(AppSettings source, AppSettings target)
+    {
+        target.SubtitlesFontSize = source.SubtitlesFontSize;
+        target.SubtitlesBubbleWidth = source.SubtitlesBubbleWidth;
+        target.SubtitlesBackgroundOpacity = source.SubtitlesBackgroundOpacity;
+        target.SubtitlesShowOriginalText = source.SubtitlesShowOriginalText;
+    }
 
     internal static void SaveAppearancePreference(AppSettings settings)
     {
@@ -389,6 +440,7 @@ internal static partial class SettingsStore
     {
         settings.UiLanguage = UiLanguagePreference.Normalize(settings.UiLanguage);
         AppearanceTheme.Normalize(settings);
+        NormalizeSubtitleAppearance(settings);
         IncomingListening.Normalize(settings);
         settings.OwnRecognitionEngine = settings.OwnRecognitionEngine == "voxtral" ? "voxtral" : "nemotron";
         settings.OwnMicrophoneDeviceId = string.IsNullOrWhiteSpace(settings.OwnMicrophoneDeviceId) ? "default" : settings.OwnMicrophoneDeviceId.Trim();

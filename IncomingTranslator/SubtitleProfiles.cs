@@ -65,6 +65,7 @@ internal sealed partial class SubtitleWindow
 
     private async Task RequestSubtitleProfileAsync(string id)
     {
+        FlushAppearanceSave();
         if (id is not (TranslationProfiles.NormalId or TranslationProfiles.GroupsId) || _profileSwitchPending
             || ProfileChangeRequested is null || _shutdown.IsCancellationRequested) return;
         if (id == _settings.ActiveTranslationProfileId && !TranslationProfiles.IsModified(_settings)) return;

@@ -33,6 +33,7 @@ internal sealed record SettingsRuntimeChanges(bool OwnChanged, bool IncomingChan
         bool incoming = includeIncoming && (TranslatorChanged(oldIncoming, newIncoming)
             || previous.IncomingSpeechEngine != next.IncomingSpeechEngine || previous.VibeVoiceModelId != next.VibeVoiceModelId || previous.VibeVoiceEndpoint != next.VibeVoiceEndpoint
             || previous.IncomingTargetLanguage != next.IncomingTargetLanguage || previous.IncomingSourceLanguage != next.IncomingSourceLanguage
+            || previous.IncomingSendEarlyPreviews != next.IncomingSendEarlyPreviews
             || previous.IncomingSettleMilliseconds != next.IncomingSettleMilliseconds || previous.SubtitlePreviewStableMilliseconds != next.SubtitlePreviewStableMilliseconds
             || previous.RecognitionDelayMilliseconds != next.RecognitionDelayMilliseconds || previous.CaptureVrChatOnly != next.CaptureVrChatOnly
             || previous.PlaybackDeviceId != next.PlaybackDeviceId || previous.NormalizeQuietPlayback != next.NormalizeQuietPlayback
@@ -58,8 +59,14 @@ internal sealed partial class MainWindow
         AppSettings candidate;
         try
         {
-            candidate = TranslationProfiles.Select(_settings, id);
             AppSettings saved = SettingsStore.Load();
+            // The compact overlay autosaves these independently of the dashboard.
+            // Rebase both snapshots before testing for a draft or selecting a built-in;
+            // an explicitly selected custom profile can still restore its own values.
+            SettingsStore.CopySubtitleAppearance(saved, _settings);
+            if (_saveStateAppliedSettings is not null)
+                SettingsStore.CopySubtitleAppearance(saved, _saveStateAppliedSettings);
+            candidate = TranslationProfiles.Select(_settings, id);
             if (!TranslationProfiles.ConfigurationEquals(_settings, saved) && !TranslationProfiles.ConfigurationEquals(candidate, _settings)
                 && !Confirm("Switch profiles and replace your unsaved changes? Save them as a custom profile first if you want to keep them.")) return;
         }

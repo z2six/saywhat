@@ -134,12 +134,13 @@ public sealed class NemotronTranscriber : IStreamingTranscriber
                 partial += delta;
                 if (partial.Length + confirmed.Length > 16384)
                     throw Protocol("transcript_limit", "Recognition exceeded the bounded text limit.");
-                await output.WriteAsync(new StreamingPartialTranscript(++sequence, confirmed + partial, audioEnd), token);
+                string visible = confirmed + RecognitionTextFilter.CleanControlOnly(partial);
+                if (visible.Length > 0) await output.WriteAsync(new StreamingPartialTranscript(++sequence, visible, audioEnd), token);
             }
             else if (type == "conversation.item.input_audio_transcription.completed")
             {
                 string final = RequiredString(message, "transcript");
-                confirmed += final;
+                confirmed += RecognitionTextFilter.CleanControlOnly(final);
                 partial = ""; sawNativeFinal = true;
                 sawFinalAfterCommit |= Volatile.Read(ref _commitRequested) != 0;
                 if (confirmed.Length > 16384) throw Protocol("transcript_limit", "Recognition exceeded the bounded text limit.");

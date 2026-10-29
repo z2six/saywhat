@@ -9,7 +9,7 @@
     <AssemblyName>SayWhat</AssemblyName>
     <StartupObject>IncomingTranslator.LocalTalkEntry</StartupObject>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <Version>0.2.5</Version>
+    <Version>0.2.6</Version>
     <ApplicationIcon>Assets/SayWhat.ico</ApplicationIcon>
     <Product>SayWhat?</Product>
     <Title>SayWhat?</Title>
@@ -23,6 +23,7 @@
     <Compile Include="../IncomingTranslator/GlobalUsings.Fixed.cs" Link="Core/GlobalUsings.cs" />
     <Compile Include="../FoxTransSource/FoxTrans/Providers/TranslationModelPrompts.cs" Link="Core/TranslationModelPrompts.cs" />
     <Compile Include="../FoxTransSource/FoxTrans/Providers/TranslationModelCapabilities.cs" Link="Core/TranslationModelCapabilities.cs" />
+    <Compile Include="../FoxTransSource/FoxTrans/Providers/RecognitionTextFilter.cs" Link="Core/RecognitionTextFilter.cs" />
     <Compile Include="../IncomingTranslator/AppSettings.cs" Link="Core/AppSettings.cs" />
     <Compile Include="../IncomingTranslator/TranslationProfiles.cs" Link="Core/TranslationProfiles.cs" />
     <Compile Include="../IncomingTranslator/IncomingPipelineProfiles.cs" Link="Core/IncomingPipelineProfiles.cs" />
@@ -52,6 +53,8 @@
     <Compile Include="../IncomingTranslator/SmokeTests.cs" Link="Core/SmokeTests.cs" />
     <Compile Include="../IncomingTranslator/Program.Fixed.cs" Link="Core/IncomingTranslation.cs" />
     <Compile Include="../IncomingTranslator/SubtitleWindowPlacement.cs" Link="Core/SubtitleWindowPlacement.cs" />
+    <Compile Include="../IncomingTranslator/SubtitleWindow.Compact.cs" Link="Core/SubtitleWindow.Compact.cs" />
+    <Compile Include="../IncomingTranslator/SubtitleTextSurface.cs" Link="Core/SubtitleTextSurface.cs" />
     <Compile Include="../IncomingTranslator/SubtitleQuickGuide.cs" Link="Core/SubtitleQuickGuide.cs" />
     <Compile Include="../IncomingTranslator/SubtitleSegmentation.cs" Link="Core/SubtitleSegmentation.cs" />
     <Compile Include="../IncomingTranslator/IncomingContinuousAudio.cs" Link="Core/IncomingContinuousAudio.cs" />

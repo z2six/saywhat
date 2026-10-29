@@ -3,6 +3,19 @@
 Installers, full notes and matching source archives are on
 [GitHub Releases](https://github.com/z2six/saywhat/releases).
 
+## 0.2.6
+
+- Replaced the large subtitle window with a compact toolbar and three recent,
+  semi-transparent bubbles that let clicks pass through to other applications.
+- Added immediate font, bubble-width, background and original-text controls.
+  Logs opens a regular copyable Transcript window with up to 200 messages and
+  the existing person-correction/review controls.
+- Changed new/default voice and subtitle delivery to finished sections. Early
+  translations are independent opt-ins; existing saved opt-ins are preserved.
+- Filtered silence/control markers such as SIL before translation, and kept
+  verified decoder progress separate from real words so valid silence updates
+  can finish the preceding phrase without becoming subtitle text.
+
 ## 0.2.5
 
 - Removed the Windows 11-only installer gate. Windows 10 21H2 and newer x64

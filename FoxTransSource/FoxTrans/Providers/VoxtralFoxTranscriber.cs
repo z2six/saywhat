@@ -636,7 +636,7 @@ public sealed class VoxtralFoxTranscriber : IStreamingTranscriber
                             "invalid_sequence",
                             $"Transcript sequence moved backwards from {lastTranscriptSequence} to {sequence}.");
                     lastTranscriptSequence = sequence;
-                    string text = RequiredString(parsed.Root, "text", parsed.Type);
+                    string text = RecognitionTextFilter.CleanControlOnly(RequiredString(parsed.Root, "text", parsed.Type));
                     long audioEndMs = RequiredLong(parsed.Root, "audio_end_ms", parsed.Type);
                     StreamingTranscriptionEvent transcript = parsed.Type == "transcript.partial"
                         ? new StreamingPartialTranscript(sequence, text, audioEndMs)

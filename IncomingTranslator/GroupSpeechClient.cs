@@ -105,6 +105,8 @@ internal static class GroupSpeechProtocol
                 if (cleaned.All(character => char.IsWhiteSpace(character) || char.IsPunctuation(character) || char.IsSymbol(character)))
                     cleaned = "";
             }
+            int controls = RecognitionTextFilter.ControlTokenCount(cleaned);
+            if (controls > 0) { segmentRemoved += controls; cleaned = ""; }
             removed += segmentRemoved;
             if (cleaned.Length > 0) speech.Add(segment with { Text = cleaned });
         }

@@ -108,7 +108,11 @@ internal static class SpeakerReviewPeopleUiTests
                 "saved review history remains visible with recognition turned off");
             var guide = new SubtitleQuickGuide(UiText.T, _ => actions++, () => actions++);
             guide.ShowGuide();
-            foreach (string key in keys.SkipWhile(key => key != "Review a suggested name"))
+            foreach (string key in new[] { "Tell voices apart",
+                "Use Select a person and the ✓ / ✕ buttons in Transcript to correct or review names.",
+                "Maybe names are suggestions. ✓ confirms one; ✕ marks it unknown. Guesses never teach themselves.",
+                "Selecting a person can save a clear voice example. Mixed, short or old audio may only change the name. You can undo a review.",
+                "Your choices improve saved voice examples, not the AI model itself." })
                 Check(Nodes(guide).OfType<TextBlock>().Any(text => text.Text == UiText.T(key)), "quick guide explains review behavior: " + key);
             guide.CloseGuide();
             Check(actions == 0, "browsing stats, changing language, and reading help never activate or modify recognition");

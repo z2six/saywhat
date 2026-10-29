@@ -22,10 +22,10 @@ internal static class DesktopTests
             Require(!window.Topmost,"Dashboard is not always on top");
             Require(SettingsStore.Load().OwnVoiceTargetLanguage == "Chinese","Own voice default remains Chinese");
             Require(SettingsStore.Load().IncomingTargetLanguage == "English","Incoming default remains English");
-            Require(SettingsStore.Load().OwnVoiceEndPauseMilliseconds == 1200 && SettingsStore.Load().OwnVoiceSendEarlyPreviews,
-                "New users get a 1.2-second finishing pause and cumulative early chat bubbles");
+            Require(SettingsStore.Load().OwnVoiceEndPauseMilliseconds == 1200 && !SettingsStore.Load().OwnVoiceSendEarlyPreviews,
+                "New users get a 1.2-second finishing pause and finished sentences by default");
             var legacyDefault = SettingsStore.ReadSettings("{\"OwnVoiceEndPauseMilliseconds\":2400,\"OwnVoiceTargetLanguage\":\"Chinese\",\"IncomingTargetLanguage\":\"English\"}");
-            Require(legacyDefault.OwnVoiceEndPauseMilliseconds == 1200 && legacyDefault.OwnVoiceSendEarlyPreviews &&
+            Require(legacyDefault.OwnVoiceEndPauseMilliseconds == 1200 && !legacyDefault.OwnVoiceSendEarlyPreviews &&
                 legacyDefault.OwnVoiceTargetLanguage == "Chinese" && legacyDefault.IncomingTargetLanguage == "English",
                 "Old default pause migrates on new-version load without changing translation languages");
             Require(SettingsStore.ReadSettings("{\"OwnVoiceEndPauseMilliseconds\":1800}").OwnVoiceEndPauseMilliseconds == 1800,
@@ -51,6 +51,8 @@ internal static class DesktopTests
             checks+=RuntimeController.RunVoiceFirstOfflineChecks();
             checks+=NativeSpeechProvisionerTests.Run();
             checks+=FireRedSpeechTests.Run();
+            checks+=RecognitionTextFilterTests.Run();
+            checks+=Task.Run(() => IncomingTranslationService.RunRecognitionControlOfflineChecksAsync(Path.Combine(directory, "recognition-controls"))).GetAwaiter().GetResult();
             checks+=Task.Run(() => IncomingNativeSpeechTests.RunAsync(Path.Combine(directory, "incoming-native-speech"))).GetAwaiter().GetResult();
             checks+=TranslationProfileTests.Run();
             checks+=ProfileSettingsRuntimeTests.Run();
@@ -87,6 +89,10 @@ internal static class DesktopTests
             checks+=DesktopLifetimeOfflineTests.RunDispatcherChecks(Path.Combine(directory, "lifetime-fixtures"));
             checks+=SubtitleWindow.RunAlwaysOnTopOfflineSelfTests();
             checks+=SubtitlePinOfflineTests.Run();
+            checks+=SubtitleAppearancePreferenceTests.Run();
+            checks+=EarlyTranslationPreferenceTests.Run();
+            checks+=SubtitleTextSurfaceTests.Run();
+            checks+=CompactSubtitleUiTests.Run(directory);
             checks+=SubtitleWindowControlsTests.Run();
             checks+=SubtitleProfileUiTests.Run();
             checks+=SubtitleQuickGuideTests.Run(directory, window);

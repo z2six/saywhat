@@ -202,10 +202,13 @@ internal static class TranslationProfilesUiTests
             var normal = (Button)typeof(SubtitleWindow).GetField("_normalProfileButton", flags)!.GetValue(overlay)!;
             var groups = (Button)typeof(SubtitleWindow).GetField("_groupsProfileButton", flags)!.GetValue(overlay)!;
             Check(normal.IsEnabled && groups.IsEnabled && ReferenceEquals(normal.Foreground, AppearanceTheme.Good), "overlay previews enabled mode controls with Normal selected");
-            var overlayContent = (FrameworkElement)overlay.Content;
+            var overlayContent = overlay.TranscriptRoot;
             var overlaySize = new Size(960, 430);
             Layout(overlayContent, overlaySize); DrainPresentation(); Layout(overlayContent, overlaySize);
             Render(overlayContent, overlaySize, "subtitle-profiles.png");
+            Check(LogicalTreeHelper.GetParent(overlayContent) is null && Nodes(overlayContent).Contains(normal) &&
+                !Nodes((FrameworkElement)overlay.Content).Contains(normal),
+                "the profile preview renders detached transcript controls without expanding the compact toolbar");
             Check(callbackCalls == 0 && !overlay.IsLoaded && !overlay.IsVisible && overlay.SpeakerFeedbackHost is null,
                 "overlay rendering never starts a service or invokes a profile switch");
             File.WriteAllLines(Path.Combine(directory, "profile-preview-layout.txt"), metrics);

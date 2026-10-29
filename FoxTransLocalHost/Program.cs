@@ -52,14 +52,14 @@ internal static class LocalHost
             using var settings = JsonDocument.Parse(File.ReadAllText(Path.Combine(Root, "vrchat-translation-settings.json")));
             return ResolveEarlyPreviewPreference(settings.RootElement);
         }
-        catch (FileNotFoundException) { return true; }
+        catch (FileNotFoundException) { return false; }
         catch { return false; } // Malformed/unreadable preferences are final-only.
     }
 
     internal static bool ResolveEarlyPreviewPreference(JsonElement settings) =>
         settings.ValueKind == JsonValueKind.Object &&
-        (!settings.TryGetProperty("OwnVoiceSendEarlyPreviews", out var flag) ||
-            flag.ValueKind == JsonValueKind.True);
+        settings.TryGetProperty("OwnVoiceSendEarlyPreviews", out var flag) &&
+            flag.ValueKind == JsonValueKind.True;
 
     internal sealed record OwnVoiceLivePreferences(int PauseMilliseconds, bool EarlyPreviews);
     internal static OwnVoiceLivePreferences ResolveLivePreferences(JsonElement settings, OwnVoiceLivePreferences fallback)
@@ -1651,7 +1651,7 @@ internal static class LocalTests
     {
         foreach ((string json, bool expected) in new[]
         {
-            ("{}", true), ("{\"OwnVoiceSendEarlyPreviews\":true}", true),
+            ("{}", false), ("{\"OwnVoiceSendEarlyPreviews\":true}", true),
             ("{\"OwnVoiceSendEarlyPreviews\":false}", false), ("{\"OwnVoiceSendEarlyPreviews\":\"true\"}", false),
             ("{\"OwnVoiceSendEarlyPreviews\":null}", false), ("[]", false)
         })

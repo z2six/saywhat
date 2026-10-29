@@ -104,7 +104,6 @@ internal sealed partial class SubtitleWindow : Window
     private readonly Button _alwaysOnTopButton;
     private readonly Button _quickGuideButton;
     private readonly SubtitleQuickGuide _quickGuide;
-    private readonly Button _maximizeButton;
     private readonly Border _dragHeader;
     private bool _headerDragPending;
     private Point _headerDragOrigin;
@@ -113,7 +112,6 @@ internal sealed partial class SubtitleWindow : Window
     private readonly System.Windows.Threading.DispatcherTimer _outgoingStateTimer;
     private readonly StackPanel _speakerRows;
     private readonly ScrollViewer _speakerScroll;
-    private readonly Dictionary<string, SpeakerCard> _cards = new();
     private readonly List<TranslationDisplay> _displayHistory = new();
     private readonly Dictionary<long, SpeakerFeedbackResult> _speakerCorrections = new();
     private readonly Dictionary<string, SpeakerPerson> _people = new();
@@ -139,221 +137,57 @@ internal sealed partial class SubtitleWindow : Window
 
     public SubtitleWindow()
     {
-        AppearanceTheme.Apply(_settings);
-        ThemeBackground.Apply(_settings);
-        Title = AppBrand.DisplayName + " · Subtitles";
-        Icon = WindowIconProvider?.Invoke();
-        Width = 960;
-        Height = 430;
-        MinWidth = 560;
-        MinHeight = 260;
-        FontFamily = ConversationFont;
-        UseLayoutRounding = true;
-        SnapsToDevicePixels = true;
-        Topmost = _settings.SubtitlesAlwaysOnTop;
-        WindowStyle = WindowStyle.None;
-        ResizeMode = ResizeMode.CanResizeWithGrip;
-        AllowsTransparency = true;
-        Background = Brushes.Transparent;
-        ShowInTaskbar = true;
-        ApplyOverlayStyles();
-
-        var frame = new Border
-        {
-            Background = OverlayBackground,
-            BorderBrush = OverlayStroke,
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(20),
-            Padding = new Thickness(20, 16, 20, 14)
-        };
-        var root = new Grid();
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        root.RowDefinitions.Add(new RowDefinition());
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-        var header = new Grid { Margin = new Thickness(0, 0, 0, 2) };
-        header.ColumnDefinitions.Add(new ColumnDefinition());
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _status = new TextBlock
-        {
-            Text = "Starting subtitles…",
-            Foreground = OverlaySage,
-            FontSize = 11,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        var heading = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0) };
-        var titleRow = new DockPanel { Margin = new Thickness(0, 0, 0, 4) };
-        Image? headerMark = HeaderMarkProvider?.Invoke(22);
-        if (headerMark is not null)
-        {
-            headerMark.Name = "SubtitleBrandMark";
-            headerMark.Margin = new Thickness(0, 0, 9, 0);
-            headerMark.VerticalAlignment = VerticalAlignment.Center;
-            DockPanel.SetDock(headerMark, Dock.Left); titleRow.Children.Add(headerMark);
-        }
-        _subtitleHeading = new TextBlock { Text = AppBrand.DisplayName + " · " + Ui("Subtitles"), FontSize = 17,
-            FontWeight = FontWeights.SemiBold, Foreground = OverlayText,
-            TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap,
-            VerticalAlignment = VerticalAlignment.Center };
-        MarkLiteralUiProvider?.Invoke(_subtitleHeading);
-        titleRow.Children.Add(_subtitleHeading);
-        heading.Children.Add(titleRow);
-        heading.Children.Add(_status);
-        var options = new Button
-        {
-            Content = "Settings",
-            Width = 82,
-            Height = 32,
-            Margin = new Thickness(0, 0, 8, 0),
-            ToolTip = "Change languages, people and subtitle settings",
-            Cursor = Cursors.Hand
-        };
-        options.Click += (_, _) => OpenSettings();
-        _quickGuideButton = new Button { Name = "SubtitleQuickGuideButton", Content = "?", Width = 32, Height = 32,
-            FontSize = 16, FontWeight = FontWeights.SemiBold, Padding = new Thickness(0),
-            Margin = new Thickness(0, 0, 8, 0), Cursor = Cursors.Hand };
-        // The glyph is literal; its localized tooltip/name are refreshed explicitly.
-        MarkLiteralUiProvider?.Invoke(_quickGuideButton);
-        _alwaysOnTopButton = new Button
-        {
-            Content = AlwaysOnTopButtonText(_settings.SubtitlesAlwaysOnTop),
-            Width = 164,
-            Height = 32,
-            Margin = new Thickness(0, 0, 8, 0),
-            ToolTip = AlwaysOnTopToolTip(_settings.SubtitlesAlwaysOnTop),
-            Cursor = Cursors.Hand
-        };
+        AppearanceTheme.Apply(_settings); ThemeBackground.Apply(_settings);
+        Title = AppBrand.DisplayName + " · Subtitles"; Icon = WindowIconProvider?.Invoke();
+        FontFamily = ConversationFont; UseLayoutRounding = true; SnapsToDevicePixels = true;
+        Width = 420; Height = 38; MinWidth = 240; MinHeight = 34; SizeToContent = SizeToContent.Height;
+        Topmost = _settings.SubtitlesAlwaysOnTop; WindowStyle = WindowStyle.None;
+        ResizeMode = ResizeMode.NoResize; AllowsTransparency = true; Background = Brushes.Transparent;
+        ShowInTaskbar = true; ApplyOverlayStyles();
+        _status = new TextBlock { Text = "Starting subtitles…", Foreground = OverlaySage, FontSize = 11, TextWrapping = TextWrapping.Wrap };
+        _subtitleHeading = new TextBlock { Text = AppBrand.DisplayName, Foreground = OverlayText, ToolTip = Ui("Subtitles") };
+        _source = new TextBlock { Text = IncomingListening.WaitingMessage(_settings), Foreground = OverlayMuted,
+            FontSize = 11, TextWrapping = TextWrapping.Wrap, MaxHeight = 48, TextTrimming = TextTrimming.CharacterEllipsis };
+        _outgoingState = new TextBlock { Foreground = OverlayMuted, FontSize = 11, TextWrapping = TextWrapping.Wrap };
+        _playbackWarning = new TextBlock { Foreground = OverlayCoral, FontSize = 11, TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
+        _pinStatus = new TextBlock { Foreground = OverlayCoral, FontSize = 11, TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
+        _alwaysOnTopButton = new Button { Cursor = Cursors.Hand };
         _alwaysOnTopButton.Click += (_, _) => ToggleAlwaysOnTop();
-        _maximizeButton = new Button { Name = "SubtitleMaximizeButton", Width = 32, Height = 32,
-            Padding = new Thickness(7), Margin = new Thickness(0, 0, 8, 0), Cursor = Cursors.Hand };
-        _maximizeButton.Click += (_, _) => ToggleMaximized();
-        var close = new Button
-        {
-            Content = "×",
-            Width = 32,
-            Height = 32,
-            FontSize = 19,
-            Foreground = OverlayMuted,
-            Background = Brushes.Transparent,
-            BorderBrush = Brushes.Transparent,
-            ToolTip = "Stop subtitles without stopping your voice translation",
-            Cursor = Cursors.Hand
-        };
-        close.Click += (_, _) => Close();
-        header.Children.Add(heading);
-        Grid.SetColumn(_quickGuideButton, 1);
-        Grid.SetColumn(options, 2);
-        Grid.SetColumn(_alwaysOnTopButton, 3);
-        Grid.SetColumn(_maximizeButton, 4);
-        Grid.SetColumn(close, 5);
-        header.Children.Add(_quickGuideButton);
-        header.Children.Add(options);
-        header.Children.Add(_alwaysOnTopButton);
-        header.Children.Add(_maximizeButton);
-        header.Children.Add(close);
-
-        _source = new TextBlock
-        {
-            Text = IncomingListening.WaitingMessage(_settings),
-            Foreground = OverlayMuted,
-            FontSize = 12,
-            LineHeight = 18,
-            MaxHeight = 54,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            Margin = new Thickness(0),
-            TextWrapping = TextWrapping.Wrap
-        };
-        var liveAudioPreview = new Border { Background = OverlayPanel, BorderBrush = OverlayStroke,
-            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(12, 9, 12, 9), Margin = new Thickness(0, 12, 0, 14), Child = CreateSubtitleProfileBar() };
-        _speakerRows = new StackPanel { Margin = new Thickness(0, 0, 10, 0) };
-        _outgoingState = new TextBlock { Foreground = OverlayMuted, FontSize = 11, LineHeight = 17, TextWrapping = TextWrapping.Wrap };
-        var footer = new Border { Background = OverlayPanel, BorderBrush = OverlayStroke, BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(10), Padding = new Thickness(10, 9, 10, 9),
-            Margin = new Thickness(0, 7, 0, 0), Child = _outgoingState };
-        _playbackWarning = new TextBlock { Foreground = OverlayCoral, FontSize = 12, TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed, Margin = new Thickness(0, 6, 0, 0) };
-        _pinStatus = new TextBlock { Foreground = OverlayCoral, FontSize = 11, TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed, Margin = new Thickness(0, 6, 0, 0) };
-        _outgoingStateTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _outgoingStateTimer.Tick += (_, _) => RefreshOutgoingState();
-        _speakerScroll = new ScrollViewer
-        {
-            Content = _speakerRows,
-            Background = Brushes.Transparent,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            PanningMode = PanningMode.VerticalOnly
-        };
-        // Artwork is decorative, not a text backdrop. Solid role-colored backplates
-        // protect every label/status even when a user chooses a high-contrast image.
-        _dragHeader = new Border { Name = "SubtitleDragHeader", Background = OverlayPanel, CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(10), Child = header };
-        var playbackBackplate = StatusBackplate(_playbackWarning);
-        var pinBackplate = StatusBackplate(_pinStatus);
-        Grid.SetRow(_dragHeader, 0);
-        Grid.SetRow(liveAudioPreview, 1);
-        Grid.SetRow(_speakerScroll, 2);
-        Grid.SetRow(footer, 3);
-        Grid.SetRow(playbackBackplate, 4);
-        Grid.SetRow(pinBackplate, 5);
-        root.Children.Add(_dragHeader);
-        root.Children.Add(liveAudioPreview);
-        root.Children.Add(footer);
-        root.Children.Add(playbackBackplate);
-        root.Children.Add(_speakerScroll);
-        root.Children.Add(pinBackplate);
+        _quickGuideButton = new Button { Name = "SubtitleQuickGuideButton", Content = "?", FontSize = 14, Padding = new Thickness(3), Cursor = Cursors.Hand };
+        MarkLiteralUiProvider?.Invoke(_quickGuideButton);
+        _speakerRows = new StackPanel();
+        _speakerScroll = new ScrollViewer { Content = _speakerRows, Background = Brushes.Transparent,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            PanningMode = PanningMode.VerticalOnly };
         _quickGuide = new SubtitleQuickGuide(Ui, seen =>
-        {
-            SettingsStore.SaveSubtitleGuidePromptPreference(seen);
-            _settings.SubtitleGuidePromptSeen = seen;
-        }, () =>
-        {
-            if (OpenSpeakerSettingsRequested is not null) OpenSpeakerSettingsRequested();
-            else OpenSettings();
-        }, error => LogOverlayError("Save subtitle guide preference", error));
-        _quickGuideButton.Click += (_, _) => _quickGuide.ShowGuide();
-        _quickGuide.Dismissed += () => _quickGuideButton.Focus();
-        MarkLiteralUiProvider?.Invoke(_quickGuide);
-        Grid.SetRow(_quickGuide, 1); Grid.SetRowSpan(_quickGuide, 5);
-        root.Children.Add(_quickGuide);
-        var themedContent = new Grid();
-        themedContent.Children.Add(ThemeBackground.CreateLayer());
-        themedContent.Children.Add(root);
-        frame.Child = themedContent;
-        Content = frame;
-        MarkLiteralUiProvider?.Invoke(_source);
-        // Translation history contains user names/source/translated text, never interface copy.
-        MarkLiteralUiProvider?.Invoke(_speakerRows);
-        ApplyAlwaysOnTop(_settings.SubtitlesAlwaysOnTop);
-        RefreshInterfaceLanguage();
-
-        _dragHeader.MouseLeftButtonDown += HeaderMouseDown;
-        _dragHeader.MouseMove += HeaderMouseMove;
-        _dragHeader.MouseLeftButtonUp += (_, _) => CancelHeaderDrag();
-        _dragHeader.LostMouseCapture += (_, _) => _headerDragPending = false;
-        PreviewKeyDown += (_, args) =>
-        {
-            if (args.Key != Key.Escape || _quickGuide.Mode == SubtitleQuickGuideMode.Hidden) return;
-            _quickGuide.Dismiss(); args.Handled = true;
-        };
-        StateChanged += (_, _) => RefreshWindowStateButton();
-        Loaded += OnLoaded;
-        AppearanceTheme.Changed += RefreshAppearance;
+        { SettingsStore.SaveSubtitleGuidePromptPreference(seen); _settings.SubtitleGuidePromptSeen = seen; }, () =>
+        { if (OpenSpeakerSettingsRequested is not null) OpenSpeakerSettingsRequested(); else OpenSettings(); },
+            error => LogOverlayError("Save subtitle guide preference", error));
+        _quickGuideButton.Click += (_, _) => { _quickGuide.ShowGuide(); OpenTranscript(); };
+        MarkLiteralUiProvider?.Invoke(_quickGuide); MarkLiteralUiProvider?.Invoke(_speakerRows); MarkLiteralUiProvider?.Invoke(_source);
+        _transcriptRoot = CreateTranscriptContent();
+        _dragHeader = new Border { Name = "SubtitleDragHeader", Child = CreateCompactToolbar() }; Content = _dragHeader;
+        _dragHeader.MouseLeftButtonDown += HeaderMouseDown; _dragHeader.MouseMove += HeaderMouseMove;
+        _dragHeader.MouseLeftButtonUp += (_, _) => CancelHeaderDrag(); _dragHeader.LostMouseCapture += (_, _) => _headerDragPending = false;
+        _outgoingStateTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        _outgoingStateTimer.Tick += (_, _) => { if (_transcriptWindow?.IsVisible == true) RefreshOutgoingState(); };
+        LocationChanged += (_, _) => ShowPassiveSurface();
+        SizeChanged += (_, _) => ShowPassiveSurface();
+        StateChanged += (_, _) => { if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal; ShowPassiveSurface(); };
+        IsVisibleChanged += (_, _) => ShowPassiveSurface();
+        PreviewKeyDown += (_, args) => { if (args.Key == Key.Escape) { _appearancePopup?.SetCurrentValue(System.Windows.Controls.Primitives.Popup.IsOpenProperty, false); } };
+        Loaded += OnLoaded; AppearanceTheme.Changed += RefreshAppearance;
         Closed += (_, _) => AppearanceTheme.Changed -= RefreshAppearance;
         Closing += (_, _) =>
         {
-            CancelHeaderDrag();
-            _shutdown.Cancel();
-            if (!_serviceStarted) _serviceStopped.TrySetResult();
-            _outgoingStateTimer.Stop();
+            CancelHeaderDrag(); FlushAppearanceSave(); _shutdown.Cancel(); _appearanceSaveTimer?.Stop();
+            if (_appearancePopup is not null) _appearancePopup.IsOpen = false;
+            var surface = _textSurface; _textSurface = null;
+            try { surface?.Close(); } catch (Exception error) { LogOverlayError("Close subtitle surface", error); }
+            try { _transcriptWindow?.Close(); } catch (Exception error) { LogOverlayError("Close subtitle transcript", error); }
+            if (!_serviceStarted) _serviceStopped.TrySetResult(); _outgoingStateTimer.Stop();
         };
+        ApplyAlwaysOnTop(_settings.SubtitlesAlwaysOnTop); RefreshInterfaceLanguage(); RefreshCompactSurface();
     }
 
     private static Border StatusBackplate(TextBlock status)
@@ -370,46 +204,36 @@ internal sealed partial class SubtitleWindow : Window
         if (!Dispatcher.CheckAccess()) { _ = Dispatcher.BeginInvoke(new Action(RefreshAppearance)); return; }
         // No service restart or history rebuild: brush mutation preserves the text and scroll.
         ApplyAlwaysOnTop(_settings.SubtitlesAlwaysOnTop);
-        RefreshWindowStateButton();
         _quickGuideButton.ToolTip = Ui("Quick subtitle guide");
         System.Windows.Automation.AutomationProperties.SetName(_quickGuideButton, Ui("Quick subtitle guide"));
         _quickGuide.RefreshLanguage();
+        RefreshCompactSurface();
     }
 
     internal void RefreshInterfaceLanguage()
     {
         Title=AppBrand.DisplayName+" · "+Ui("Subtitles");
-        _subtitleHeading.Text=Title;
+        _subtitleHeading.Text=AppBrand.DisplayName;
         _status.Text=_lastStatus == IncomingListening.WaitingMessage(_settings)
             ? ListeningSourceWaitingUi(_settings) : Ui(_lastStatus);
         if(!_receivedSource) _source.Text=ListeningSourceWaitingUi(_settings);
         ApplyAlwaysOnTop(_settings.SubtitlesAlwaysOnTop);
-        RefreshWindowStateButton();
         _quickGuideButton.ToolTip = Ui("Quick subtitle guide");
         System.Windows.Automation.AutomationProperties.SetName(_quickGuideButton, Ui("Quick subtitle guide"));
         _quickGuide.RefreshLanguage();
         RefreshSubtitleProfileButtons();
-        foreach (var child in _speakerRows.Children.OfType<Border>())
-            RefreshCorrectionButton(child);
+        foreach (var refresh in _refreshCompactCopy) refresh();
+        if (_appearancePopup is { IsOpen: true }) _appearancePopup.Child = CreateAppearanceControls();
+        if (_transcriptWindow is not null) _transcriptWindow.Title = AppBrand.DisplayName + " · " + Ui("Transcript");
+        RefreshCorrectionButton(_transcriptRoot);
+        RefreshCompactSurface();
         LocalizeUiProvider?.Invoke(this);
     }
 
     private void ToggleMaximized()
     {
         CancelHeaderDrag();
-        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
-        RefreshWindowStateButton();
-    }
-
-    private void RefreshWindowStateButton()
-    {
-        bool maximized = WindowState == WindowState.Maximized;
-        string caption = Ui(maximized ? "Restore window" : "Maximize window");
-        _maximizeButton.ToolTip = caption;
-        System.Windows.Automation.AutomationProperties.SetName(_maximizeButton, caption);
-        _maximizeButton.Content = new System.Windows.Shapes.Path { Width = 12, Height = 12, Stretch = Stretch.Uniform,
-            Stroke = OverlayText, StrokeThickness = 1.2, IsHitTestVisible = false,
-            Data = Geometry.Parse(maximized ? "M3,0 H12 V9 H9 M0,3 H9 V12 H0 Z M3,0 V3" : "M0,0 H12 V12 H0 Z") };
+        OpenTranscript(maximize: true);
     }
 
     internal static bool IsSubtitleDragSource(DependencyObject? source, DependencyObject header)
@@ -482,6 +306,8 @@ internal sealed partial class SubtitleWindow : Window
         }
         else if (root is TextBlock text && text.Tag is SubtitleInterfaceLabel label)
             text.Text = label.Values is null ? Ui(label.Source) : UiFormat(label.Source, label.Values);
+        else if (root is Button captionButton && captionButton.Tag is SubtitleInterfaceLabel caption)
+            captionButton.Content = caption.Values is null ? Ui(caption.Source) : UiFormat(caption.Source, caption.Values);
         foreach(object child in LogicalTreeHelper.GetChildren(root)) if(child is DependencyObject dependency) RefreshCorrectionButton(dependency);
     }
 
@@ -556,12 +382,13 @@ internal sealed partial class SubtitleWindow : Window
         if (_serviceStarted || _shutdown.IsCancellationRequested) return;
         _serviceStarted = true;
         Rect area = SystemParameters.WorkArea;
-        Left = area.Left + (area.Width - Width) / 2;
-        Top = area.Bottom - Height - 45;
+        Left = area.Left + (area.Width - ActualWidth) / 2;
+        Top = Math.Max(area.Top + 12, area.Bottom - 370);
+        ShowPassiveSurface();
         RefreshOutgoingState();
         _outgoingStateTimer.Start();
         // This only offers help. It never waits for a dialog or delays audio startup.
-        _quickGuide.ShowPromptIfNeeded(_settings.SubtitleGuidePromptSeen);
+        if (_quickGuide.ShowPromptIfNeeded(_settings.SubtitleGuidePromptSeen)) OpenTranscript();
         try { SettingsStore.Save(_settings); }
         catch (Exception exception)
         {
@@ -632,9 +459,17 @@ internal sealed partial class SubtitleWindow : Window
     private Task SetStatus(string text, bool error = false) =>
         Dispatcher.InvokeAsync(new Action(() =>
         {
+            _statusIsError = error;
             _lastStatus=text; _status.Text = text == IncomingListening.WaitingMessage(_settings)
                 ? ListeningSourceWaitingUi(_settings) : Ui(text);
             _status.Foreground = error ? AppearanceTheme.Error : OverlaySage;
+            _dragHeader.ToolTip = _surfaceFailed ? _pinStatus.Text : _status.Text;
+            _subtitleHeading.Foreground = error || _surfaceFailed ? AppearanceTheme.Error : OverlayText;
+            _compactStatus.Text = error ? _status.Text : Ui("No subtitles yet.");
+            _compactStatus.Foreground = error ? AppearanceTheme.Error : OverlayMuted;
+            if ((_displayHistory.Count == 0 || error) && _compactStatus.Parent is null) _compactRows.Children.Add(_compactStatus);
+            else if (_displayHistory.Count > 0 && !error) _compactRows.Children.Remove(_compactStatus);
+            ShowPassiveSurface();
         })).Task;
 
     private static void LogOverlayError(string action, Exception error)
@@ -670,7 +505,9 @@ internal sealed partial class SubtitleWindow : Window
     {
         _settings.SubtitlesAlwaysOnTop = enabled;
         Topmost = enabled;
-        _alwaysOnTopButton.Content = UiFormat("Always on top · {0}", Ui(enabled ? "On" : "Off"));
+        _alwaysOnTopButton.Content = enabled ? "◆" : "◇";
+        if (_textSurface is not null) _textSurface.Topmost = enabled;
+        System.Windows.Automation.AutomationProperties.SetName(_alwaysOnTopButton, UiFormat("Always on top · {0}", Ui(enabled ? "On" : "Off")));
         _alwaysOnTopButton.ToolTip = Ui(AlwaysOnTopToolTip(enabled));
         _alwaysOnTopButton.Foreground = enabled ? OverlaySage : OverlayMuted;
         _alwaysOnTopButton.BorderBrush = enabled ? OverlaySage : OverlayStroke;
@@ -752,10 +589,10 @@ internal sealed partial class SubtitleWindow : Window
         {
             if (_service is null) return;
             await _service.ResetSpeakersAsync(_shutdown.Token);
-            _cards.Clear();
             _speakerRows.Children.Clear();
             _displayHistory.Clear();
             _speakerColors.Clear();
+            RenderHistory();
         };
         window.Saved += async settings =>
         {
@@ -814,100 +651,8 @@ internal sealed partial class SubtitleWindow : Window
 
     private void RenderHistory()
     {
-        _speakerRows.Children.Clear();
-        _cards.Clear();
-        if (_settings.OverlayMode is "Sentence bubbles" or "Latest sentence")
-        {
-            foreach (TranslationDisplay sentence in _displayHistory.OrderBy(item => item.At)
-                .TakeLast(_settings.OverlayMode == "Latest sentence" ? 1 : _settings.HistoryLinesPerSpeaker))
-                CreateSentenceBubble(sentence);
-        }
-        else
-        {
-            // A guessed name is not a confirmed shared identity. Keep uncertain voices
-            // separate even when the matcher proposes the same saved person for both.
-            var speakers = _displayHistory.Select(DisplayGroupKey).Distinct().OrderBy(speaker =>
-                _displayHistory.Last(item => DisplayGroupKey(item) == speaker).At).TakeLast(_settings.VisibleSpeakerRows);
-            foreach (string speakerId in speakers)
-                CreateSpeakerCard(speakerId, _displayHistory.Where(item => DisplayGroupKey(item) == speakerId).TakeLast(_settings.HistoryLinesPerSpeaker).ToList());
-        }
-        _speakerScroll.UpdateLayout();
-        _speakerScroll.ScrollToEnd();
-        _ = Dispatcher.InvokeAsync(_speakerScroll.ScrollToEnd, System.Windows.Threading.DispatcherPriority.Loaded);
-    }
-
-    private void CreateSentenceBubble(TranslationDisplay sentence)
-    {
-        var panel = new StackPanel();
-        var header = new DockPanel { Margin = new Thickness(0, 0, 0, 7) };
-        AddCorrectionButton(header, sentence);
-        AddSuggestionReviewButtons(header, sentence);
-        AddPersonAvatar(header, sentence);
-        var time = new TextBlock { Text = $"{sentence.At.ToLocalTime():HH:mm}", Foreground = OverlayMuted,
-            FontSize = 10, Margin = new Thickness(16, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        DockPanel.SetDock(time, Dock.Right); header.Children.Add(time);
-        var speaker = new TextBlock { Text = DisplayPersonLabel(sentence), Foreground = IsSpeakerSuggestion(sentence) ? OverlayMuted : GetSpeakerColor(sentence.Speaker),
-            Tag = InterfacePersonLabel(sentence),
-            FontSize = 12, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis,
-            VerticalAlignment = VerticalAlignment.Center };
-        header.Children.Add(speaker);
-        panel.Children.Add(header);
-        panel.Children.Add(new TextBlock { Text = sentence.Translation, Foreground = OverlayText, FontFamily = ConversationFont,
-            FontSize = 19, FontWeight = FontWeights.Normal, LineHeight = 28, TextWrapping = TextWrapping.Wrap });
-        AddFeedbackSummary(panel, sentence);
-        _speakerRows.Children.Add(new Border { Background = OverlayPanel,
-            BorderBrush = OverlayStroke, BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(4, 16, 16, 16), Padding = new Thickness(15, 11, 15, 12),
-            Margin = new Thickness(0, 0, 0, 10), MaxWidth = 820, HorizontalAlignment = HorizontalAlignment.Left, Child = panel });
-    }
-
-    private void CreateSpeakerCard(string speakerId, List<TranslationDisplay> lines)
-    {
-        TranslationDisplay result = lines[^1];
-        if (!_cards.TryGetValue(speakerId, out SpeakerCard? card))
-        {
-            var speaker = new TextBlock
-            {
-                Text = DisplayPersonLabel(result),
-                Tag = InterfacePersonLabel(result),
-                Foreground = IsSpeakerSuggestion(result) ? OverlayMuted : GetSpeakerColor(result.Speaker),
-                FontSize = 12,
-                Margin = new Thickness(0, 0, 0, 7),
-                FontWeight = FontWeights.SemiBold
-            };
-            var translation = new TextBlock { Foreground = OverlayText, FontFamily = ConversationFont, FontSize = 19,
-                FontWeight = FontWeights.Normal, LineHeight = 28, TextWrapping = TextWrapping.Wrap };
-            var source = new TextBlock { Foreground = OverlayMuted, FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 9, 0, 0) };
-            var panel = new StackPanel();
-            var header = new DockPanel();
-            AddCorrectionButton(header, result);
-            AddSuggestionReviewButtons(header, result);
-            AddPersonAvatar(header, result);
-            header.Children.Add(speaker);
-            panel.Children.Add(header);
-            panel.Children.Add(translation);
-            panel.Children.Add(source);
-            AddFeedbackSummary(panel, result);
-            var border = new Border
-            {
-                Background = OverlayPanel,
-                BorderBrush = OverlayStroke,
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(4, 16, 16, 16),
-                Padding = new Thickness(15, 11, 15, 12),
-                Margin = new Thickness(0, 0, 0, 10),
-                MaxWidth = 820,
-                HorizontalAlignment = HorizontalAlignment.Left,
-                Child = panel
-            };
-            card = new SpeakerCard(border, translation, source, DateTimeOffset.UtcNow);
-            _cards[speakerId] = card;
-            _speakerRows.Children.Add(border);
-        }
-        card.Translation.Text = string.Join(Environment.NewLine + Environment.NewLine,
-            lines.Select(item => $"{item.At.ToLocalTime():HH:mm:ss}  {item.Translation}"));
-        card.Source.Text = result.Source;
-        card.LastUpdated = DateTimeOffset.UtcNow;
+        RenderTranscript();
+        RefreshCompactSurface();
     }
 
     private void AddCorrectionButton(DockPanel header, TranslationDisplay sentence)
@@ -926,7 +671,7 @@ internal sealed partial class SubtitleWindow : Window
             button.IsEnabled = false;
             try
             {
-                SpeakerFeedbackResult? result = await CorrectSpeakerRequested(this, button, _service, sentence);
+                SpeakerFeedbackResult? result = await CorrectSpeakerRequested(Window.GetWindow(button) ?? this, button, _service, HistoryEntry(sentence.UtteranceId) ?? sentence);
                 if (result is not null && !_shutdown.IsCancellationRequested)
                 {
                     ApplySpeakerCorrection(sentence.UtteranceId, result, sentence.EvidenceId);
@@ -1076,7 +821,7 @@ internal sealed partial class SubtitleWindow : Window
             if (!state.InstructionAcknowledged)
             {
                 bool acknowledged = EnsureSpeakerLearningRequested is not null
-                    && await EnsureSpeakerLearningRequested(this, host, sentence.Speaker, confirmed);
+                    && await EnsureSpeakerLearningRequested(_transcriptWindow is { IsVisible: true } ? _transcriptWindow : this, host, sentence.Speaker, confirmed);
                 if (_shutdown.IsCancellationRequested) return;
                 if (!acknowledged && confirmed) { _speakerReviewMessages.Remove(sentence.UtteranceId); return; }
             }
@@ -1129,15 +874,7 @@ internal sealed partial class SubtitleWindow : Window
         return colors[index % colors.Length];
     }
 
-    private sealed class SpeakerCard
-    {
-        public Border Container { get; }
-        public TextBlock Translation { get; }
-        public TextBlock Source { get; }
-        public DateTimeOffset LastUpdated { get; set; }
-        public SpeakerCard(Border container, TextBlock translation, TextBlock source, DateTimeOffset lastUpdated) =>
-            (Container, Translation, Source, LastUpdated) = (container, translation, source, lastUpdated);
-    }
+
 }
 
 internal readonly record struct TranslationRequest(string Source, SpeakerAttribution Speaker, long UtteranceId, DateTimeOffset At)
@@ -2130,6 +1867,8 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
 
     private async Task ObserveTranscriptAsync(string cumulative, DateTimeOffset? audioEnd = null)
     {
+        ObserveDecodedAudio(audioEnd);
+        if (RecognitionTextFilter.IsControlOnly(cumulative)) return;
         string active;
         bool meaningfulChanged = false;
         lock (_gate)
@@ -2188,18 +1927,23 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
         return await TakeSubtitleSegmentAsync(final: false, cancellationToken);
     }
 
-    private Task<TranslationRequest?> TakeSubtitleSegmentAsync(bool final, CancellationToken cancellationToken)
+    private Task<TranslationRequest?> TakeSubtitleSegmentAsync(bool final, CancellationToken cancellationToken, DateTimeOffset? observedAt = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         SubtitleSegment segment;
         long bubbleId;
-        DateTimeOffset end = DateTimeOffset.UtcNow;
+        DateTimeOffset end = observedAt ?? DateTimeOffset.UtcNow;
         DateTimeOffset evidenceEnd, evidenceStart;
         lock (_gate)
         {
-            _subtitleSegments.StabilityMilliseconds = CurrentSettings().SubtitlePreviewStableMilliseconds;
+            AppSettings settings = CurrentSettings();
+            _subtitleSegments.StabilityMilliseconds = settings.SubtitlePreviewStableMilliseconds;
+            _subtitleSegments.SendEarlyPreviews = settings.IncomingSendEarlyPreviews;
+            TimeSpan settle = TimeSpan.FromMilliseconds(Math.Clamp(settings.IncomingSettleMilliseconds, 600, 2400));
+            bool quiet = SubtitleSegmentation.HasAudioPause(end, _speakerTracker.LastVoiceLikeAt, _lastDecodedAudioEnd, settle,
+                lastWordAudioEnd: _lastMeaningfulAudioEnd ?? _lastTextAudioEnd, lastAudibleAt: _speakerTracker.LastAudibleAt);
             if (!_subtitleSegments.TryTakeReady(end, final,
-                TimeSpan.FromMilliseconds(Math.Clamp(CurrentSettings().IncomingSettleMilliseconds, 600, 2400)), out segment)) return Task.FromResult<TranslationRequest?>(null);
+                settle, out segment, allowQuietCommit: quiet)) return Task.FromResult<TranslationRequest?>(null);
             if (!_subtitleBubbleIds.TryGetValue(segment.SequenceIndex, out bubbleId))
                 _subtitleBubbleIds[segment.SequenceIndex] = bubbleId = Interlocked.Increment(ref _nextUtteranceId);
             evidenceEnd = _lastTextAudioEnd ?? end;
@@ -2326,6 +2070,8 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
 
     private async Task TranslateAndPublishAsync(TranslationRequest request, CancellationToken cancellationToken)
     {
+        if (RecognitionTextFilter.IsControlOnly(request.Source)) return;
+        if (!request.IsCommitted && !CurrentSettings().IncomingSendEarlyPreviews) return;
         try
         {
             if (IsSuperseded(request)) return;
@@ -2363,14 +2109,15 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
                 _ => "center"
             };
             Log($"Source: [{request.Speaker.Label}; {pan}; confidence {request.Speaker.Confidence:0.00}] {request.Source} | {settings.IncomingTargetLanguage}: {translated}");
-            RememberContext(request);
             bool manuallyAttributed;
             lock (_feedbackGate) manuallyAttributed = IsConfirmedDisplayLocked(request.UtteranceId);
             var display = new TranslationDisplay(request.Speaker.Label, request.Source, translated, request.UtteranceId, request.At)
                 { EvidenceId = request.Speaker.EvidenceId, PersonId = request.Speaker.PersonId,
                     SpeakerRecognitionEpoch = request.SpeakerRecognitionEpoch, IsManuallyAttributed = manuallyAttributed,
                     SessionVoiceKey = request.Speaker.SessionVoiceKey };
+            if (!request.IsCommitted && !CurrentSettings().IncomingSendEarlyPreviews) return;
             await PublishTranslationDisplayAsync(display);
+            RememberContext(request);
             if (request.IsCommitted) await RecordPublishedTranslationAsync(request, cancellationToken);
             await ReportHealthAsync(_connected ? "listening" : "waiting",
                 _connected ? ListeningStatus(settings) : "Waiting for speech…", onlyWhenHealthy: true);
@@ -2669,6 +2416,7 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
         lock (_gate)
         {
             _latest = "";
+            _lastDecodedAudioEnd = null;
             _currentUtteranceId = 0;
             _subtitleSegments.Reset();
             _subtitleBubbleIds.Clear();

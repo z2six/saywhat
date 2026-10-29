@@ -129,6 +129,12 @@ if ([version]($Version -split '-', 2)[0] -ge [version]'0.2.5') {
     $requiredSource += @('IncomingTranslator/IncomingCaptureCapabilities.cs','LocalTalk/IncomingCaptureUi.cs',
         'LocalTalk/IncomingCaptureCapabilityTests.cs','Packaging/Test-WindowsCompatibility.ps1')
 }
+if ([version]($Version -split '-', 2)[0] -ge [version]'0.2.6') {
+    $requiredSource += @('IncomingTranslator/SubtitleWindow.Compact.cs','IncomingTranslator/SubtitleTextSurface.cs',
+        'LocalTalk/CompactSubtitleUiTests.cs','LocalTalk/SubtitleTextSurfaceTests.cs',
+        'LocalTalk/SubtitleAppearancePreferenceTests.cs','LocalTalk/EarlyTranslationPreferenceTests.cs',
+        'FoxTransSource/FoxTrans/Providers/RecognitionTextFilter.cs','LocalTalk/RecognitionTextFilterTests.cs','docs/subtitles.md')
+}
 $archive = [IO.Compression.ZipFile]::OpenRead($sourceZip)
 $sha = [Security.Cryptography.SHA256]::Create()
 $sourceInventory = [Collections.Generic.List[object]]::new()

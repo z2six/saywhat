@@ -6,6 +6,7 @@ internal sealed record SubtitleSegment(string Text, int SequenceIndex, bool IsCo
 internal sealed class SubtitleSegmentation
 {
     public int StabilityMilliseconds { get; set; } = 500;
+    public bool SendEarlyPreviews { get; set; }
     private static readonly TimeSpan SoftDuration = TimeSpan.FromSeconds(7);
     private string _full = "", _committedPrefix = "", _active = "", _boundaryText = "", _lastPreview = "";
     private int _sequence;
@@ -39,7 +40,8 @@ internal sealed class SubtitleSegmentation
         TrackBoundary(now);
     }
 
-    public bool TryTakeReady(DateTimeOffset now, bool final, TimeSpan settle, out SubtitleSegment segment)
+    public bool TryTakeReady(DateTimeOffset now, bool final, TimeSpan settle, out SubtitleSegment segment,
+        bool allowQuietCommit = true)
     {
         segment = null!;
         if (settle < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(settle));
@@ -53,9 +55,10 @@ internal sealed class SubtitleSegmentation
             end = sentence > 0 && (bounded == 0 || sentence <= bounded) ? sentence
                 : bounded > 0 ? bounded : _active.Length;
         }
-        else if (_boundaryText.Length >= 2 && now - _boundaryAt >= punctuationStable) end = _boundaryText.Length;
-        else if (_active.Length >= 2 && now - _changedAt >= settle) end = _active.Length;
-        else if (_active.Length >= 220 || CountCjk(_active) >= 80 || now - _startedAt >= SoftDuration)
+        else if (SendEarlyPreviews && _boundaryText.Length >= 2 && now - _boundaryAt >= punctuationStable) end = _boundaryText.Length;
+        else if (allowQuietCommit && now - _changedAt >= settle) end = _active.Length;
+        else if (_active.Length >= 220 || CountCjk(_active) >= 80 ||
+            SendEarlyPreviews && now - _startedAt >= SoftDuration && (_active.Length >= 24 || CountCjk(_active) >= 8))
             end = SoftEnd(_active);
         if (end > 0 && (end > 220 || CountCjk(_active[..end]) > 80))
             end = Math.Min(end, SoftEnd(_active));
@@ -79,13 +82,42 @@ internal sealed class SubtitleSegmentation
         }
         // Useful stable previews may revise the same bubble. Tiny word fragments do not
         // generate previews, and only punctuation/settle/soft limits commit a new bubble.
-        if ((_active.Length >= 24 || CountCjk(_active) >= 8) && now - _changedAt >= punctuationStable && _lastPreview != _active)
+        if (SendEarlyPreviews && (_active.Length >= 24 || CountCjk(_active) >= 8) &&
+            now - _changedAt >= punctuationStable && _lastPreview != _active)
         {
             _lastPreview = _active;
             segment = new(_active, _sequence, false, _startedAt);
             return true;
         }
         return false;
+    }
+
+    // A slow decoder can repeat an old word while audio continues arriving.
+    // Only an actual voice pause covered by decoded audio proves a turn ended.
+    internal static bool HasAudioPause(DateTimeOffset now, DateTimeOffset lastVoiceLikeAt,
+        DateTimeOffset? decodedThrough, TimeSpan settle, DateTimeOffset? lastWordAudioEnd = null,
+        DateTimeOffset? lastAudibleAt = null)
+    {
+        if (settle < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(settle));
+        if (decodedThrough is not DateTimeOffset decoded) return false;
+        DateTimeOffset? word = lastWordAudioEnd is DateTimeOffset mappedWord && mappedWord != DateTimeOffset.MinValue ? mappedWord : null;
+        DateTimeOffset? audible = lastAudibleAt is DateTimeOffset heard && heard != DateTimeOffset.MinValue ? heard : null;
+        // The tracker works in 40ms frames and incoming PCM arrives in 80ms
+        // chunks. That rounding tolerance must not let an old ordinary voice
+        // frame terminate newer hushed/unpitched speech.
+        bool currentVoice = lastVoiceLikeAt != DateTimeOffset.MinValue &&
+            (word is null || word.Value <= lastVoiceLikeAt || word.Value - lastVoiceLikeAt <= TimeSpan.FromMilliseconds(80)) &&
+            (audible is null || audible.Value <= lastVoiceLikeAt);
+        if (currentVoice)
+            return now >= lastVoiceLikeAt && now - lastVoiceLikeAt >= settle && decoded >= lastVoiceLikeAt;
+
+        // Real ASR words can exist below the tracker's loudness/pitch threshold.
+        // Their timestamp alone is not quiet: require a full further span of
+        // processed audio with no later words or audible activity. This cannot
+        // fire merely because a decoder stopped producing updates.
+        if (word is not DateTimeOffset boundary) return false;
+        if (audible is DateTimeOffset audibleEnd && audibleEnd > boundary) boundary = audibleEnd;
+        return now >= boundary && now - boundary >= settle && decoded >= boundary && decoded - boundary >= settle;
     }
 
     private void TrackBoundary(DateTimeOffset now)
@@ -197,7 +229,80 @@ internal sealed class SubtitleSegmentation
         void Check(bool value, string label) { if (!value) throw new InvalidOperationException("Subtitle segmentation: " + label); checks++; }
         DateTimeOffset time = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
         TimeSpan settle = TimeSpan.FromSeconds(1);
-        var cut = new SubtitleSegmentation();
+        var finalOnly = new SubtitleSegmentation();
+        Check(!finalOnly.SendEarlyPreviews, "early translations require an explicit opt-in");
+        finalOnly.Observe("First sentence. The person is still talking", time);
+        Check(!finalOnly.TryTakeReady(time.AddMilliseconds(600), false, settle, out _, allowQuietCommit: false),
+            "punctuation alone cannot publish a default subtitle during ongoing audio");
+        Check(!finalOnly.TryTakeReady(time.AddSeconds(2), false, settle, out _, allowQuietCommit: false),
+            "unchanged recognition text is not proof that ongoing audio ended");
+        Check(finalOnly.TryTakeReady(time.AddSeconds(2), false, settle, out var paused, allowQuietCommit: true) &&
+            paused.IsCommitted && paused.Text == "First sentence. The person is still talking" && paused.SequenceIndex == 0,
+            "a real pause publishes the retained complete text once without an earlier draft");
+        Check(!finalOnly.TryTakeReady(time.AddSeconds(3), true, settle, out _), "final after a pause does not duplicate a sentence");
+        finalOnly.Reset(); finalOnly.Observe("This sentence needs enough context before translation", time);
+        Check(!finalOnly.TryTakeReady(time.AddMilliseconds(600), false, settle, out _, allowQuietCommit: false),
+            "meaningful default text does not schedule a speculative translation");
+        finalOnly.Observe("This corrected sentence now contains the complete thought", time.AddMilliseconds(800));
+        Check(finalOnly.TryTakeReady(time.AddMilliseconds(900), true, settle, out var authoritative, allowQuietCommit: false) &&
+            authoritative.Text == "This corrected sentence now contains the complete thought" && authoritative.IsCommitted,
+            "an ASR final immediately publishes its corrected full sentence without waiting for silence twice");
+        finalOnly.Reset(); finalOnly.Observe("Hello", time);
+        Check(!finalOnly.TryTakeReady(time.AddSeconds(20), false, settle, out _, allowQuietCommit: false),
+            "a slow decoder repeating one short word cannot manufacture an ended sentence from elapsed time");
+        Check(finalOnly.TryTakeReady(time.AddSeconds(20), true, settle, out var shortFinal) && shortFinal.Text == "Hello",
+            "the retained short word is not lost when a genuine final arrives");
+        finalOnly.Reset(); finalOnly.Observe("This ongoing sentence is long enough to trigger the old wall-clock bound", time);
+        Check(!finalOnly.TryTakeReady(time.AddSeconds(7), false, settle, out _, allowQuietCommit: false) &&
+            !finalOnly.TryTakeReady(time.AddMinutes(1), false, settle, out _, allowQuietCommit: false),
+            "a long stale draft is not a completed sentence merely because seven seconds or a minute passed");
+        finalOnly.Observe("This ongoing sentence is long enough to trigger the old wall-clock bound and the person is still speaking", time.AddMinutes(1));
+        Check(!finalOnly.TryTakeReady(time.AddMinutes(1).AddMilliseconds(500), false, settle, out _, allowQuietCommit: false),
+            "fresh continued words do not allow a time-only finish without a verified pause");
+        Check(finalOnly.TryTakeReady(time.AddMinutes(1).AddSeconds(2), false, settle, out var longPaused, allowQuietCommit: true) &&
+            longPaused.Text.EndsWith("still speaking", StringComparison.Ordinal), "the full retained thought finishes once a real pause arrives");
+        finalOnly.Reset(); finalOnly.Observe("好", time);
+        Check(finalOnly.TryTakeReady(time.AddSeconds(2), false, settle, out var oneCharacter, allowQuietCommit: true) && oneCharacter.Text == "好",
+            "a genuine pause can finish a meaningful one-character answer");
+        Check(!HasAudioPause(time.AddSeconds(2), time.AddMilliseconds(1500), time.AddSeconds(2), settle),
+            "recent voice frames prevent a false quiet commit despite stale text");
+        Check(!HasAudioPause(time.AddSeconds(3), time.AddSeconds(1), time.AddMilliseconds(900), settle),
+            "a delayed decoder must reach the last voice frame before quiet can finish its text");
+        Check(HasAudioPause(time.AddSeconds(2), time.AddSeconds(1), time.AddSeconds(1), settle),
+            "decoded audio covering a full selected pause proves a boundary at the exact threshold");
+        Check(!HasAudioPause(time.AddSeconds(2), DateTimeOffset.MinValue, time, settle) &&
+            !HasAudioPause(time.AddSeconds(2), time, null, settle) && !HasAudioPause(time, time.AddSeconds(1), time.AddSeconds(1), settle),
+            "missing and future audio evidence cannot prove a pause");
+        Check(!HasAudioPause(time.AddSeconds(3), DateTimeOffset.MinValue, time.AddSeconds(1), settle,
+            lastWordAudioEnd: time.AddSeconds(1)), "hushed words alone cannot be treated as a completed sentence without further decoded quiet");
+        Check(!HasAudioPause(time.AddSeconds(3), DateTimeOffset.MinValue, time.AddMilliseconds(1999), settle,
+            lastWordAudioEnd: time.AddSeconds(1)) && HasAudioPause(time.AddSeconds(3), DateTimeOffset.MinValue, time.AddSeconds(2), settle,
+            lastWordAudioEnd: time.AddSeconds(1)), "a mapped quiet-word fallback requires one complete selected pause of further decoder progress");
+        Check(!HasAudioPause(time.AddSeconds(3), time, time.AddSeconds(3), settle,
+            lastWordAudioEnd: time.AddSeconds(1), lastAudibleAt: time.AddMilliseconds(2900)),
+            "an old voice-like frame cannot end a newer audible but unpitched voice while it continues");
+        Check(!HasAudioPause(time.AddSeconds(4), time, time.AddMilliseconds(3499), settle,
+            lastWordAudioEnd: time.AddSeconds(1), lastAudibleAt: time.AddMilliseconds(2500)) &&
+            HasAudioPause(time.AddSeconds(4), time, time.AddMilliseconds(3500), settle,
+                lastWordAudioEnd: time.AddSeconds(1), lastAudibleAt: time.AddMilliseconds(2500)),
+            "newer audible activity resets both the quiet timer and the required decoded quiet span");
+        Check(!HasAudioPause(time.AddSeconds(5), DateTimeOffset.MinValue, time.AddSeconds(5), settle,
+            lastAudibleAt: time.AddSeconds(1)), "audible noise with no real ASR words cannot use the hush fallback");
+        var timedPreview = new SubtitleSegmentation { SendEarlyPreviews = true };
+        timedPreview.Observe("A long continuous thought can be sent as one bounded section in early mode", time);
+        Check(timedPreview.TryTakeReady(time.AddSeconds(7), false, settle, out var boundedTime, allowQuietCommit: false) && boundedTime.IsCommitted,
+            "explicit early mode retains its time-bounded sections without pretending a real pause occurred");
+        finalOnly.Reset(); finalOnly.Observe(new string('x', 500), time);
+        var boundedFinals = new List<SubtitleSegment>();
+        while (finalOnly.TryTakeReady(time, false, settle, out var boundedPart, allowQuietCommit: false)) boundedFinals.Add(boundedPart);
+        while (finalOnly.TryTakeReady(time, true, settle, out var boundedPart)) boundedFinals.Add(boundedPart);
+        Check(boundedFinals.Count == 3 && boundedFinals.All(part => part.IsCommitted && part.Text.Length <= 220) &&
+            string.Concat(boundedFinals.Select(part => part.Text)) == new string('x', 500),
+            "bounded default sections and their final tail preserve every recognized character exactly once");
+
+        // Explicit early-translation mode retains its previous revision and
+        // punctuation behavior, independently of the safer default above.
+        var cut = new SubtitleSegmentation { SendEarlyPreviews = true };
         cut.Observe("你好世界。接下来我们去哪里？", time);
         Check(cut.TryTakeReady(time.AddMilliseconds(600), false, settle, out var first) && first.Text == "你好世界。" && first.SequenceIndex == 0 && first.IsCommitted, "CJK sentence without spaces");
         Check(cut.TryTakeReady(time.AddMilliseconds(600), true, settle, out var tail) && tail.Text == "接下来我们去哪里？" && tail.SequenceIndex == 1, "Final returns only uncommitted tail");

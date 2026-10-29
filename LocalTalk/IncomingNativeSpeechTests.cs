@@ -56,24 +56,48 @@ internal static class IncomingNativeSpeechTests
         }
         var transcript = new NativeSubtitleTranscript();
         NativeSubtitleUpdate delta = transcript.Observe(Json("""{"type":"conversation.item.input_audio_transcription.delta","delta":"你好","audio_processed":0.4}"""), 800, false);
-        Check(delta.Text == "你好" && delta.AudioEndMilliseconds == 400 && !delta.Completed,
+        Check(delta.Text == "你好" && delta.AudioEndMilliseconds == 400 && delta.VerifiedAudioEndMilliseconds == 400 && !delta.Completed,
             "partial words use acknowledged audio time and remain speculative");
         NativeSubtitleUpdate empty = transcript.Observe(Json("""{"type":"conversation.item.input_audio_transcription.delta","delta":"","audio_processed":0.5}"""), 900, false);
-        Check(empty.Text is null && !empty.Completed, "empty processing updates cannot fabricate words or finalize speech");
+        Check(empty.Text is null && !empty.Completed && empty.VerifiedAudioEndMilliseconds == 500,
+            "empty updates retain explicit processing proof without fabricating words or finalizing speech");
         NativeSubtitleUpdate final = transcript.Observe(Json("""{"type":"conversation.item.input_audio_transcription.completed","transcript":"你好吗？","audio_processed":0.45}"""), 900, false);
-        Check(final.Text == "你好吗？" && final.AudioEndMilliseconds == 500 && !final.Completed,
+        Check(final.Text == "你好吗？" && final.AudioEndMilliseconds == 500 && final.VerifiedAudioEndMilliseconds == 450 && !final.Completed,
             "authoritative completed text replaces partial guesses and timestamps never move backward");
         delta = transcript.Observe(Json("""{"type":"conversation.item.input_audio_transcription.delta","delta":"再见","audio_processed":99999}"""), 1200, false);
-        Check(delta.Text == "你好吗？再见" && delta.AudioEndMilliseconds == 1200,
-            "later native turns accumulate while reported positions are clamped to sent PCM");
+        Check(delta.Text == "你好吗？再见" && delta.AudioEndMilliseconds == 1200 && delta.VerifiedAudioEndMilliseconds is null,
+            "future cursors retain bounded legacy display positions but never become verified decoder progress");
         Reject(() => transcript.Observe(Json("""{"type":"input_audio_buffer.committed"}"""), 1200, false),
             "unsolicited commit acknowledgements cannot release a session");
         Reject(() => transcript.Observe(Json("""{"type":"input_audio_buffer.committed"}"""), 1200, true),
             "a final from before commit cannot stand in for the requested final");
         final = transcript.Observe(Json("""{"type":"conversation.item.input_audio_transcription.completed","transcript":"再见。"}"""), 1200, true);
         NativeSubtitleUpdate complete = transcript.Observe(Json("""{"type":"input_audio_buffer.committed"}"""), 1200, true);
-        Check(final.Text == "你好吗？再见。" && complete.Completed && complete.Text == final.Text,
-            "verified commit completion retains the authoritative final transcript");
+        Check(final.Text == "你好吗？再见。" && complete.Completed && complete.Text == final.Text &&
+            complete.VerifiedAudioEndMilliseconds is null,
+            "commit acknowledgement retains the authoritative final transcript without inventing its own audio timestamp");
+        var proof = new NativeSubtitleTranscript();
+        NativeSubtitleUpdate missingProof = proof.Observe(Json("""{"type":"conversation.item.input_audio_transcription.delta","delta":"Real words"}"""), 9000, false);
+        Check(missingProof.AudioEndMilliseconds == 9000 && missingProof.VerifiedAudioEndMilliseconds is null,
+            "missing processed time exposes a legacy sent fallback separately from verified progress");
+        NativeSubtitleUpdate genuine = proof.Observe(Json("""{"type":"conversation.item.input_audio_transcription.delta","delta":"","audio_processed":0.5}"""), 10000, false);
+        Check(genuine.AudioEndMilliseconds == 9000 && genuine.VerifiedAudioEndMilliseconds == 500,
+            "a later valid acknowledgement cannot inherit the inflated sent fallback watermark");
+        NativeSubtitleUpdate olderProof = proof.Observe(Json("""{"type":"conversation.item.input_audio_transcription.delta","delta":"","audio_processed":0.3}"""), 10000, false);
+        Check(olderProof.AudioEndMilliseconds == 9000 && olderProof.VerifiedAudioEndMilliseconds == 300,
+            "an out-of-order explicit cursor remains its own proof rather than being ratcheted through the legacy display position");
+        foreach (string invalidProcessed in new[] { "null", "true", "\"0.8\"", "\"NaN\"", "-0.1", "1e309", "1e308", "99", "{}", "[]" })
+        foreach (string received in new[] { "", " extra words" })
+        {
+            string invalidMessage = "{\"type\":\"conversation.item.input_audio_transcription.delta\",\"delta\":" +
+                JsonSerializer.Serialize(received) + ",\"audio_processed\":" + invalidProcessed + "}";
+            NativeSubtitleUpdate invalidProof = proof.Observe(Json(invalidMessage), 10000, false);
+            Check(invalidProof.VerifiedAudioEndMilliseconds is null && invalidProof.AudioEndMilliseconds <= 10000,
+                "invalid processed metadata cannot prove decoder progress for empty or nonempty deltas: " + invalidProcessed);
+        }
+        NativeSubtitleUpdate zeroProof = proof.Observe(Json("""{"type":"conversation.item.input_audio_transcription.delta","delta":"","audio_processed":0}"""), 10000, false);
+        Check(zeroProof.VerifiedAudioEndMilliseconds == 0,
+            "an explicit valid zero is distinguished from missing processing metadata");
         Reject(() => new NativeSubtitleTranscript().Observe(Json("[]"), 0, false), "non-object events are rejected");
         Reject(() => new NativeSubtitleTranscript().Observe(Json("""{"type":"conversation.item.input_audio_transcription.delta","delta":7}"""), 0, false),
             "malformed delta types are rejected");

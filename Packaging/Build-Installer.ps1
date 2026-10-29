@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '0.2.5',
+    [string]$Version = '0.2.6',
     [string]$CompilerPath,
     [switch]$SkipPublish,
     [string]$AppPublishDirectory,
@@ -194,6 +194,10 @@ try {
         'LocalTalk/HomeSubtitleControls.cs','LocalTalk/HomeSubtitleUiTests.cs',
         'IncomingTranslator/IncomingCaptureCapabilities.cs','LocalTalk/IncomingCaptureUi.cs',
         'LocalTalk/IncomingCaptureCapabilityTests.cs','Packaging/Test-WindowsCompatibility.ps1',
+        'IncomingTranslator/SubtitleWindow.Compact.cs','IncomingTranslator/SubtitleTextSurface.cs',
+        'LocalTalk/CompactSubtitleUiTests.cs','LocalTalk/SubtitleTextSurfaceTests.cs',
+        'LocalTalk/SubtitleAppearancePreferenceTests.cs','LocalTalk/EarlyTranslationPreferenceTests.cs',
+        'FoxTransSource/FoxTrans/Providers/RecognitionTextFilter.cs','LocalTalk/RecognitionTextFilterTests.cs','docs/subtitles.md',
         'FoxTransSource/FoxTrans/Providers/NemotronTranscriber.cs','FoxTransLocalHost/NativeSpeechTests.cs',
         'LocalTalk/RuntimeProfiles.cs','LocalTalk/VibeVoiceRuntime.cs','LocalTalk/MainWindowProfileRuntime.cs',
         'LocalTalk/TranslationProfilesUi.cs','IncomingTranslator/TranslationProfiles.cs',

@@ -28,7 +28,7 @@ Generation does not download or start an image model, send the fingerprint anywh
 
 The recognition network is **not retrained** when a person is selected. SayWhat? extracts a compact normalized embedding—a numerical voice fingerprint—and stores a human-confirmed reference. Later fingerprints are compared to these references using cosine similarity. This can improve matching to a familiar voice without modifying the model's weights or running a training job.
 
-Click **Select a person** under a subtitle. The small picker offers recent names and a search across saved people. Selecting a name labels the message immediately. On the first learning use, the app explains that an example should contain one clear, isolated voice. When recognition is enabled and usable evidence is still available, the label also adds or corrects that reference.
+Open **Logs → Transcript** from the subtitle toolbar, then click **Select a person** on a message. The compact overlay's bubbles let clicks pass through; name corrections are in the interactive transcript. The small picker offers recent names and a search across saved people. Selecting a name labels the message immediately. On the first learning use, the app explains that an example should contain one clear, isolated voice. When recognition is enabled and usable evidence is still available, the label also adds or corrects that reference.
 
 A message can be labeled without teaching the model. Learning is withheld when recognition was off, the evidence has expired, no valid embedding exists, audio is mixed/too short/clipped, or the bounded reference collection is full. Recent in-memory evidence is retained for at most five minutes, with at most 200 observations. The raw audio is not retained as a training dataset.
 
@@ -38,7 +38,7 @@ Repeated revisions of the same voiced interval represent **one** example, not in
 
 ### Review a suggested name
 
-From 0.1.26, every automatically named message appears as **Maybe [name]**, with the person's picture and ✓ / ✕ controls. Its translation is already visible; reviewing a name never gates speech recognition or translation.
+From 0.1.26, every automatically named message appears as **Maybe [name]**, with the person's picture. Open **Transcript** for ✓ / ✕ review controls. Its translation is already visible; reviewing a name never gates speech recognition or translation.
 
 - **✓** confirms this message. If its retained audio is eligible, the app stores a positive reference.
 - **✕** changes this message to Unknown person. Eligible evidence becomes a person-specific negative reference: this voice is **not** the suggested person. It is not evidence for another person's identity.

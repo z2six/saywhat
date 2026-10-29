@@ -4,14 +4,13 @@ using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
 namespace IncomingTranslator;
 
-// Inert cards and an unshown overlay only. Never raises Loaded, reads voice
+// Inert cards and unshown subtitle/transcript controls only. Never raises Loaded, reads voice
 // evidence, opens Settings, starts capture/models, or writes real preferences.
 internal static class SubtitleQuickGuideTests
 {
@@ -66,6 +65,24 @@ internal static class SubtitleQuickGuideTests
             guide.ShowGuide(); guide.CloseGuide(); guide.ShowGuide();
             Check(writes.Count == 1 && settingsRequests == 0 && guide.Mode == SubtitleQuickGuideMode.Guide,
                 "reopening and closing the guide does not change translation settings");
+            foreach (string phrase in new[]
+            {
+                "By default, the overlay shows the latest three messages. Its bubbles let clicks pass through; drag or use controls from the toolbar.",
+                "Original text is what speech recognition heard; the translation appears below. Either step can make mistakes.",
+                "Choose Logs for up to 200 recent messages in Transcript. Select text, use Copy all, or turn Follow latest on to keep up.",
+                "Use Select a person and the ✓ / ✕ buttons in Transcript to correct or review names.",
+                "Open Appearance on the toolbar to change Font size, Bubble width, Background and Original text. Changes save immediately.",
+                "The background starts at 65% opacity; text stays solid. Always on top controls whether the overlay stays in front.",
+                "Use Appearance or Transcript to switch Normal / Groups. Open Settings in Transcript; use ? for this guide.",
+                "Normal uses your chosen speech model. Groups uses an extra local model to recognize separate voices; it adds delay and can still miss overlapping speech.",
+                "Maybe names are suggestions. ✓ confirms one; ✕ marks it unknown. Guesses never teach themselves.",
+                "Selecting a person can save a clear voice example. Mixed, short or old audio may only change the name. You can undo a review."
+            })
+                Check(Nodes(guide).OfType<TextBlock>().Any(text => text.Text == phrase),
+                    "the guide explains compact display, full transcript and safe review: " + phrase);
+            Check(!Nodes(guide).OfType<TextBlock>().Any(text => text.Text ==
+                "Choose Select a person below a message, then pick or add their name. Use a clear example with only that person speaking. When recognition is on, this helps the app recognize them next time."),
+                "the guide no longer directs users to click passive overlay bubbles");
             Button(guide, "SubtitleGuidePrimary").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
             Check(guide.Mode == SubtitleQuickGuideMode.Hidden && settingsRequests == 1 && writes.Count == 1,
                 "speaker-settings link closes only the guide and invokes its dedicated settings callback");
@@ -90,10 +107,12 @@ internal static class SubtitleQuickGuideTests
             T Read<T>(string field) => (T)typeof(SubtitleWindow).GetField(field, flags)!.GetValue(overlay)!;
             var helpButton = Read<Button>("_quickGuideButton");
             var integrated = Read<SubtitleQuickGuide>("_quickGuide");
-            FrameworkElement content = (FrameworkElement)overlay.Content;
+            FrameworkElement content = overlay.TranscriptRoot;
             var dragHeader = Read<Border>("_dragHeader");
-            Check(helpButton.Content?.ToString() == "?" && helpButton.Width == 32 && helpButton.IsEnabled &&
+            Check(helpButton.Content?.ToString() == "?" && helpButton.Width >= 24 && helpButton.IsEnabled &&
                 !SubtitleWindow.IsSubtitleDragSource(helpButton, dragHeader), "literal question-mark button is independent of title-bar dragging");
+            Check(Nodes(content).Contains(integrated) && !Nodes((DependencyObject)overlay.Content).Contains(integrated),
+                "the guide belongs to the interactive transcript, not the passive subtitle surface or compact toolbar");
             TranslationDisplay sample = new("Speaker 1", "Synthetic source", "Synthetic translated sentence", 971, DateTimeOffset.UtcNow);
             overlay.Publish(sample);
             object? historyBefore = overlay.HistoryEntry(sample.UtteranceId);
@@ -104,7 +123,7 @@ internal static class SubtitleQuickGuideTests
             overlay.OpenSpeakerSettingsRequested = () => speakerRequests++;
             helpButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
             Check(integrated.Mode == SubtitleQuickGuideMode.Guide && !overlay.IsLoaded && !overlay.IsVisible,
-                "header help works without opening another window or starting audio capture");
+                "toolbar help prepares its guide without showing windows or starting audio in an unshown fixture");
             Button(integrated, "SubtitleGuidePrimary").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
             Check(speakerRequests == 1 && optionsRequests == 0 && integrated.Mode == SubtitleQuickGuideMode.Hidden,
                 "guide uses the real speaker-settings entry point rather than the language page");
@@ -123,11 +142,12 @@ internal static class SubtitleQuickGuideTests
                     Check(Nodes(integrated).OfType<TextBlock>().Any(text => text.Text == UiText.T("Saved names and voice examples stay on your device. They aren't uploaded.")) &&
                         Nodes(integrated).OfType<TextBlock>().Any(text => text.Text == UiText.T("You can turn Voice recognition on or off in Settings. Translations still work when it's off.")),
                         "local storage and optional recognition are explained without hiding the settings action");
-                    foreach (Size viewport in new[] { new Size(560, 260), new Size(960, 430) })
+                    foreach (Size viewport in new[] { new Size(560, 400), new Size(960, 640) })
                     {
+                        integrated.MaxHeight = Math.Clamp(viewport.Height * .45, 120, 320);
                         content.InvalidateMeasure(); content.InvalidateArrange();
                         content.Measure(viewport); content.Arrange(new Rect(new Point(), viewport)); content.UpdateLayout();
-                        foreach (Button button in new[] { helpButton, Button(integrated, "SubtitleGuidePrimary"), Button(integrated, "SubtitleGuideSecondary") })
+                        foreach (Button button in new[] { Button(integrated, "SubtitleGuidePrimary"), Button(integrated, "SubtitleGuideSecondary") })
                         {
                             Point point = button.TranslatePoint(new Point(), content);
                             Check(double.IsFinite(point.X) && double.IsFinite(point.Y) && button.ActualWidth >= 24 && button.ActualHeight >= 24 &&
@@ -143,9 +163,9 @@ internal static class SubtitleQuickGuideTests
             UiText.Language = "en"; AppearanceTheme.Apply(original); overlay.RefreshInterfaceLanguage(); integrated.ShowGuide();
             foreach ((string name, Size viewport) in new[] { ("subtitle-quick-guide.png", new Size(960, 430)),
                 ("subtitle-quick-guide-small.png", new Size(560, 260)) }) Render(content, viewport, Path.Combine(directory, name));
-            overlay.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, new InertPresentationSource(), 0, Key.Escape) { RoutedEvent = Keyboard.PreviewKeyDownEvent });
+            integrated.Dismiss();
             Check(integrated.Mode == SubtitleQuickGuideMode.Hidden && !overlay.IsVisible && !overlay.IsLoaded,
-                "Escape dismisses the guide without closing or showing the subtitle window");
+                "dismissing the guide does not close or show the subtitle window");
             Check(JsonSerializer.Serialize(Read<AppSettings>("_settings")) == settingsBefore &&
                 Equals(historyBefore, overlay.HistoryEntry(sample.UtteranceId)) &&
                 Read<StackPanel>("_speakerRows").Children.Cast<DependencyObject>().SequenceEqual(bubbles),
@@ -252,13 +272,6 @@ internal static class SubtitleQuickGuideTests
         var frame = new DispatcherFrame();
         Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() => frame.Continue = false));
         Dispatcher.PushFrame(frame);
-    }
-
-    private sealed class InertPresentationSource : PresentationSource
-    {
-        public override Visual RootVisual { get; set; } = new DrawingVisual();
-        public override bool IsDisposed => false;
-        protected override CompositionTarget GetCompositionTargetCore() => null!;
     }
 
     private static void Render(FrameworkElement content, Size viewport, string path)

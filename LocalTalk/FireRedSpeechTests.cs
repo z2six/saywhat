@@ -138,7 +138,37 @@ internal static class FireRedSpeechTests
         Reject<ArgumentException>(() => invalid.Observe(new(new byte[32002], start), 1200), "oversized capture chunks cannot grow a segment unboundedly");
         Check(invalid.Observe(new(Array.Empty<byte>(), start), 1200) is null, "an empty capture chunk produces no decode work");
 
-        var continuous = new FireRedAudioSegmenter();
+        var finalOnly = new FireRedAudioSegmenter();
+        Check(!finalOnly.SendEarlyPreviews, "FireRed does not repeatedly decode unfinished speech by default");
+        var completeSections = new List<FireRedDecodeJob>();
+        var completeSamples = new List<float>();
+        for (int i = 0; i < 140; i++)
+        {
+            completeSamples.AddRange(Enumerable.Repeat(1000 / 32768f, 1280));
+            if (finalOnly.Observe(Chunk(1280, 1000, start.AddMilliseconds(i * 80)), 1200) is { } job) completeSections.Add(job);
+        }
+        Check(completeSections.Count == 1 && completeSections[0] is { Final: true, Revision: 1 } &&
+            completeSections[0].Samples.Length == FireRedAudioSegmenter.MaxSamples,
+            "ongoing default speech creates only the eight-second finished section, with no repeated preview inference");
+        for (int i = 0; i < 15; i++)
+        {
+            completeSamples.AddRange(Enumerable.Repeat(0f, 1280));
+            if (finalOnly.Observe(Chunk(1280, 0, start.AddMilliseconds((140 + i) * 80)), 1200) is { } job) completeSections.Add(job);
+        }
+        Check(completeSections.Count == 2 && completeSections.All(job => job.Final && job.Revision == 1) &&
+            completeSections.SelectMany(job => job.Samples).SequenceEqual(completeSamples),
+            "the real pause finishes the retained default tail without dropping or duplicating captured samples");
+        var livePolicy = new FireRedAudioSegmenter { SendEarlyPreviews = true };
+        for (int i = 0; i < 30; i++) livePolicy.Observe(Chunk(1280, 1000, start.AddMilliseconds(i * 80)), 1200);
+        livePolicy.SendEarlyPreviews = false;
+        FireRedDecodeJob? afterOptOut = null;
+        for (int i = 30; i < 100; i++)
+            if (livePolicy.Observe(Chunk(1280, 1000, start.AddMilliseconds(i * 80)), 1200) is { } job)
+            { Check(job.Final, "turning early translations off suppresses further draft decode work immediately"); afterOptOut = job; }
+        Check(afterOptOut is { Final: true } && afterOptOut.Samples.Length == FireRedAudioSegmenter.MaxSamples,
+            "turning drafts off retains audio collected before the setting changed");
+
+        var continuous = new FireRedAudioSegmenter { SendEarlyPreviews = true };
         var snapshots = new List<FireRedDecodeJob>();
         for (int i = 0; i < 100; i++)
             if (continuous.Observe(Chunk(1280, 1000, start.AddMilliseconds(i * 80)), 1200) is { } snapshot) snapshots.Add(snapshot);
@@ -269,7 +299,17 @@ internal static class FireRedSpeechTests
         }
 
         FireRedDecodeJob Job(long segment, int revision, bool final) => new(segment, revision, new[] { .1f }, start, start.AddSeconds(1), final);
-        var queue = new FireRedDecodeQueue();
+        var finalQueue = new FireRedDecodeQueue();
+        finalQueue.Enqueue(Job(1, 1, false));
+        Check(!finalQueue.TryRead(out _) && finalQueue.IsObsoletePreview(Job(1, 1, false)) && finalQueue.DroppedSections == 0,
+            "the default decode queue cannot admit a speculative job from an older settings snapshot");
+        finalQueue.SendEarlyPreviews = true; finalQueue.Enqueue(Job(1, 2, false));
+        finalQueue.SendEarlyPreviews = false;
+        finalQueue.Enqueue(Job(1, 3, true));
+        Check(finalQueue.TryRead(out FireRedDecodeJob? finishedOnly) && finishedOnly is { Final: true, Revision: 3 } && !finalQueue.TryRead(out _),
+            "opting out clears a queued draft while preserving the finished section");
+
+        var queue = new FireRedDecodeQueue { SendEarlyPreviews = true };
         Check(!queue.TryRead(out FireRedDecodeJob? empty) && empty is null && queue.DroppedSections == 0, "an empty queue has no synthetic work");
         FireRedDecodeJob preview1 = Job(1, 1, false), preview2 = Job(1, 2, false);
         queue.Enqueue(preview1); queue.Enqueue(preview2);
@@ -287,7 +327,7 @@ internal static class FireRedSpeechTests
         Check(queue.TryRead(out FireRedDecodeJob? finalRead) && ReferenceEquals(finalRead, ownFinal) && !queue.TryRead(out _),
             "a draft cannot appear again after its final is already queued");
 
-        var overloaded = new FireRedDecodeQueue();
+        var overloaded = new FireRedDecodeQueue { SendEarlyPreviews = true };
         for (int i = 1; i <= 6; i++) overloaded.Enqueue(Job(i, 1, true));
         FireRedDecodeJob future = Job(7, 1, false); overloaded.Enqueue(future);
         var retained = new List<FireRedDecodeJob>();
@@ -297,7 +337,7 @@ internal static class FireRedSpeechTests
         Check(retained.Take(3).All(item => item.Final) && !retained.Last().Final && !overloaded.TryRead(out _),
             "bounded overload recovery does not reorder retained finals or duplicate work");
 
-        var inFlight = new FireRedDecodeQueue();
+        var inFlight = new FireRedDecodeQueue { SendEarlyPreviews = true };
         FireRedDecodeJob oldInFlight = Job(1, 1, false);
         inFlight.Enqueue(oldInFlight); inFlight.TryRead(out _);
         for (int i = 1; i <= 4; i++) inFlight.Enqueue(Job(i, 2, true));

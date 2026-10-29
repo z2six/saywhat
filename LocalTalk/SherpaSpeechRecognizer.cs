@@ -46,8 +46,9 @@ internal sealed class SherpaSpeechRecognizer : IDisposable
             token.ThrowIfCancellationRequested();
             // FireRed has no language-force parameter. Source selection chooses
             // the specialist and translator context, not an invented ASR prompt.
-            return stream.Result.Text.Trim();
+            return CleanTranscript(stream.Result.Text);
         }, token);
     }
+    internal static string CleanTranscript(string text) => RecognitionTextFilter.CleanControlOnly(text.Trim());
     public void Dispose() { if (_disposed) return; _disposed = true; _recognizer.Dispose(); }
 }

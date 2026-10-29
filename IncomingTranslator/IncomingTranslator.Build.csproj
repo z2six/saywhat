@@ -13,6 +13,7 @@
     <Compile Include="GlobalUsings.Fixed.cs" />
     <Compile Include="../FoxTransSource/FoxTrans/Providers/TranslationModelPrompts.cs" Link="Core/TranslationModelPrompts.cs" />
     <Compile Include="../FoxTransSource/FoxTrans/Providers/TranslationModelCapabilities.cs" Link="Core/TranslationModelCapabilities.cs" />
+    <Compile Include="../FoxTransSource/FoxTrans/Providers/RecognitionTextFilter.cs" Link="Core/RecognitionTextFilter.cs" />
     <Compile Include="AppSettings.cs" />
     <Compile Include="TranslationProfiles.cs" />
     <Compile Include="IncomingPipelineProfiles.cs" />

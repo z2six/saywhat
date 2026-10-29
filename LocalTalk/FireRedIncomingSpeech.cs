@@ -14,6 +14,7 @@ internal sealed class FireRedAudioSegmenter
     private DateTimeOffset? _lastInputEnd;
     private long _segment;
     private int _revision, _quietSamples, _lastPreviewSamples;
+    internal bool SendEarlyPreviews { get; set; }
     internal bool TryFinishAtGap(DateTimeOffset nextStart, out FireRedDecodeJob? job)
     {
         job = null;
@@ -72,7 +73,7 @@ internal sealed class FireRedAudioSegmenter
             }
             return result;
         }
-        if (_samples.Count >= 38400 && _samples.Count - _lastPreviewSamples >= 38400)
+        if (SendEarlyPreviews && _samples.Count >= 38400 && _samples.Count - _lastPreviewSamples >= 38400)
         {
             _lastPreviewSamples = _samples.Count;
             return Snapshot(final: false);
@@ -91,7 +92,20 @@ internal sealed class FireRedDecodeQueue
     private readonly Queue<FireRedDecodeJob> _finals = new();
     private FireRedDecodeJob? _preview;
     private long _finalizedThrough;
+    private volatile bool _sendEarlyPreviews;
     internal long DroppedSections { get; private set; }
+    internal bool SendEarlyPreviews
+    {
+        get => _sendEarlyPreviews;
+        set
+        {
+            lock (_gate)
+            {
+                _sendEarlyPreviews = value;
+                if (!value) _preview = null;
+            }
+        }
+    }
     internal void Enqueue(FireRedDecodeJob job)
     {
         lock (_gate)
@@ -103,7 +117,7 @@ internal sealed class FireRedDecodeQueue
                 if (_finals.Count == 3) { _finals.Dequeue(); DroppedSections++; }
                 _finals.Enqueue(job);
             }
-            else if (job.Segment > _finalizedThrough) _preview = job;
+            else if (SendEarlyPreviews && job.Segment > _finalizedThrough) _preview = job;
         }
     }
     internal bool TryRead(out FireRedDecodeJob? job)
@@ -117,7 +131,7 @@ internal sealed class FireRedDecodeQueue
     internal bool IsObsoletePreview(FireRedDecodeJob job)
     {
         if (job.Final) return false;
-        lock (_gate) return job.Segment <= _finalizedThrough ||
+        lock (_gate) return !SendEarlyPreviews || job.Segment <= _finalizedThrough ||
             _preview is { } newer && newer.Segment == job.Segment && newer.Revision > job.Revision;
     }
 }
@@ -164,8 +178,10 @@ internal sealed partial class IncomingTranslationService
                 {
                     Interlocked.Add(ref _audioBytesSent, chunk.Bytes.Length);
                     Interlocked.Exchange(ref _lastAudioSendTicks, DateTimeOffset.UtcNow.UtcTicks);
+                    AppSettings current = CurrentSettings();
+                    segmenter.SendEarlyPreviews = queue.SendEarlyPreviews = current.IncomingSendEarlyPreviews;
                     if (segmenter.TryFinishAtGap(chunk.At, out FireRedDecodeJob? beforeGap)) queue.Enqueue(beforeGap!);
-                    if (segmenter.Observe(chunk, CurrentSettings().IncomingSettleMilliseconds) is { } job) queue.Enqueue(job);
+                    if (segmenter.Observe(chunk, current.IncomingSettleMilliseconds) is { } job) queue.Enqueue(job);
                     if (queue.DroppedSections > loggedDrops)
                     {
                         loggedDrops = queue.DroppedSections;
@@ -185,9 +201,9 @@ internal sealed partial class IncomingTranslationService
             {
                 if (!queue.TryRead(out FireRedDecodeJob? job)) { await Task.Delay(25, cancellation); continue; }
                 cancellation.ThrowIfCancellationRequested();
-                if (queue.IsObsoletePreview(job!)) continue;
+                if (queue.IsObsoletePreview(job!) || !job!.Final && !CurrentSettings().IncomingSendEarlyPreviews) continue;
                 string text = await recognizer.DecodeAsync(job!.Samples, settings.IncomingSourceLanguage, cancellation);
-                if (queue.IsObsoletePreview(job)) continue;
+                if (queue.IsObsoletePreview(job) || !job.Final && !CurrentSettings().IncomingSendEarlyPreviews) continue;
                 Interlocked.Increment(ref _transcriptEvents);
                 Interlocked.Exchange(ref _lastDecoderProgressTicks, DateTimeOffset.UtcNow.UtcTicks);
                 if (string.IsNullOrWhiteSpace(text))

@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Interop;
 using System.Windows.Media;
 
 namespace IncomingTranslator;
@@ -38,14 +39,30 @@ internal static class SubtitleWindowControlsTests
                 "overlay remains unshown on its creating STA");
             Check(Field<object?>("_service") is null && !Field<bool>("_serviceStarted") && !overlay.ServiceStopped.IsCompleted,
                 "constructing controls did not start or stop any translation service");
-            var maximize = Field<Button>("_maximizeButton");
-            Check(maximize.Name == "SubtitleMaximizeButton" && maximize.IsEnabled && maximize.Visibility == Visibility.Visible,
-                "the independent maximize/restore control is discoverable and available");
             FrameworkElement content = (FrameworkElement)overlay.Content;
             FrameworkElement header = Descendants(content).OfType<FrameworkElement>().Single(item => item.Name == "SubtitleDragHeader");
+            FrameworkElement transcript = overlay.TranscriptRoot;
+            FrameworkElement preview = overlay.CompactPreview;
+            Check(overlay.ResizeMode == ResizeMode.NoResize && overlay.WindowStyle == WindowStyle.None &&
+                overlay.WindowState == WindowState.Normal && overlay.SizeToContent == SizeToContent.Height && overlay.Width == 420,
+                "the compact toolbar has a bounded width, fits its control height and exposes no maximize or resizing chrome");
+            Check(overlay.AllowsTransparency && overlay.Background == Brushes.Transparent,
+                "the toolbar does not add a full opaque subtitle window behind its compact controls");
+            Check(!ReferenceEquals(content, transcript) && !ReferenceEquals(content, preview) && !ReferenceEquals(transcript, preview)
+                && LogicalTreeHelper.GetParent(transcript) is null && LogicalTreeHelper.GetParent(preview) is null,
+                "transcript and passive subtitles are separate detached content trees before the toolbar is loaded");
+            Check(!Descendants(content).Contains(Field<ScrollViewer>("_speakerScroll")) &&
+                Descendants(transcript).Contains(Field<ScrollViewer>("_speakerScroll")),
+                "conversation history and its scrollbar belong to the transcript rather than the toolbar");
+            Check(!Descendants(content).OfType<TextBox>().Any() && !Descendants(content).OfType<ScrollViewer>().Any() &&
+                !Descendants(preview).Any(item => item is ButtonBase or TextBoxBase or Selector or ScrollBar),
+                "compact subtitles have no editable, selectable or scrolling controls");
+            Button logs = Descendants(header).OfType<Button>().Single(button => button.Name == "SubtitleTranscriptButton");
+            Button appearance = Descendants(header).OfType<Button>().Single(button => button.Name == "SubtitleAppearanceButton");
+            Check(logs.IsEnabled && appearance.IsEnabled && !Descendants(header).OfType<Button>().Any(button => button.Name.Contains("Maximize", StringComparison.Ordinal)),
+                "the toolbar exposes Logs and Appearance instead of a misleading maximize control");
             Check(SubtitleWindow.IsSubtitleDragSource(header, header), "blank title/header space may start a drag");
             Check(!SubtitleWindow.IsSubtitleDragSource(null, header), "an absent event source never starts dragging");
-            Check(Descendants(header).Contains(maximize), "restore control is in the draggable header, not hidden in settings");
             foreach (Button button in Descendants(header).OfType<Button>())
             {
                 Check(!SubtitleWindow.IsSubtitleDragSource(button, header), "header button does not start dragging: " + button.Content);
@@ -66,8 +83,8 @@ internal static class SubtitleWindowControlsTests
                 Check(!SubtitleWindow.IsSubtitleDragSource(item, syntheticHeader), "interactive descendants never become synthetic drag handles");
             Check(!SubtitleWindow.IsSubtitleDragSource(new TextBlock(), header), "unrelated content outside the header never starts dragging");
 
-            // Keep existing sentence/reinforcement data and exact evidence intact as
-            // the window is maximized and restored repeatedly. No host is attached.
+            // Existing sentence/reinforcement data belongs to the transcript.
+            // Locale, theme and toolbar navigation must preserve exact evidence.
             overlay.CorrectSpeakerRequested = (_, _, _, _) => Task.FromResult<SpeakerFeedbackResult?>(null);
             TranslationDisplay sentence = new("Synthetic speaker", "Synthetic source", "Synthetic translated sentence", 871,
                 new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero)) { EvidenceId = "unchanged-evidence-871" };
@@ -77,7 +94,10 @@ internal static class SubtitleWindowControlsTests
             TranslationDisplay? historyBefore = overlay.HistoryEntry(sentence.UtteranceId);
             DependencyObject[] bubbleObjects = Field<StackPanel>("_speakerRows").Children.Cast<DependencyObject>().ToArray();
             Check(historyBefore is { Speaker: "Synthetic corrected name", PersonId: "synthetic-person", EvidenceId: "unchanged-evidence-871" },
-                "synthetic corrected sentence is present before changing window state");
+                "synthetic corrected sentence is present in the detached transcript");
+            Check(overlay.CompactBubbleCount == 1 && Descendants(preview).OfType<Border>()
+                .Where(item => item.Name == "CompactSubtitleBubble").All(item => !item.IsHitTestVisible),
+                "the same translated sentence has a noninteractive compact preview");
             int optionRequests = 0;
             overlay.OpenOptionsRequested = () => optionRequests++;
             Button pin = Field<Button>("_alwaysOnTopButton");
@@ -89,35 +109,29 @@ internal static class SubtitleWindowControlsTests
                 {
                     UiText.Language = language; overlay.RefreshInterfaceLanguage();
                     string settingsBefore = JsonSerializer.Serialize(settings);
-                    object? pinText = pin.Content; object? pinTooltip = pin.ToolTip;
-                    overlay.WindowState = WindowState.Normal; NotifyStateChanged(overlay);
-                    string normalGlyph = Glyph(maximize);
-                    Check(maximize.ToolTip?.ToString() == UiText.T("Maximize window") &&
-                        AutomationProperties.GetName(maximize) == UiText.T("Maximize window"),
-                        "normal-window hint and accessibility name are localized: " + language);
-                    Check(normalGlyph.Length > 0, "normal-window control has a visible glyph");
-                    maximize.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                    Check(overlay.WindowState == WindowState.Maximized, "one click maximizes the unshown window");
-                    Check(maximize.ToolTip?.ToString() == UiText.T("Restore window") &&
-                        AutomationProperties.GetName(maximize) == UiText.T("Restore window") && Glyph(maximize) != normalGlyph,
-                        "maximized-window control switches to the localized restore hint and different glyph: " + language);
-                    maximize.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                    Check(overlay.WindowState == WindowState.Normal && Glyph(maximize) == normalGlyph &&
-                        maximize.ToolTip?.ToString() == UiText.T("Maximize window"), "second click restores and resets its visual state");
-                    overlay.WindowState = WindowState.Maximized; NotifyStateChanged(overlay);
-                    Check(maximize.ToolTip?.ToString() == UiText.T("Restore window"), "an OS/Snap state-change callback refreshes the restore affordance");
-                    maximize.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                    Check(overlay.WindowState == WindowState.Normal, "Snap-maximized window can be restored by the same control");
-                    Check(overlay.Topmost == pinned && Equals(pin.Content, pinText) && Equals(pin.ToolTip, pinTooltip),
-                        "changing window state preserves pin preference and the pin control");
+                    Check(pin.Content?.ToString() == (pinned ? "◆" : "◇") &&
+                        AutomationProperties.GetName(pin) == UiText.Format("Always on top · {0}", UiText.T(pinned ? "On" : "Off")) &&
+                        pin.ToolTip?.ToString() == UiText.T(pinned
+                            ? "Keep subtitles in front of other windows. Click to turn off."
+                            : "Click to keep subtitles in front of other windows."),
+                        "the compact pin glyph has a full localized state and explanation: " + language);
+                    Check(logs.Content?.ToString() == UiText.T("Logs") && AutomationProperties.GetName(logs) == UiText.T("Logs") &&
+                        appearance.Content?.ToString() == UiText.T("Appearance") && AutomationProperties.GetName(appearance) == UiText.T("Appearance"),
+                        "toolbar navigation remains localized and accessible: " + language);
+                    logs.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    typeof(SubtitleWindow).GetMethod("OpenTranscript", flags)!.Invoke(overlay, [true]);
+                    Check(overlay.WindowState == WindowState.Normal && Field<Window?>("_transcriptWindow") is null &&
+                        Field<SubtitleTextSurface?>("_textSurface") is null && new WindowInteropHelper(overlay).Handle == 0,
+                        "Logs and the maximize-transcript request stay inert before the toolbar is loaded");
+                    Check(overlay.Topmost == pinned, "transcript navigation preserves the toolbar pin preference");
                     Check(JsonSerializer.Serialize(settings) == settingsBefore && ReferenceEquals(settings, Field<AppSettings>("_settings")),
-                        "window state changes never rewrite translation or recognition settings");
+                        "toolbar navigation never rewrites translation or recognition settings");
                     Check(Equals(overlay.HistoryEntry(sentence.UtteranceId), historyBefore) &&
                         Field<StackPanel>("_speakerRows").Children.Cast<DependencyObject>().SequenceEqual(bubbleObjects),
-                        "window state changes retain sentence history, manual labels, evidence and existing bubble objects");
+                        "toolbar navigation retains sentence history, manual labels, evidence and existing transcript rows");
                     Check(optionRequests == 0 && Field<object?>("_service") is null && !Field<bool>("_serviceStarted") &&
                         !overlay.IsLoaded && !overlay.IsVisible && !overlay.ServiceStopped.IsCompleted,
-                        "maximize/restore is local chrome only, with no settings window, capture, model, or service lifetime change");
+                        "toolbar navigation does not show settings, create capture, load a model, or change service lifetime");
                 }
             }
             UiText.Language = "en";
@@ -125,24 +139,29 @@ internal static class SubtitleWindowControlsTests
             {
                 var themed = originalAppearance.Copy(); themed.UiThemeId = preset.Id;
                 AppearanceTheme.Apply(themed);
-                foreach (WindowState state in new[] { WindowState.Normal, WindowState.Maximized })
+                foreach (string language in new[] { "en", "zh-CN", "ja", "ko" })
                 {
-                    overlay.WindowState = state; NotifyStateChanged(overlay);
-                    Check(maximize.IsEnabled && maximize.Visibility == Visibility.Visible && maximize.Content is not null,
-                        "restore/maximize stays available in " + preset.Id + " / " + state);
-                    Check(maximize.Content is System.Windows.Shapes.Path glyph && ReferenceEquals(glyph.Stroke, AppearanceTheme.Text),
-                        "window-state glyph follows the shared text-color theme role in " + preset.Id + " / " + state);
-                    foreach (Size viewport in new[] { new Size(560, 260), new Size(960, 430), new Size(1920, 1080) })
+                    UiText.Language = language; overlay.RefreshInterfaceLanguage();
+                    Check(pin.IsEnabled && pin.Visibility == Visibility.Visible &&
+                        ReferenceEquals(pin.Foreground, settings.SubtitlesAlwaysOnTop ? AppearanceTheme.Good : AppearanceTheme.Muted),
+                        "the pin follows its shared state color in " + preset.Id + " / " + language);
+                    content.Measure(new Size(1200, 100));
+                    var viewport = new Size(overlay.Width, Math.Max(34, content.DesiredSize.Height));
+                    content.Arrange(new Rect(new Point(), viewport)); content.UpdateLayout();
+                    Check(viewport.Height < 100 && viewport.Width < 1200,
+                        "the toolbar stays compact in " + preset.Id + " / " + language);
+                    foreach (Button button in Descendants(header).OfType<Button>())
                     {
-                        content.Measure(viewport); content.Arrange(new Rect(new Point(), viewport)); content.UpdateLayout();
-                        Point origin = maximize.TranslatePoint(new Point(), content);
-                        Check(double.IsFinite(origin.X) && double.IsFinite(origin.Y) && maximize.ActualWidth >= 24 && maximize.ActualHeight >= 24 &&
-                            origin.X >= 0 && origin.Y >= 0 && origin.X + maximize.ActualWidth <= viewport.Width + 0.5 &&
-                            origin.Y + maximize.ActualHeight <= viewport.Height + 0.5,
-                            "window control remains fully reachable at " + viewport + " in " + preset.Id + " / " + state);
+                        Point origin = button.TranslatePoint(new Point(), content);
+                        Check(double.IsFinite(origin.X) && double.IsFinite(origin.Y) && button.ActualWidth >= 24 && button.ActualHeight >= 24 &&
+                            origin.X >= 0 && origin.Y >= 0 && origin.X + button.ActualWidth <= viewport.Width + 0.5 &&
+                            origin.Y + button.ActualHeight <= viewport.Height + 0.5,
+                            $"each toolbar action remains reachable in {preset.Id} / {language}: {button.Name}, origin={origin}, size={button.RenderSize}, viewport={viewport}");
                     }
                 }
             }
+            Check(new WindowInteropHelper(overlay).Handle == 0 && !overlay.IsLoaded && !overlay.IsVisible,
+                "theme and layout checks never created or activated a toolbar window");
 
             CheckPlacement(Check);
             foreach ((string path, byte[]? bytes) in filesBefore)
@@ -193,14 +212,6 @@ internal static class SubtitleWindowControlsTests
         check(Finite(SubtitleWindowPlacement.RestoredDragPosition(new Point(double.NaN, double.PositiveInfinity), normal,
             double.NaN, double.NaN, new Rect(-1920, 0, 1920, 1040))), "invalid cursor information fails to a safe finite position");
     }
-
-    // An unshown Window has no native WM_SIZE. Raise only its managed callback to
-    // simulate Windows changing state after Snap; do not show/create a live HWND.
-    private static void NotifyStateChanged(Window window) => typeof(Window)
-        .GetMethod("OnStateChanged", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [EventArgs.Empty]);
-
-    private static string Glyph(Button button) => button.Content is System.Windows.Shapes.Path path
-        ? path.Data?.ToString() ?? "" : "";
 
     private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
     {

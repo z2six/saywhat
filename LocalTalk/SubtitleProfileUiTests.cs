@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Interop;
 
 namespace IncomingTranslator;
 
@@ -33,8 +34,11 @@ internal static class SubtitleProfileUiTests
             Button normal = Read<Button>("_normalProfileButton"), groups = Read<Button>("_groupsProfileButton");
             Check(!window.IsVisible && !window.IsLoaded && window.SpeakerFeedbackHost is null, "window construction is inert");
             Check(!normal.IsEnabled && !groups.IsEnabled, "standalone overlays cannot switch an unmanaged runtime without an app callback");
-            var profileButtons = Nodes(window).OfType<Button>().Where(button => button.Name.Contains("ProfileButton", StringComparison.Ordinal)).ToArray();
-            Check(profileButtons.Length == 2 && profileButtons.Contains(normal) && profileButtons.Contains(groups), "overlay contains only Normal and Groups switches, not Quick");
+            var profileButtons = Nodes(window.TranscriptRoot).OfType<Button>().Where(button => button.Name.Contains("ProfileButton", StringComparison.Ordinal)).ToArray();
+            Check(profileButtons.Length == 2 && profileButtons.Contains(normal) && profileButtons.Contains(groups), "transcript contains only Normal and Groups switches, not Quick");
+            Check(!Nodes(window).Contains(normal) && !Nodes(window).Contains(groups) &&
+                !Nodes(window.CompactPreview).OfType<Button>().Any() && LogicalTreeHelper.GetParent(window.TranscriptRoot) is null,
+                "profile controls stay in the detached transcript rather than the compact toolbar or passive subtitles");
             var quick = TranslationProfiles.Select(original, TranslationProfiles.QuickId);
             SetSettings(quick); Refresh();
             Check(Read<TextBlock>("_subtitleProfileCaption").Text == UiText.T("Quick · change profiles in Settings"), "Quick has a Settings caption rather than an overlay switch");
@@ -76,7 +80,9 @@ internal static class SubtitleProfileUiTests
             }
             var named = TranslationProfiles.Create(quick, "Settings"); SetSettings(named); Refresh();
             Check(Read<TextBlock>("_subtitleProfileCaption").Text == "Settings", "custom names remain literal even when they match a translated UI key");
-            Check(!window.IsLoaded && !window.IsVisible && window.SpeakerFeedbackHost is null, "profile checks never started an incoming service");
+            Check(!window.IsLoaded && !window.IsVisible && new WindowInteropHelper(window).Handle == 0 &&
+                LogicalTreeHelper.GetParent(window.TranscriptRoot) is null && window.SpeakerFeedbackHost is null,
+                "profile checks never created a window or started an incoming service");
             Check(filesBefore.All(pair => pair.Value is null ? !File.Exists(pair.Key) : File.Exists(pair.Key) && File.ReadAllBytes(pair.Key).SequenceEqual(pair.Value)), "profile checks did not save preferences, audio evidence or logs");
             return checks;
         }

@@ -33,9 +33,9 @@ its original native/vendor sources and license notices remain in the source tree
   Neither unchanged recognizer text nor a late final without the completion
   acknowledgment can promote a stale fragment into a complete sentence.
 - `OwnVoiceSendEarlyPreviews` chooses cumulative early submitted chat bubbles or
-  final-only output. It defaults true when missing; malformed/unreadable preferences
-  fail safely to final-only. This flag is read once when the host starts. The new
-  application timing default is 1.2 seconds of real quiet; the host follows its
+  final-only output. It defaults false when missing; malformed/unreadable preferences
+  also fail safely to final-only. An explicitly saved true value opts into previews.
+  The application timing default is 1.2 seconds of real quiet; the host follows its
   supplied configuration and does not alter settings or a running session itself.
 - `OwnVoiceAdditionalLanguagesEnabled` is off by default. When enabled, the primary
   target plus up to two `OwnVoiceAdditionalTargetLanguages` appear in one chat bubble,

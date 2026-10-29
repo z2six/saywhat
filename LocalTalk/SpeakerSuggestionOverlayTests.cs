@@ -144,7 +144,7 @@ internal static class SpeakerSuggestionOverlayTests
                     Check(button.ToolTip?.ToString() == UiText.T(caption) && AutomationProperties.GetName(button) == UiText.T(caption), "review hints/accessibility update live in " + preset.Id + "/" + language);
                     Check(ReferenceEquals(button.Foreground, caption == "Confirm this person" ? AppearanceTheme.Good : AppearanceTheme.Warning), "feedback glyph contrast follows shared theme roles");
                 }
-                FrameworkElement content = (FrameworkElement)layout.Content;
+            FrameworkElement content = layout.TranscriptRoot;
                 foreach (Size size in new[] { new Size(560, 430), new Size(960, 540) })
                 {
                     content.Measure(size); content.Arrange(new Rect(new Point(), size)); content.UpdateLayout();
@@ -222,6 +222,11 @@ internal static class SpeakerSuggestionOverlayTests
     private static IEnumerable<DependencyObject> Nodes(DependencyObject root)
     {
         yield return root;
+        if (root is SubtitleWindow overlay)
+        {
+            foreach (var node in Nodes(overlay.TranscriptRoot)) yield return node;
+            foreach (var node in Nodes(overlay.CompactPreview)) yield return node;
+        }
         foreach (object child in LogicalTreeHelper.GetChildren(root))
             if (child is DependencyObject dependency) foreach (DependencyObject node in Nodes(dependency)) yield return node;
     }
