@@ -13,6 +13,7 @@ Packaging/tools/
 Packaging/dist/
 Packaging/build-*/
 Packaging/release-export-*/
+Packaging/release-export-*.zip.sha256.txt
 Packaging/qa/
 **/offline-*/
 **/*-checks/
