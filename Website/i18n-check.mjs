@@ -17,7 +17,11 @@ function check(value, description) { assert.ok(value, description); checks++; }
 function equal(actual, expected, description) { assert.deepEqual(actual, expected, description); checks++; }
 function tokens(value) { return value.match(/\{[A-Za-z][A-Za-z0-9_]*\}|<[^>]*>/g) || []; }
 const englishKeys = Object.keys(catalogs.en).sort();
-equal(englishKeys.length, 148, 'complete English catalog includes voice-first setup and separate speech/translation model guidance');
+check(englishKeys.length >= 183, 'complete English catalog includes voice-first setup, product benefits and the current interface illustration');
+for (const key of ['benefits.freeTitle', 'benefits.freeBody', 'benefits.localTitle', 'benefits.localBody',
+  'benefits.privacyTitle', 'benefits.privacyBody', 'benefits.sourceTitle', 'benefits.sourceBody',
+  'demo.home', 'demo.panelTitle', 'demo.speak', 'demo.translate', 'demo.start', 'demo.person', 'demo.caption'])
+  check(englishKeys.includes(key), `new product copy has a stable catalog key: ${key}`);
 for (const code of languages) {
   equal(Object.keys(catalogs[code]).sort(), englishKeys, `${code}: every English key has a translation`);
   for (const key of ['hero.local', 'release.pendingMeta', 'release.availableMeta'])
@@ -217,7 +221,7 @@ for (const configuration of [{ ok: false }, { noBody: true }, { raw: '{bad' }, {
   const fixture = harness({ languages: ['ja-JP'] }); fixture.reply('en'); await settle();
   const response = fixture.reply('ja', catalogs.ja, configuration); await settle();
   equal(fixture.api.language, 'en', 'absent/malformed/oversized catalog falls back to visible English');
-  equal(fixture.document.querySelectorAll('h1')[0].textContent, 'Translate your voiceinto VRChat chat', 'fallback page content remains visible');
+  equal(fixture.document.querySelectorAll('h1')[0].textContent, catalogs.en['hero.title'], 'fallback page content remains visible with the requested title');
   equal(fixture.document.getElementById('language-status').hidden, false, 'failed catalog has visible user feedback');
   equal(fixture.document.getElementById('language-status').textContent, catalogs.en['language.unavailable'], 'failed catalog uses explicit fallback explanation');
   check(response.options.signal.aborted, 'failed catalog aborts any remaining work');
