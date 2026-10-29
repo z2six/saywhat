@@ -72,6 +72,10 @@ internal static class VoiceFirstHomeUiTests
                 var primary = nodes.OfType<Button>().Single(button => button.Name == "OwnVoiceStartButton");
                 Check(primary.Content?.ToString() == VoiceFirstText.T("Start translating my voice") &&
                     primary.Background == ModernTheme.Accent, "one primary own-voice start, localized: " + locale);
+                var cleanHeaderApply = nodes.OfType<Button>().Single(button => button.Name == "HomeOwnVoiceHeaderApplyButton");
+                Check(cleanHeaderApply.Visibility == Visibility.Collapsed && !cleanHeaderApply.IsEnabled &&
+                    !nodes.OfType<Button>().Single(button => button.Name == "ApplyHomeOwnVoiceChoicesButton").IsEnabled,
+                    "clean own choices hide the header Apply and leave the bottom action disabled: " + locale);
                 Check(!nodes.OfType<Button>().Any(button => button.Content?.ToString() == UiText.T("Start both")),
                     "Home never defaults to starting both pipelines: " + locale);
                 Check(nodes.OfType<Button>().Count(button => button.Name is "HomeNemotronRecognitionButton" or "HomeVoxtralRecognitionButton") == 2 &&
@@ -133,7 +137,7 @@ internal static class VoiceFirstHomeUiTests
                     "turning mute following back on restores the checked Home state: " + locale);
             }
             UiText.Language = "en";
-            checks += CheckStagedBatch(window, settings, runtime, Field);
+            checks += CheckStagedBatch(window, settings, runtime, Field, directory);
             settings.OwnRecognitionEngine = "voxtral"; settings.OwnVoiceSourceLanguage = "Automatic";
             window.Navigate("Home");
             var sources = Nodes(window).OfType<WrapPanel>().Single(panel => panel.Name == "HomeSpokenLanguageChoices");
@@ -192,7 +196,7 @@ internal static class VoiceFirstHomeUiTests
         }
     }
 
-    private static int CheckStagedBatch(MainWindow window, AppSettings settings, RuntimeController runtime, Func<string, FieldInfo> field)
+    private static int CheckStagedBatch(MainWindow window, AppSettings settings, RuntimeController runtime, Func<string, FieldInfo> field, string? directory)
     {
         int checks = 0;
         void Check(bool valid, string detail)
@@ -262,6 +266,42 @@ internal static class VoiceFirstHomeUiTests
                 Nodes(window).OfType<TextBlock>().Single(text => text.Name == "HomeOwnVoiceSelectionState").Text == VoiceFirstText.T("Not applied yet") &&
                 Button("OwnVoiceStartButton").Content?.ToString() == VoiceFirstText.T("Apply & start"),
                 "pending choices expose an explicit Apply action and make Start's application behavior clear");
+            foreach (string locale in new[] { "en", "zh-CN", "ja", "ko" })
+            {
+                UiText.Language = locale; window.Navigate("Home");
+                Button topApply = Button("HomeOwnVoiceHeaderApplyButton"), bottomApply = Button("ApplyHomeOwnVoiceChoicesButton");
+                Check(topApply.Visibility == Visibility.Visible && topApply.IsEnabled && topApply.Content?.ToString() == bottomApply.Content?.ToString() &&
+                    (topApply.Content?.ToString() == VoiceFirstText.T("Download & apply") || topApply.Content?.ToString() == VoiceFirstText.T("Apply changes")),
+                    "pending choices expose the same localized Apply action beside Start and below the controls: " + locale);
+                Check(Button("HomeSubtitleHeaderApplyButton").Visibility == Visibility.Visible &&
+                    Button("HomeSubtitleHeaderApplyButton").Content?.ToString() == Button("ApplyHomeSubtitleChoicesButton").Content?.ToString(),
+                    "pending subtitle choices also expose their shared Apply action in the card header: " + locale);
+            }
+            UiText.Language = "en";
+            const BindingFlags runtimeFlags = BindingFlags.Instance | BindingFlags.NonPublic;
+            FieldInfo ownRunning = typeof(RuntimeController).GetField("_ownRunning", runtimeFlags)!;
+            try
+            {
+                ownRunning.SetValue(runtime, true); window.Navigate("Home");
+                Check(Button("HomeOwnVoiceHeaderApplyButton").Visibility == Visibility.Visible && Button("HomeOwnVoiceHeaderApplyButton").IsEnabled &&
+                    Button("OwnVoiceStartButton").Content?.ToString() == VoiceFirstText.T("Stop my voice"),
+                    "a running own translator keeps an obvious header Apply beside its immediate Stop action");
+            }
+            finally { ownRunning.SetValue(runtime, false); }
+            foreach (bool closing in new[] { false, true })
+            foreach (bool busy in new[] { false, true })
+            {
+                field("_busy").SetValue(window, busy); field("_closing").SetValue(window, closing); window.Navigate("Home");
+                Check(Button("HomeOwnVoiceHeaderApplyButton").IsEnabled == (!busy && !closing) &&
+                    Button("ApplyHomeOwnVoiceChoicesButton").IsEnabled == (!busy && !closing),
+                    "both own Apply actions share busy/closing guards: " + busy + "/" + closing);
+            }
+            field("_busy").SetValue(window, false); field("_closing").SetValue(window, false); window.Navigate("Home");
+            if (directory is not null)
+            {
+                RenderHomePreview(window, directory, "voice-first-home-pending.png", new Size(1160, 800));
+                RenderHomePreview(window, directory, "voice-first-home-pending-narrow.png", new Size(900, 650));
+            }
             AppSettings candidate = MainWindow.VoiceFirstCandidate(baseline, settings, includeModels: true);
             Check(candidate.OwnManagedModelId == settings.OwnManagedModelId && candidate.OwnRecognitionEngine == "voxtral" &&
                 candidate.OwnVoiceTargetLanguage == "Chinese" && candidate.OwnVoiceAdditionalTargetLanguages.SequenceEqual(new[] { "Japanese", "Korean" }) &&
@@ -294,6 +334,8 @@ internal static class VoiceFirstHomeUiTests
             window.Navigate("Home");
             Check(!Button("ApplyHomeOwnVoiceChoicesButton").IsEnabled && Button("OwnVoiceStartButton").Content?.ToString() == VoiceFirstText.T("Start translating my voice"),
                 "returning own choices to their baseline disables Apply despite unrelated pending settings");
+            Check(Button("HomeOwnVoiceHeaderApplyButton").Visibility == Visibility.Collapsed && !Button("HomeOwnVoiceHeaderApplyButton").IsEnabled,
+                "returning to the applied own choices removes the extra header action");
         }
         finally
         {
@@ -321,22 +363,27 @@ internal static class VoiceFirstHomeUiTests
             {
                 AppSettings selected = appearance.Copy(); selected.UiThemeId = sample.Theme;
                 AppearanceTheme.ApplyForTests(selected); UiText.Language = sample.Locale; window.Navigate("Home");
-                FrameworkElement frame = (FrameworkElement)window.Content;
-                Size size = new(sample.Width, sample.Height);
-                frame.Measure(size); frame.Arrange(new Rect(new Point(), size)); frame.UpdateLayout();
-                const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
-                var content = (ContentControl)typeof(MainWindow).GetField("_content", flags)!.GetValue(window)!;
-                (content.Parent as ScrollViewer)?.ScrollToTop(); frame.UpdateLayout();
-                var bitmap = new RenderTargetBitmap(sample.Width, sample.Height, 96, 96, PixelFormats.Pbgra32);
-                bitmap.Render(frame);
-                var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
-                using var file = File.Create(Path.Combine(directory, sample.File)); encoder.Save(file);
+                RenderHomePreview(window, directory, sample.File, new Size(sample.Width, sample.Height));
             }
         }
         finally
         {
             AppearanceTheme.ApplyForTests(appearance); UiText.Language = previousLanguage; window.Navigate("Home");
         }
+    }
+
+    private static void RenderHomePreview(MainWindow window, string directory, string fileName, Size size)
+    {
+        Directory.CreateDirectory(directory);
+        FrameworkElement frame = (FrameworkElement)window.Content;
+        frame.Measure(size); frame.Arrange(new Rect(new Point(), size)); frame.UpdateLayout();
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        var content = (ContentControl)typeof(MainWindow).GetField("_content", flags)!.GetValue(window)!;
+        (content.Parent as ScrollViewer)?.ScrollToTop(); frame.UpdateLayout();
+        var bitmap = new RenderTargetBitmap((int)size.Width, (int)size.Height, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(frame);
+        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var file = File.Create(Path.Combine(directory, fileName)); encoder.Save(file);
     }
 
     private static IEnumerable<DependencyObject> Nodes(DependencyObject root)

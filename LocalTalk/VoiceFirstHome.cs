@@ -14,12 +14,18 @@ internal sealed partial class MainWindow
         var page = Page("");
         var voice = new StackPanel();
         var heading = new DockPanel { LastChildFill = true };
-        _ownVoiceTourTarget = VoiceFirstButton(_runtime.OwnRunning ? "Stop my voice" : HasPendingHomeOwnVoiceChoices() ? "Apply & start" : "Start translating my voice",
+        HomeOwnVoiceApplyState ownApplyState = GetHomeOwnVoiceApplyState();
+        var ownActions = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(12, 0, 0, 0) };
+        var headerApply = CreateHomeOwnVoiceApplyButton("HomeOwnVoiceHeaderApplyButton", ownApplyState);
+        headerApply.Visibility = ownApplyState.Pending ? Visibility.Visible : Visibility.Collapsed;
+        ownActions.Children.Add(headerApply);
+        _ownVoiceTourTarget = VoiceFirstButton(_runtime.OwnRunning ? "Stop my voice" : ownApplyState.Pending ? "Apply & start" : "Start translating my voice",
             async (_, _) => await ToggleVoiceFirstOwnAsync(), primary: true);
         _ownVoiceTourTarget.Name = "OwnVoiceStartButton";
         _ownVoiceTourTarget.MinWidth = 190;
         _ownVoiceTourTarget.IsEnabled = !_busy && !_closing;
-        DockPanel.SetDock(_ownVoiceTourTarget, Dock.Right); heading.Children.Add(_ownVoiceTourTarget);
+        ownActions.Children.Add(_ownVoiceTourTarget);
+        DockPanel.SetDock(ownActions, Dock.Right); heading.Children.Add(ownActions);
         var title = new StackPanel();
         title.Children.Add(ModernTheme.Kicker("MY VOICE", ModernTheme.Accent));
         title.Children.Add(VoiceFirstHeading("Translate into VRChat chat", 27));
@@ -141,7 +147,7 @@ internal sealed partial class MainWindow
         previews.Unchecked += async (_, _) => await SetVoiceFirstEarlyAsync(false);
         voice.Children.Add(previews);
         voice.Children.Add(VoiceFirstLabel("On: chat updates as you speak. Off: send only after the pause.", 11, ModernTheme.Muted));
-        AppendHomeOwnVoiceApply(voice);
+        AppendHomeOwnVoiceApply(voice, ownApplyState);
         var ownCard = ModernTheme.Card(voice); ownCard.Name = "HomeOwnVoiceCard";
         ownCard.Background = ModernTheme.Hero; ownCard.BorderBrush = ModernTheme.HeroStroke;
         ownCard.Padding = new Thickness(20); page.Children.Add(ownCard);
@@ -246,10 +252,15 @@ internal sealed partial class MainWindow
     {
         var incoming = new StackPanel();
         var row = new DockPanel();
+        var incomingActions = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(12, 0, 0, 0) };
+        var headerApply = CreateHomeSubtitleApplyButton(inHeader: true);
+        headerApply.Visibility = HasPendingHomeSubtitleChoices() ? Visibility.Visible : Visibility.Collapsed;
+        incomingActions.Children.Add(headerApply);
         _subtitlesTourTarget = ModernTheme.Button(_runtime.IncomingRunning ? "Stop subtitles" :
             VoiceFirstIncomingNeedsPreparation() ? "Prepare live subtitles" : "Start subtitles", async (_, _) => await ToggleVoiceFirstSubtitlesAsync());
         _subtitlesTourTarget.Name = "SubtitlesStartButton";
-        DockPanel.SetDock(_subtitlesTourTarget, Dock.Right); row.Children.Add(_subtitlesTourTarget);
+        incomingActions.Children.Add(_subtitlesTourTarget);
+        DockPanel.SetDock(incomingActions, Dock.Right); row.Children.Add(incomingActions);
         var copy = new StackPanel(); copy.Children.Add(VoiceFirstHeading("Optional · live subtitles", 21));
         copy.Children.Add(VoiceFirstLabel("Read other people’s translated speech in a separate window.", 12, ModernTheme.Muted));
         row.Children.Add(copy); incoming.Children.Add(row);
@@ -258,7 +269,7 @@ internal sealed partial class MainWindow
         if (!_runtime.IncomingRunning && !SupportsSelectedSubtitleSource)
             _subtitlesTourTarget.ToolTip = UiText.T(IncomingCaptureCapabilities.UnavailableMessage);
         if (!_runtime.IncomingRunning && SupportsSelectedSubtitleSource && HasPendingHomeSubtitleChoices())
-            _subtitlesTourTarget.ToolTip = SubtitleSpeechText.T("Apply your subtitle choices below before starting.");
+            _subtitlesTourTarget.ToolTip = SubtitleSpeechText.T("Apply your subtitle choices before starting.");
         ToolTipService.SetShowOnDisabled(_subtitlesTourTarget, true);
         incoming.Children.Add(CreateSubtitleSpeechCard(onHome: true));
         var card = ModernTheme.Card(incoming); card.Name = "HomeSubtitlesCard"; card.Padding = new Thickness(18);
@@ -350,13 +361,6 @@ internal sealed partial class MainWindow
         return Task.CompletedTask;
     }
 
-    private bool HasPendingHomeOwnVoiceChoices()
-    {
-        AppSettings saved = HomeOwnVoiceSavedSettings();
-        return !TranslationProfiles.ConfigurationEquals(VoiceFirstCandidate(saved, saved, includeModels: true),
-            VoiceFirstCandidate(saved, _settings, includeModels: true));
-    }
-
     private AppSettings HomeOwnVoiceSavedSettings()
     {
         try { return ReadVoiceFirstSavedSettings(); }
@@ -364,27 +368,41 @@ internal sealed partial class MainWindow
         { return _saveStateAppliedSettings?.Copy() ?? _settings.Copy(); }
     }
 
-    private void AppendHomeOwnVoiceApply(StackPanel voice)
+    private readonly record struct HomeOwnVoiceApplyState(bool Pending, bool Download);
+
+    private HomeOwnVoiceApplyState GetHomeOwnVoiceApplyState()
     {
-        bool changed = HasPendingHomeOwnVoiceChoices();
+        AppSettings saved = HomeOwnVoiceSavedSettings();
+        bool changed = !TranslationProfiles.ConfigurationEquals(VoiceFirstCandidate(saved, saved, includeModels: true),
+            VoiceFirstCandidate(saved, _settings, includeModels: true));
         bool download = false;
         if (changed)
         {
             try
             {
-                AppSettings candidate = VoiceFirstCandidate(HomeOwnVoiceSavedSettings(), _settings, includeModels: true);
+                AppSettings candidate = VoiceFirstCandidate(saved, _settings, includeModels: true);
                 download = MissingVoiceFirstDownloadBytes(candidate) > 0 ||
                     candidate.OwnRecognitionEngine == "voxtral" && _provisioner.SpeechRegistration is null;
             }
             catch (ArgumentException) { /* Apply reports the exact incompatible model/language selection. */ }
         }
-        var state = VoiceFirstLabel(changed ? "Not applied yet" : "Current selection", 12, changed ? ModernTheme.Warning : ModernTheme.Good);
-        state.Name = "HomeOwnVoiceSelectionState"; voice.Children.Add(state);
-        var apply = VoiceFirstButton(download ? "Download & apply" : "Apply changes", async (_, _) => await ApplyVoiceFirstModelChangeAsync());
-        apply.Name = "ApplyHomeOwnVoiceChoicesButton"; apply.IsEnabled = CanEditVoiceFirst() && changed;
+        return new(changed, download);
+    }
+
+    private Button CreateHomeOwnVoiceApplyButton(string name, HomeOwnVoiceApplyState state)
+    {
+        var apply = VoiceFirstButton(state.Download ? "Download & apply" : "Apply changes", async (_, _) => await ApplyVoiceFirstModelChangeAsync());
+        apply.Name = name; apply.IsEnabled = CanEditVoiceFirst() && state.Pending;
         apply.Background = apply.IsEnabled ? ModernTheme.Accent : ModernTheme.Raised;
         apply.Foreground = apply.IsEnabled ? ModernTheme.Ink : ModernTheme.Muted;
-        voice.Children.Add(apply);
+        return apply;
+    }
+
+    private void AppendHomeOwnVoiceApply(StackPanel voice, HomeOwnVoiceApplyState state)
+    {
+        var status = VoiceFirstLabel(state.Pending ? "Not applied yet" : "Current selection", 12, state.Pending ? ModernTheme.Warning : ModernTheme.Good);
+        status.Name = "HomeOwnVoiceSelectionState"; voice.Children.Add(status);
+        voice.Children.Add(CreateHomeOwnVoiceApplyButton("ApplyHomeOwnVoiceChoicesButton", state));
         voice.Children.Add(VoiceFirstLabel(_runtime.OwnRunning
             ? "Choose everything first, then apply once. Your current translation keeps running until you apply."
             : "Choose everything first, then apply once. Applying does not start your microphone.", 11, ModernTheme.Muted));

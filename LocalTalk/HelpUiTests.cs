@@ -39,19 +39,37 @@ internal static class HelpUiTests
             Check(HelpUi.Topics.Single(topic => topic.Id == "getting-started").Description.Contains("Subtitles and People are optional", StringComparison.Ordinal) &&
                 !HelpUi.Topics.Single(topic => topic.Id == "getting-started").Description.Contains("start your voice, subtitles, or both", StringComparison.Ordinal),
                 "first-time guidance does not require starting or preparing subtitles");
-            Check(HelpUi.Topics.Single(topic => topic.Id == "accuracy").Description.Contains("On Home, check I speak", StringComparison.Ordinal) &&
-                HelpUi.Topics.Single(topic => topic.Id == "models").Description.Contains("The speech model turns your voice into words", StringComparison.Ordinal),
+            HelpTopic accuracyHelp = HelpUi.Topics.Single(topic => topic.Id == "accuracy");
+            HelpTopic modelHelp = HelpUi.Topics.Single(topic => topic.Id == "models");
+            Check(accuracyHelp.Description.Contains("Check I speak and translation languages on Home, then Apply changes", StringComparison.Ordinal) &&
+                modelHelp.Description.Contains("Speech models turn voices into words; translators change their language", StringComparison.Ordinal),
                 "help explains actual source-language selection and separate recognition/translation choices on Home");
+            Check(modelHelp.Description.Contains("choose speech and translation model cards, then Apply changes or Download & apply", StringComparison.Ordinal) &&
+                modelHelp.Description.Contains("Switching may briefly pause translation; the app handles that", StringComparison.Ordinal) &&
+                modelHelp.Description.Contains("When stopped, Apply & start can save choices and start your voice", StringComparison.Ordinal) &&
+                !modelHelp.Description.Contains("Stop your voice translation before switching", StringComparison.Ordinal),
+                "model help explains batched choices, downloads and stopped-start saving without requiring a manual engine stop");
+            Check(HelpUi.Topics.Single(topic => topic.Id == "timing").Description.Contains("on Home, then Apply changes", StringComparison.Ordinal) &&
+                HelpUi.Topics.Single(topic => topic.Id == "slow").Description.Contains("then Apply changes", StringComparison.Ordinal),
+                "timing and speed help make applying staged Home choices explicit");
             HelpTopic chatHelp = HelpUi.Topics.Single(topic => topic.Id == "chat");
             Check(chatHelp.Pages.Contains("Home") &&
                 chatHelp.Description.Contains("Pause when my VRChat mic is muted is on by default", StringComparison.Ordinal) &&
-                chatHelp.Description.Contains("turn it off to capture and send translations while muted", StringComparison.Ordinal) &&
-                chatHelp.Description.Contains("When on, an already-captured sentence can still finish and send if that option is enabled", StringComparison.Ordinal),
-                "chat help explains the default Home mute checkbox, its off behavior and the captured-sentence option when on");
+                chatHelp.Description.Contains("edit the Home checkbox and select Apply changes", StringComparison.Ordinal) &&
+                chatHelp.Description.Contains("Unmute to capture when it is on", StringComparison.Ordinal) &&
+                chatHelp.Description.Contains("turning it off permits translated chat while VRChat is muted", StringComparison.Ordinal) &&
+                chatHelp.Description.Contains("an already-captured sentence can still finish and send if that option is enabled", StringComparison.Ordinal),
+                "chat help explains applying the default mute checkbox, capture when unmuted, its off behavior and the captured-sentence option");
             HelpTopic subtitleHelp = HelpUi.Topics.Single(topic => topic.Id == "subtitles");
-            Check(subtitleHelp.Pages.Contains("Listening") && subtitleHelp.Description.Contains("search for an application", StringComparison.Ordinal) &&
+            Check(subtitleHelp.Pages.Contains("Listening") && subtitleHelp.Description.Contains("Search for an application in the listening source picker", StringComparison.Ordinal) &&
                 !subtitleHelp.Description.Contains("VRChat-only capture", StringComparison.Ordinal),
                 "subtitle help explains the selected application picker instead of the removed VRChat-only checkbox");
+            Check(subtitleHelp.Description.Contains("then Apply subtitle choices and Start subtitles", StringComparison.Ordinal) &&
+                subtitleHelp.Description.Contains("Home's person-recognition toggle is staged with these choices too", StringComparison.Ordinal) &&
+                subtitleHelp.Description.Contains("selected application's volume and the Windows mixer", StringComparison.Ordinal) &&
+                subtitleHelp.Description.Contains("subtitles wait for it; other applications are not substituted", StringComparison.Ordinal) &&
+                subtitleHelp.Description.Contains("Closing the overlay stops subtitles", StringComparison.Ordinal),
+                "subtitle help explains applying its independent draft, volume checks, waiting for the chosen app and closing behavior");
             HelpTopic chineseHelp = HelpUi.Topics.Single(topic => topic.Id == "chinese-subtitles");
             Check(chineseHelp.Pages.SequenceEqual(new[] { "Home", "Listening" }) &&
                 chineseHelp.Description.Contains("Optional · live subtitles", StringComparison.Ordinal) &&

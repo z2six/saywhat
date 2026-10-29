@@ -226,9 +226,7 @@ internal sealed partial class MainWindow
         bool changed = !TranslationProfiles.ConfigurationEquals(saved, HomeSubtitleCandidate(saved, _settings));
         string translatorId = selection.ShareTranslationModel ? selection.OwnManagedModelId : selection.IncomingManagedModelId;
         ProvisionModelChoice? selectedTranslator = LocalTalkProvisioner.ModelCatalog.FirstOrDefault(model => model.Id == translatorId && model.Role == ProvisionModelRole.Translation);
-        bool translationMissing = selection.UseManagedTranslator &&
-            (selectedTranslator is null || _provisioner.ResolveModelPath(translatorId) is null || !VoiceFirstRuntimeReady(selection.ManagedRuntimeId));
-        bool missing = SubtitleSpeechFilesMissing(selection) || translationMissing;
+        bool missing = HomeSubtitleFilesMissing(selection);
         var status = SubtitleSpeechLabel(changed ? "Not applied yet" : "Current selection", 12, changed ? ModernTheme.Warning : ModernTheme.Good);
         status.Name = "HomeSubtitleSelectionState"; body.Children.Add(status);
         if (missing)
@@ -242,14 +240,30 @@ internal sealed partial class MainWindow
             var download = ModernTheme.Label(SubtitleSpeechText.Format("Download needed: {0:0.0} GB. Files stay on this PC and are reused.", bytes / 1e9), 12, ModernTheme.Muted, localize: false);
             download.Name = "HomeSubtitleDownloadSize"; body.Children.Add(download);
         }
-        var apply = SubtitleSpeechButton(missing ? "Download & apply" : "Apply subtitle choices", async (_, _) => await ApplyHomeSubtitleChoicesAsync());
-        apply.Name = "ApplyHomeSubtitleChoicesButton"; apply.IsEnabled = CanEditSubtitleSpeech() && SupportsSelectedSubtitleSource && (changed || missing);
-        apply.Background = apply.IsEnabled ? ModernTheme.Accent : ModernTheme.Raised;
-        apply.Foreground = apply.IsEnabled ? ModernTheme.Ink : ModernTheme.Muted; body.Children.Add(apply);
+        body.Children.Add(CreateHomeSubtitleApplyButton());
         body.Children.Add(SubtitleSpeechLabel(saved.ShareTranslationModel != selection.ShareTranslationModel
             ? "Changing model sharing briefly pauses both translators. Your microphone choices stay the same."
             : _runtime.IncomingRunning ? "Files download before subtitles briefly pause to apply the change. Your voice translator keeps running."
                 : "Apply these choices, then choose Start subtitles on Home. Models load only when subtitles start.", 12, ModernTheme.Muted));
+    }
+
+    private bool HomeSubtitleFilesMissing(AppSettings selection)
+    {
+        string id = selection.ShareTranslationModel ? selection.OwnManagedModelId : selection.IncomingManagedModelId;
+        ProvisionModelChoice? model = LocalTalkProvisioner.ModelCatalog.FirstOrDefault(item => item.Id == id && item.Role == ProvisionModelRole.Translation);
+        return SubtitleSpeechFilesMissing(selection) || selection.UseManagedTranslator &&
+            (model is null || _provisioner.ResolveModelPath(id) is null || !VoiceFirstRuntimeReady(selection.ManagedRuntimeId));
+    }
+
+    private Button CreateHomeSubtitleApplyButton(bool inHeader = false)
+    {
+        bool missing = HomeSubtitleFilesMissing(HomeSubtitleSelection());
+        var apply = SubtitleSpeechButton(missing ? "Download & apply" : "Apply subtitle choices", async (_, _) => await ApplyHomeSubtitleChoicesAsync());
+        apply.Name = inHeader ? "HomeSubtitleHeaderApplyButton" : "ApplyHomeSubtitleChoicesButton";
+        apply.IsEnabled = CanEditSubtitleSpeech() && SupportsSelectedSubtitleSource && (HasPendingHomeSubtitleChoices() || missing);
+        apply.Background = apply.IsEnabled ? ModernTheme.Accent : ModernTheme.Raised;
+        apply.Foreground = apply.IsEnabled ? ModernTheme.Ink : ModernTheme.Muted;
+        return apply;
     }
 
     private void AppendHomeSubtitleListening(StackPanel body)

@@ -42,7 +42,7 @@ internal static class SubtitleSpeechText
         Add("Files download before subtitles briefly pause to apply the change. Your voice translator keeps running.", "会先下载文件，再短暂暂停字幕以应用更改。你的语音翻译会继续运行。", "先にファイルをダウンロードし、字幕だけを短く停止して変更を適用します。自分の音声翻訳は続きます。", "먼저 파일을 다운로드한 뒤 자막만 잠깐 멈춰 변경을 적용합니다. 내 음성 번역은 계속 실행됩니다.");
         Add("Apply these choices, then choose Start subtitles on Home. Models load only when subtitles start.", "应用设置后，在主页选择“启动字幕”。模型仅在启动字幕时加载。", "設定を適用してからホームで字幕を開始してください。モデルは字幕の開始時にだけ読み込みます。", "설정을 적용한 뒤 홈에서 자막 시작을 누르세요. 모델은 자막을 시작할 때만 불러옵니다.");
         Add("Speech model & language", "语音模型与语言", "音声モデルと言語", "음성 모델 및 언어");
-        Add("Apply your subtitle choices below before starting.", "请先在下方应用字幕设置，再启动字幕。", "開始する前に、下の字幕設定を適用してください。", "시작하기 전에 아래에서 자막 설정을 적용하세요.");
+        Add("Apply your subtitle choices before starting.", "请先应用字幕设置，再启动字幕。", "開始する前に字幕設定を適用してください。", "시작하기 전에 자막 설정을 적용하세요.");
         Add("Choose compatible languages or another translator first.", "请先选择支持的语言组合，或换一个翻译模型。", "先に対応する言語の組み合わせ、または別の翻訳モデルを選んでください。", "먼저 지원되는 언어 조합이나 다른 번역 모델을 고르세요.");
         Add("Translation model · translates their words", "翻译模型 · 翻译对方的话", "翻訳モデル · 相手の言葉を翻訳", "번역 모델 · 상대방의 말을 번역");
         Add("Use the same translator as My voice", "与“我的语音”使用同一个翻译模型", "自分の音声と同じ翻訳モデルを使う", "내 음성과 같은 번역 모델 사용");

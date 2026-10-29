@@ -120,7 +120,7 @@ These pauses exclude subsequent recognition-final drain, translator queue/comput
 
 | Setting / key | Default | Range / behavior |
 | --- | --- | --- |
-| Voice recognition / `UseAiSpeakerRecognition` | `true` | Optional local CPU identity model; loading is deferred until subtitles need a clear speech sample. The Home toggle is staged until **Apply subtitle choices**. Direct Settings/People switches remain immediate. Background matching does not block translation. Off unloads the model and retains People; translation/manual labeling remain available. |
+| Voice recognition / `UseAiSpeakerRecognition` | `true` | Optional local CPU identity model; loading is deferred until subtitles need a clear speech sample. The Home toggle is staged until **Apply subtitle choices**. Direct Settings/People switches remain immediate. Matching runs in the background so a subtitle need not wait for its name. Off unloads the model and retains People; translation/manual labeling remain available. |
 | Voice recognition model / `SpeakerModelPath` | Managed CAM++ Mandarin ONNX | Choose CAM++ or ERes2Net in the UI, download it, or import a compatible ONNX embedding model. Arbitrary ONNX is not necessarily compatible. |
 | Match threshold / `SpeakerMatchThreshold` | `0.50` | Dashboard/recognizer 0.35–0.85. Higher is stricter and leaves more voices unidentified; lower may merge different people. It is cosine similarity, not an accuracy probability. |
 | Unnamed voice profile limit / `MaxSpeakerProfiles` | `2` | 2–8. Caps anonymous automatically learned identities; it does **not** cap all saved People. Increasing it can create more false identities. |
