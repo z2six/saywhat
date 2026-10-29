@@ -1,0 +1,53 @@
+name: Unreleased installer candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-candidate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    name: Build and verify an unreleased Windows candidate
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+    steps:
+      - name: Check out the selected source commit
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Set up .NET SDKs
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+      - name: Set up Node.js for source and website checks
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Build, test and package the selected commit
+        run: ./eng/Build-ReleaseCandidate.ps1 -ExpectedCommit $env:GITHUB_SHA
+      - name: Upload the verified candidate for review and antivirus analysis
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: SayWhat-unreleased-AV-review-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/release-candidate/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      # Manual review output only: no GitHub Release, website deployment, update
+      # feed change, installer execution, model download, inference or capture.

@@ -186,6 +186,14 @@ the verified runtime download and installer/export commands. Installer builds
 are separate from the default CI workflow and do not automatically install or
 upload anything. Keep old releases and their corresponding source unchanged.
 
+Maintainers can manually run the **Unreleased installer candidate** GitHub Actions
+workflow for a selected source commit. It builds and tests self-contained native
+outputs, prepares the pinned packaging runtime and uses an already-installed Inno
+Setup compiler. Its review artifact contains the verified installer/source export,
+the exact raw app DLL for antivirus analysis, the source commit and SHA-256
+manifest. It does not install the app, publish a GitHub release, deploy the website
+or change the update feed. Candidate artifacts expire after 14 days.
+
 The [website guide](../Website/README.md) covers its static source, localization,
 offline checks and deployment. Website tests use only Node's built-in APIs; no
 package installation is required. Maintainer publishing credentials stay outside

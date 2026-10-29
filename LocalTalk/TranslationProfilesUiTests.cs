@@ -174,6 +174,9 @@ internal static class TranslationProfilesUiTests
             {
                 Layout(content, size); MainWindow.ApplySlimScrollbars(content); DrainPresentation();
                 mainScroll.ScrollToTop(); DrainPresentation(); Layout(content, size); DrainPresentation(); Layout(content, size);
+                // Theme/localization work can rebuild the page during the drain.
+                // Measure its active selector rather than a detached old control.
+                picker = Get<ComboBox>("_translationProfilesPicker");
                 Rect pickerBounds = picker.TransformToAncestor(mainScroll).TransformBounds(new Rect(new Point(), picker.RenderSize));
                 Check(mainScroll.VerticalOffset < .5 && mainScroll.HorizontalScrollBarVisibility == ScrollBarVisibility.Disabled
                     && mainScroll.ScrollableWidth < 1, "Settings starts at the profile card without horizontal overflow at " + size);

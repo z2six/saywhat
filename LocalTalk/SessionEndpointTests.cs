@@ -80,16 +80,17 @@ internal static class SessionEndpointTests
         try
         {
             var ui = originalSettings.Copy(); field.SetValue(window, ui);
-            window.Navigate("Manual setup");
-            var automatic = Descendants(window).OfType<CheckBox>().Single(box => Equals(box.Content, UiText.T("Choose local ports automatically (recommended)")));
-            var port = Descendants(window).OfType<TextBox>().Single(box => box.Name == "OwnSpeechPort");
+            var section = (StackPanel)typeof(MainWindow).GetMethod("ConnectionSettingsSection", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null)!;
+            UiLocalization.ApplyTree(section);
+            var automatic = Descendants(section).OfType<CheckBox>().Single(box => Equals(box.Content, UiText.T("Choose local ports automatically (recommended)")));
+            var port = Descendants(section).OfType<TextBox>().Single(box => box.Name == "OwnSpeechPort");
             Check(automatic.IsChecked == true && !port.IsEnabled, "automatic is the default and fixed fields stay inactive");
             automatic.IsChecked = false;
             Check(!ui.AutomaticManagedPorts && port.IsEnabled, "advanced users can select fixed connections");
             port.Text = "53210";
             Check(ui.OwnSpeechPort == 53210 && SettingsStore.Load().AutomaticManagedPorts, "connection edits stay staged until Save all");
         }
-        finally { field.SetValue(window, originalSettings); window.Navigate("Home"); }
+        finally { field.SetValue(window, originalSettings); }
         var fixedSettings = preferences.Copy(); fixedSettings.AutomaticManagedPorts = false;
         var changed = fixedSettings.Copy(); changed.OwnSpeechPort = 49001;
         Check(SettingsRuntimeChanges.Between(fixedSettings, changed) is { OwnChanged: true, IncomingChanged: false }, "own fixed speech change only affects own direction");
