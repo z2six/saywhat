@@ -154,7 +154,7 @@ foreach ($sourceFolder in @('LocalTalk','IncomingTranslator','FoxTransLocalHost'
         $_.Name -notmatch '^(Test-InstallerDataLifecycle[.]ps1|vrchat-translation-settings[.]json|provisioning[.]json|setup-progress[.]json|config[.].*[.]jsonc)$' -and
         ($sourceExtensions -contains $_.Extension.ToLowerInvariant() -or $relative -in $publicInstallerDefaults -or $relative -in $publicProviderExamples -or
             ($relative -match '^Website[\\/]public[\\/]' -and $_.Extension -in @('.json','.png','.ico')) -or
-            $relative -eq 'Website\wrangler.jsonc' -or
+            $relative -in @('Website\wrangler.jsonc','Website\public\_headers') -or
             ($relative -in @('LocalTalk\Assets\SayWhat.ico', 'LocalTalk\Assets\saywhat-mark.png', 'LocalTalk\Assets\saywhat-icon-256.png', 'LocalTalk\Assets\saywhat-lockup.png')) -or
             # Public upstream branding/build resources, never user photos or previews.
             ($relative -match '^FoxTransSource[\\/](brand[\\/]|FoxTrans[.]Desktop[\\/]Assets[\\/])' -and $_.Extension -in @('.png','.svg','.ico')) -or
@@ -222,7 +222,7 @@ try {
         'Packaging/Build-Installer.ps1','Packaging/scripts/run-voxtral.sh',
         'Packaging/Export-Release.ps1','Packaging/Test-ReleaseLicenses.ps1','Packaging/Release-Distribution.md',
         'eng/Build.ps1','eng/Prepare-Packaging.ps1','eng/Check-PublicSource.mjs','docs/development.md','docs/codebase-guide.md',
-        'Website/public/index.html','Website/public/assets/person-ari.svg','Website/public/assets/person-mina.svg',
+        'Website/public/index.html','Website/public/_headers','Website/public/assets/person-ari.svg','Website/public/assets/person-mina.svg',
         '.github/workflows/ci.yml','README.md','CONTRIBUTING.md','SECURITY.md','SUPPORT.md','CHANGELOG.md','SOURCE-PROVENANCE.md',
         'LocalTalk/AppUpdateChecker.cs','LocalTalk/AppUpdateInstaller.cs',
         'LocalTalk/VrchatOscConnection.cs','LocalTalk/VrchatOscConnectionTests.cs',

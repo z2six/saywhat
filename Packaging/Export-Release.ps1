@@ -120,7 +120,7 @@ if ([version]($Version -split '-', 2)[0] -ge [version]'0.2.4') {
         'eng/Build.ps1','eng/Prepare-Packaging.ps1','eng/Check-PublicSource.mjs',
         'docs/development.md','docs/codebase-guide.md','README.md','CONTRIBUTING.md','SECURITY.md','SUPPORT.md',
         'CHANGELOG.md','SOURCE-PROVENANCE.md','SayWhat.sln','.github/workflows/ci.yml',
-        'Website/public/index.html','Website/public/assets/person-ari.svg','Website/public/assets/person-mina.svg')
+        'Website/public/index.html','Website/public/_headers','Website/public/assets/person-ari.svg','Website/public/assets/person-mina.svg')
 }
 $reviewedWebsiteImages = @('Website/public/favicon.svg','Website/public/favicon.ico',
     'Website/public/assets/person-ari.svg','Website/public/assets/person-mina.svg',
