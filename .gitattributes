@@ -26,3 +26,6 @@ FoxTransSource/native/vendor/** -whitespace
 Packaging/Languages/*.isl -whitespace
 Packaging/licenses/** -whitespace
 Packaging/scripts/*.patch -whitespace
+
+# Keep the reviewed upstream license byte-for-byte, including its line endings.
+Packaging/licenses/Unicode-License-V3.txt -text -whitespace
