@@ -113,6 +113,8 @@ Some logs contain names and source/translated conversation text. The incoming lo
 
 The explicit local health check does not start engines; an unused stopped endpoint being unavailable is expected. The four-sample translation test uses the currently running translator and adds real work. It measures text-only latency, not total speech-to-chat delay.
 
+Managed speech and translation ports are automatic by default. When checking an address manually, use the running service's address rather than assuming ports 8080/8081 or 1235/1236. In advanced fixed-port mode, choose an unused port if another program is already listening; do not close an unrelated program just to reclaim a historical port. External translator URLs remain your configured addresses, and VRChat's OSC output still uses port 9000.
+
 ## Report a reproducible problem
 
 Use [GitHub Issues](https://github.com/z2six/saywhat/issues), including app/Windows versions, profile and incoming speech engine, model/runtime, shared/separate mode, active directions, pause/lookahead choices, expected behavior and a small redacted log excerpt. Note whether it happens only during overlap, music, mute/unmute, audio-device changes, or crowded worlds. If possible compare final-only versus early previews and optional voice recognition on versus off without changing every setting at once.

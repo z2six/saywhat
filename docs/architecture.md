@@ -55,7 +55,7 @@ Playback is resampled for 16 kHz recognition. Quiet-audio normalization affects 
 
 **Home → Speech model & language** opens independent incoming **They speak**, target and recognizer choices. **Download & apply** prepares missing files; **Apply subtitle choices** uses prepared files. Changing the source creates a fresh subtitle audio/text context so old buffered audio is not interpreted under the new language. Changing recognizers pauses only the incoming pipeline, preserves displayed history, and attempts to restore the prior mode if the replacement cannot start. An unchanged compatible translator remains loaded. These actions do not change microphone recognition settings.
 
-Native incoming Nemotron uses the same pinned Windows engine as the microphone, with its own process/session on port8081. The selected explicit language is sent in `session.update`; Any language sends `auto`. Configuration requires `session.created` then `session.updated`. Audio remains continuous through silence. Empty progress deltas update transport activity but do not count as words. Authoritative completed text replaces speculative partial wording; a requested context handoff requires a final transcript and commit acknowledgment. The model is kept resident for a source-language session change, while the subtitle service and capture context restart.
+Native incoming Nemotron uses the same pinned Windows engine as the microphone, with its own process/session and managed loopback address. The selected explicit language is sent in `session.update`; Any language sends `auto`. Configuration requires `session.created` then `session.updated`. Audio remains continuous through silence. Empty progress deltas update transport activity but do not count as words. Authoritative completed text replaces speculative partial wording; a requested context handoff requires a final transcript and commit acknowledgment. The model is kept resident for a source-language session change, while the subtitle service and capture context restart.
 
 FireRedASR2 CTC/AED are segment recognizers hosted inside the subtitle service. Capture continues while one CPU decode runs. Growing section drafts are coalesced, and a final section has priority over its drafts. Sections are bounded to eight seconds; the configured quiet interval can finish one sooner. Longer uninterrupted speech becomes another bounded section rather than one indefinitely growing audio request. The work queue retains at most three finished sections plus the latest draft and reports when overload skips an old section. These bounds favor staying near live audio; they cannot restore skipped speech or guarantee that a CPU can keep up.
 
@@ -85,13 +85,20 @@ The configured streaming chunk plus lookahead requires roughly **3.5 seconds of 
 
 ## Local endpoints
 
-| Endpoint | Purpose |
+Managed speech and translation services use automatically selected loopback TCP ports by default. Their effective addresses belong to the running services and may change after a restart; clients use those addresses rather than assuming the historical port numbers. This does not change a separately configured external translator URL or the OSC ports.
+
+Advanced fixed-port mode disables automatic selection and uses the saved port values. The numbers below are that mode's initial defaults, not guaranteed addresses for an automatic session. See [connection settings](settings-reference.md#managed-local-connections).
+
+| Service | Initial fixed-mode address | Purpose |
+| --- | --- | --- |
+| Microphone speech | `127.0.0.1:8080` HTTP/WebSocket | Native Nemotron by default, or legacy Voxtral |
+| Incoming speech | `127.0.0.1:8081` HTTP/WebSocket | Incoming Nemotron or legacy Voxtral; FireRed runs in-process without this listener |
+| Groups speech | `127.0.0.1:8082` HTTP/WebSocket | Optional incoming VibeVoice service |
+| Own-voice translation | `127.0.0.1:1235/v1` HTTP | Built-in translator; shared by subtitles when sharing is on |
+| Separate incoming translation | `127.0.0.1:1236/v1` HTTP | Built-in subtitle translator when sharing is off |
+
+| Unchanged OSC endpoint | Purpose |
 | --- | --- |
-| `127.0.0.1:8080` HTTP/WebSocket | Your selected microphone recognizer: native Nemotron by default, or legacy Voxtral |
-| `127.0.0.1:8081` HTTP/WebSocket | Incoming Nemotron or legacy Voxtral server; FireRed runs in-process without this listener |
-| `127.0.0.1:8082` HTTP/WebSocket | Optional incoming VibeVoice Groups service |
-| `127.0.0.1:1235/v1` HTTP | Built-in translator for your voice; shared by subtitles when sharing is on |
-| `127.0.0.1:1236/v1` HTTP | Separate built-in subtitle translator when sharing is off |
 | `127.0.0.1:9010` UDP | Internal OSC sentence proxy input |
 | `127.0.0.1:9011` UDP | Internal microphone-host mute control |
 | `127.0.0.1:9001` UDP | VRChat outgoing mute/state listener used by the controller |
@@ -111,4 +118,6 @@ VRChat's [public OSC input documentation](https://docs.vrchat.com/docs/osc-as-in
 
 ## Ownership and cleanup
 
-The controller retains the exact Windows processes it started and token-owned WSL wrappers. It does not stop an arbitrary process just because it occupies a familiar port. A conflicting listener causes startup to fail with an explanation. Shared translator reference counts keep the model loaded while either direction still uses it; stopping the last user releases it. Details are in [install, update and lifecycle](install-and-updates.md).
+The controller retains the exact Windows processes it started and token-owned WSL wrappers. It does not stop or adopt an arbitrary process just because it occupies a familiar port. Automatic selection avoids occupied candidate ports; a conflict in fixed mode causes startup to fail with an explanation. Address selection does not guarantee successful backend startup or readiness. Shared translator reference counts keep the model loaded while either direction still uses it; stopping the last user releases it. Details are in [install, update and lifecycle](install-and-updates.md).
+
+For WSL Voxtral, HTTP health alone is not ownership evidence. The wrapper first verifies that its retained child's executable/birth identity owns the selected loopback TCP listener through its socket inode, then emits an owner-and-port receipt for the controller. WSL start wrappers also perform a bind-only conflict check without connecting to another service. This requires Python 3's standard library; managed Voxtral preparation includes it, while an older prepared distribution without Python reports that setup needs repair.

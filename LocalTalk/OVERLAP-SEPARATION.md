@@ -38,7 +38,7 @@ An RTF of 0.3 would mean computation took 0.3 times the sample duration. It does
 
 1. Maintain bounded overlapping audio windows only while speech is present; benchmark window size and stitching to avoid boundary losses/artifacts.
 2. Run the actual separator, reject invalid/near-duplicate tracks, and match trusted voiced portions to the clean enrolled profiles. Account for source-order swaps without using spatial identity.
-3. Route two estimated voices to independent ASR states. Reuse the incoming recognizer capacity on ports 8081/8082 rather than retaining an extra mixed recognizer as well. Own-voice recognition remains separate. Any backend without two simultaneous sessions must report unsupported rather than silently dropping a voice.
+3. Route two estimated voices to independent ASR states. Reuse the incoming recognizer capacity through its managed session addresses rather than retaining an extra mixed recognizer as well. Own-voice recognition remains separate. Any backend without two simultaneous sessions must report unsupported rather than silently dropping a voice.
 4. Measure end-to-end latency and CPU/GPU/VRAM impact while VRChat is running, then require explicit approval to enable. Backpressure must drop/log bounded stale work rather than grow the queue.
 5. Show uncertain/failed separation honestly; do not claim that two clean sentences were recovered merely because a neural network returned two arrays. More than two concurrent talkers, music/singing, similar voices, reverb, and distorted network audio can defeat this model.
 

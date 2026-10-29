@@ -48,7 +48,7 @@ The subtitle **Careful** style permits 192 output tokens and a 22-second request
 
 Sharing is recommended because one model is loaded once and used by both directions. Each request still carries its own task/context. Sharing does not blend microphone text into incoming subtitles. The managed server has one inference slot, so simultaneous directions compete for compute/queue time.
 
-With sharing off, running both directions uses two server instances, normally on ports 1235 and 1236. Even using the **same** model separately duplicates residency. Home choices wait for their Apply action; selecting a card alone does not load another model. Two instances on one GPU do not create twice the hardware throughput, and can hurt VRChat frame time. Separate selection is useful when different language pairs or quality requirements justify it, not as a way to isolate people.
+With sharing off, running both directions uses two server instances with separate managed loopback addresses. Internal ports are selected automatically by default; advanced fixed-port mode can keep chosen addresses. Even using the **same** model separately duplicates residency. Home choices wait for their Apply action; selecting a card alone does not load another model. Two instances on one GPU do not create twice the hardware throughput, and can hurt VRChat frame time. Separate selection is useful when different language pairs or quality requirements justify it, not as a way to isolate people.
 
 ## Translation acceleration
 

@@ -1223,7 +1223,10 @@ internal sealed partial class MainWindow : Window
         actions.Children.Add(ModernTheme.Button("Local health checks", async (_, _) => await HealthChecksAsync()));
         panel.Children.Add(actions); page.Children.Add(ModernTheme.Card(panel));
         var help = Section("Quick checks", "Connection refused: speech/runtime is stopped or the port differs. 503: the speech server may be busy. Audio stalled: inspect capture status and queue age, not just HTTP health.");
-        help.Children.Add(ModernTheme.Label("Own speech 127.0.0.1:8080 · incoming speech 127.0.0.1:8081 · managed translation 1235 / 1236 · final OSC output 127.0.0.1:9000", 12, ModernTheme.Muted));
+        var connections = _runtime.HealthEndpoints();
+        help.Children.Add(ModernTheme.Label("Active local connections", 12, ModernTheme.Muted));
+        if (connections.Count == 0) help.Children.Add(ModernTheme.Label("No translation tools are running.", 12, ModernTheme.Muted));
+        foreach (string endpoint in connections) { var address = ModernTheme.Label(endpoint, 12, ModernTheme.Muted); UiLocalization.Literal(address); help.Children.Add(address); }
         page.Children.Add(ModernTheme.Card(help)); RefreshLog(); return page;
     }
 
@@ -1432,6 +1435,7 @@ internal sealed partial class MainWindow : Window
     {
         var page = Page("One dashboard manages the tools. Translation runs natively on Windows; realtime Voxtral currently still requires WSL2. Installing Windows features may require a restart.");
         page.Children.Add(ModernTheme.Card(FirstRunModelSection()));
+        page.Children.Add(ModernTheme.Card(ConnectionSettingsSection()));
         var translation = Section("1 · Local translation runtime", "The managed Windows runtime does not require Bionic / LM Studio. Download a Hy-MT2 model here or import an existing compatible GGUF; model loading only happens when you press Start.");
         translation.Children.Add(Check("Use the built-in translation runtime", _settings.UseManagedTranslator, value => _settings.UseManagedTranslator = value));
         translation.Children.Add(ModernTheme.Button("Models & runtimes", (_, _) => Navigate("Models")));
@@ -1537,6 +1541,7 @@ internal sealed partial class MainWindow : Window
 
     private void Persist(bool applyingProfile = false, bool applySpeakerRecognition = false)
     {
+        ManagedPortAllocator.ValidateConfiguration(_settings);
         AppSettings latest = SettingsStore.Load();
         if (!applyingProfile)
         {
@@ -1549,7 +1554,6 @@ internal sealed partial class MainWindow : Window
         {
             ProvisionModelChoice own = LocalTalkProvisioner.ModelCatalog.First(m => m.Id == _settings.OwnManagedModelId && m.Role == ProvisionModelRole.Translation);
             ProvisionModelChoice incoming = LocalTalkProvisioner.ModelCatalog.First(m => m.Id == (_settings.ShareTranslationModel ? own.Id : _settings.IncomingManagedModelId) && m.Role == ProvisionModelRole.Translation);
-            _settings.OwnTranslatorBaseUrl = "http://127.0.0.1:1235/v1"; _settings.TranslatorBaseUrl = _settings.ShareTranslationModel ? "http://127.0.0.1:1235/v1" : "http://127.0.0.1:1236/v1";
             _settings.OwnTranslatorModel = own.ApiAlias; _settings.TranslatorModel = incoming.ApiAlias;
         }
         else
@@ -1844,8 +1848,7 @@ internal sealed partial class MainWindow : Window
     private async Task HealthChecksAsync() => await RunTask(async token =>
     {
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
-        string ownHealth = _settings.OwnRecognitionEngine == "voxtral" ? "http://127.0.0.1:8080/health" : "http://127.0.0.1:8080/ready";
-        foreach (string url in new[] { ownHealth, "http://127.0.0.1:8081/health", _settings.OwnTranslatorBaseUrl.TrimEnd('/') + "/models", _settings.TranslatorBaseUrl.TrimEnd('/') + "/models" }.Distinct())
+        foreach (string url in _runtime.HealthEndpoints())
         {
             try { using var response = await http.GetAsync(url, token); DesktopLog.Write($"Health {url} → {(int)response.StatusCode} {response.ReasonPhrase}"); }
             catch (HttpRequestException error) { DesktopLog.Write("Health " + url + " → unavailable: " + error.Message); }

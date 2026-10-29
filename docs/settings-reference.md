@@ -4,7 +4,7 @@
 
 Defaults below describe a new packaged installation before setup changes them. Existing preferences are preserved during ordinary updates. Interface language can inherit the installer's selection. Values are not measured hardware recommendations.
 
-Home's everyday voice controls apply their changes directly. Other settings pages use **Save & apply**; changing an Advanced control is not the same as saving it. Saving unchanged settings avoids unnecessary engine changes. Pinning subtitles, changing interface language/theme, changing names/photos, and toggling voice recognition have targeted paths that do not need to restart translation models. Do not edit files during an active session: some settings are snapshots read at startup.
+Home's everyday voice choices wait for their card's Apply action. Other settings pages use **Save & apply**; changing an Advanced control is not the same as saving it. Saving unchanged settings avoids unnecessary engine changes. Pinning subtitles, changing interface language/theme, changing names/photos, and direct recognition switches outside Home have targeted paths that do not need to restart translation models. Do not edit files during an active session: some settings are snapshots read at startup.
 
 The persisted application settings file is `vrchat-translation-settings.json` in the [per-user data directory](privacy-and-storage.md). The tables give its key names for technical inspection. They are settings, not a stable third-party API. UI labels may change or be translated; compatibility keys still use some older `Speaker` names.
 
@@ -42,7 +42,7 @@ Older settings migrate into **Current settings** without applying a new preset. 
 | `IncomingNormalSpeechEngine` | `voxtral` | Remembers the non-Groups recognizer when switching to Groups and back. |
 | `IncomingNormalSourceLanguage` | `Automatic` | Remembers that recognizer's spoken language when switching to Groups and back. |
 | `VibeVoiceModelId` | `microsoft/VibeVoice-ASR-Streaming-1.5B` | Optional 7B streaming checkpoint is also selectable under Groups model options. |
-| `VibeVoiceEndpoint` | `http://127.0.0.1:8082` | Loopback HTTP only; no credentials, query or fragment. |
+| `VibeVoiceEndpoint` | `http://127.0.0.1:8082` compatibility fallback | Managed startup supplies the current Groups loopback address. Loopback HTTP only; no credentials, query or fragment. |
 
 Groups preparation requires explicit approval for extra model/runtime downloads. Starting subtitles never silently installs missing Groups tools. Selecting or saving a profile while stopped does not itself load models or open capture.
 
@@ -162,11 +162,28 @@ Appearance controls apply without restarting services. Their scoped save patches
 
 Setup/help bookkeeping keys are `FirstRunSetupCompleted`, `FirstRunIntroductionCompleted`, and `SubtitleGuidePromptSeen` (initially `false`). They control dedicated setup and one-time offers, not engine permission. Use **Settings → Run setup again** instead of manually changing them.
 
+## Managed local connections
+
+Automatic internal ports are enabled by default. SayWhat? selects available loopback TCP ports for the speech and translation services it starts, so another application using a historical port need not block translation. These are internal connections, not VRChat OSC settings. The running address may change after stopping and starting a service. An automatically selected port is not a saved external-server URL.
+
+Turn automatic selection off only when a local integration needs fixed addresses, then choose distinct available ports from 1024 through 65535 for the managed services. Port 0 is not a fixed address. Invalid saved fixed values are reported when that mode needs them rather than silently changed; automatic mode ignores inactive fixed values. Runtime validation checks the services needed by the requested direction: a shared translator counts once, and external translator URLs are excluded from managed-port allocation. A fixed-port conflict is reported; SayWhat? does not close the application using that port. Changing connection settings does not turn a stopped feature on.
+
+| Key | New-install default | Meaning |
+| --- | --- | --- |
+| `AutomaticManagedPorts` | `true` | Select internal managed-service ports automatically. Disable to use the five saved fixed ports below. |
+| `OwnSpeechPort` | `8080` | Fixed microphone Nemotron/Voxtral port. |
+| `IncomingSpeechPort` | `8081` | Fixed incoming Nemotron/Voxtral port; FireRed runs in-process. |
+| `OwnTranslationPort` | `1235` | Fixed built-in translator port for your voice and shared subtitles. |
+| `IncomingTranslationPort` | `1236` | Fixed separate built-in subtitle translator port. |
+| `GroupsSpeechPort` | `8082` | Fixed VibeVoice Groups port. |
+
+External translator URLs remain exactly as configured and must already be running; automatic selection does not relocate or manage their listeners. OSC chat output, mute state and the internal OSC helpers keep their existing ports. See the [endpoint table](architecture.md#local-endpoints).
+
 ## Advanced local translator compatibility keys
 
 | Keys | Initial fallback | Effect |
 | --- | --- | --- |
-| `OwnTranslatorBaseUrl` | `http://localhost:1234/v1` | External my-voice endpoint; managed startup replaces this with its planned loopback endpoint. |
+| `OwnTranslatorBaseUrl` | `http://localhost:1234/v1` | External my-voice endpoint; managed operation uses its effective managed loopback address instead. |
 | `TranslatorBaseUrl` | `http://127.0.0.1:1234/v1` | External incoming endpoint when sharing is off. |
 | `OwnTranslatorModel`, `TranslatorModel` | `tencent/hy-mt2-1.8b` | OpenAI-compatible aliases; may differ from local GGUF filenames. Managed planning sets the catalog aliases. |
 | `DetectAnySourceLanguage` | `true` | Legacy text-prompt compatibility preference. Use They speak / `IncomingSourceLanguage` for current subtitle selection. This field does not itself configure an audio recognizer. |

@@ -8,6 +8,8 @@ internal static class UserFacingErrors
     {
         SetupUserException => error.Message,
         ModelSelectionUserException => error.Message,
+        ManagedPortConfigurationException configuration => DescribePortConfiguration(configuration),
+        ManagedPortConflictException conflict => UiText.Format(conflict.Template, UiText.T(conflict.Service), conflict.Port),
         IncomingListeningSelectionException => error.Message,
         PersonPhotoException => error.Message,
         SpeechSetupException => error.Message,
@@ -17,4 +19,7 @@ internal static class UserFacingErrors
         TimeoutException => "This is taking longer than expected. Try again or open Troubleshooting.",
         _ => "Couldn't finish this step. Try again or open Troubleshooting for details."
     };
+
+    private static string DescribePortConfiguration(ManagedPortConfigurationException error) =>
+        UiText.Format(error.Template, error.Arguments.Select(value => value is string label ? UiText.T(label) : value).ToArray());
 }

@@ -23,14 +23,18 @@ internal sealed record SettingsRuntimeChanges(bool OwnChanged, bool IncomingChan
         }
         static bool TranslatorChanged(RuntimeController.RuntimePlan left, RuntimeController.RuntimePlan right) =>
             left.TranslationKey != right.TranslationKey || left.Shared != right.Shared || left.Managed != right.Managed;
-        bool own = TranslatorChanged(oldOwn, newOwn)
+        bool ownConnections = previous.AutomaticManagedPorts != next.AutomaticManagedPorts ||
+            !next.AutomaticManagedPorts && previous.OwnSpeechPort != next.OwnSpeechPort;
+        bool incomingConnections = previous.AutomaticManagedPorts != next.AutomaticManagedPorts ||
+            !next.AutomaticManagedPorts && (RuntimeProfiles.UsesGroups(next) ? previous.GroupsSpeechPort != next.GroupsSpeechPort : previous.IncomingSpeechPort != next.IncomingSpeechPort);
+        bool own = ownConnections || TranslatorChanged(oldOwn, newOwn)
             || previous.OwnRecognitionEngine != next.OwnRecognitionEngine || previous.OwnMicrophoneDeviceId != next.OwnMicrophoneDeviceId
             || previous.OwnVoiceTargetLanguage != next.OwnVoiceTargetLanguage || previous.OwnVoiceSourceLanguage != next.OwnVoiceSourceLanguage
             || !previous.EffectiveOwnVoiceTargetLanguages().SequenceEqual(next.EffectiveOwnVoiceTargetLanguages())
             || previous.OwnVoiceEndPauseMilliseconds != next.OwnVoiceEndPauseMilliseconds || previous.OwnVoiceSendEarlyPreviews != next.OwnVoiceSendEarlyPreviews
             || previous.FinishCapturedSentenceOnMute != next.FinishCapturedSentenceOnMute || previous.RecognitionDelayMilliseconds != next.RecognitionDelayMilliseconds
             || previous.TranslationQuality != next.TranslationQuality || previous.Glossary != next.Glossary;
-        bool incoming = includeIncoming && (TranslatorChanged(oldIncoming, newIncoming)
+        bool incoming = includeIncoming && (incomingConnections || TranslatorChanged(oldIncoming, newIncoming)
             || previous.IncomingSpeechEngine != next.IncomingSpeechEngine || previous.VibeVoiceModelId != next.VibeVoiceModelId || previous.VibeVoiceEndpoint != next.VibeVoiceEndpoint
             || previous.IncomingTargetLanguage != next.IncomingTargetLanguage || previous.IncomingSourceLanguage != next.IncomingSourceLanguage
             || previous.IncomingSendEarlyPreviews != next.IncomingSendEarlyPreviews
@@ -158,6 +162,7 @@ internal sealed partial class MainWindow
 
     internal static void ValidateTranslationSettingsForWindows(AppSettings candidate, bool incomingRunning, Version windowsVersion)
     {
+        ManagedPortAllocator.ValidateConfiguration(candidate);
         if (incomingRunning) IncomingCaptureCapabilities.Validate(candidate, windowsVersion);
         _ = RuntimeController.BuildPlan(candidate, incoming: false);
         if (!incomingRunning && !IncomingCaptureCapabilities.SupportsSource(candidate, windowsVersion)) return;

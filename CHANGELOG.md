@@ -3,6 +3,19 @@
 Installers, full notes and matching source archives are on
 [GitHub Releases](https://github.com/z2six/saywhat/releases).
 
+## 0.2.11
+
+- Managed speech and translation servers now choose available local ports
+  automatically, avoiding conflicts with apps already using port 8080 or other
+  former defaults.
+- Reconnects, subtitle profiles and capture settings keep using the chosen
+  session addresses. External translators and VRChat OSC routes stay configured
+  as before.
+- Added optional fixed ports in Advanced → Manual setup → Connection settings,
+  with clear conflict feedback and active connection details in Diagnostics.
+- Startup retries confirmed port collisions without stopping unrelated apps;
+  shutdown retains exact ownership checks for native and WSL helpers.
+
 ## 0.2.10
 
 - Home choices now stay selected without switching or reloading models until

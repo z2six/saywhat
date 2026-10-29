@@ -102,6 +102,11 @@ directly without an override uses the normal app data path.
 - Dashboard, settings, migration, layout, theme, model-selection, queue, identity,
   update and fake-provisioning checks through `--ui-self-test`.
 - Capture-host regressions through its `--self-test` entry point.
+- Owned-listener readiness and port handoff through the separate
+  [ManagedPortTests project](../Packaging/ManagedPortTests/ManagedPortTests.csproj).
+  It uses temporary loopback sockets and two hidden fixture processes, checks
+  exact process ownership, and closes those processes when it finishes. Its
+  external script and runner are developer test files, excluded from the app.
 - Isolated VRChat mute discovery/policy, installer-update and Windows-version source contracts.
 - Static website release-gate and eight-language checks.
 
@@ -110,6 +115,17 @@ It does not load speech/translation models, open microphone/playback capture,
 send chat to VRChat, install Windows components or modify the installed app.
 NuGet restore can access package servers; “offline checks” describes the tested
 runtime behavior, not a promise that dependency restore needs no network.
+
+After a source build, run that connection fixture separately with:
+
+```powershell
+dotnet run --project .\Packaging\ManagedPortTests\ManagedPortTests.csproj -c Release -- .\artifacts\build\app .\artifacts\test-results\managed-ports-manual
+```
+
+Use `artifacts/publish/app` instead when checking a self-contained publish.
+The fixture loads the already-built application assembly for its ownership
+checks; it does not launch the app UI or translation engines. Reports and data
+stay under the supplied isolated test directory.
 
 The CI workflow runs the same source build and offline checks on Windows, plus
 the public-source audit. It has read-only permissions and does not deploy,

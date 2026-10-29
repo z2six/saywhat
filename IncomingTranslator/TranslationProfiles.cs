@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace IncomingTranslator;
@@ -41,7 +42,7 @@ internal static class TranslationProfiles
     internal const string DefaultVibeVoiceModel = "microsoft/VibeVoice-ASR-Streaming-1.5B";
     private const int MaximumCustomProfiles = 64;
     private static readonly PropertyInfo[] SettingsProperties = typeof(AppSettings).GetProperties(BindingFlags.Instance | BindingFlags.Public)
-        .Where(property => property.CanRead && property.CanWrite).ToArray();
+        .Where(property => property.CanRead && property.CanWrite && property.GetCustomAttribute<JsonIgnoreAttribute>() is null).ToArray();
     private static readonly HashSet<string> SnapshotExcludedProperties = new(StringComparer.Ordinal)
     {
         nameof(AppSettings.ActiveTranslationProfileId), nameof(AppSettings.CustomTranslationProfiles),

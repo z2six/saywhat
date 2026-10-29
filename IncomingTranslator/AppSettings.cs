@@ -2,6 +2,7 @@ using System.IO;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -69,6 +70,18 @@ internal sealed class AppSettings
     public string OwnManagedModelId { get; set; } = "hy-mt2-1.8b-q4_k_m";
     public string IncomingManagedModelId { get; set; } = "hy-mt2-1.8b-q4_k_m";
     public string ManagedRuntimeId { get; set; } = "llama-vulkan";
+    public bool AutomaticManagedPorts { get; set; } = true;
+    public int OwnSpeechPort { get; set; } = 8080;
+    public int IncomingSpeechPort { get; set; } = 8081;
+    public int OwnTranslationPort { get; set; } = 1235;
+    public int IncomingTranslationPort { get; set; } = 1236;
+    public int GroupsSpeechPort { get; set; } = 8082;
+    // Resolved for an owned runtime session only. Never persist these addresses
+    // over user-entered external endpoints or the configured fixed-port choices.
+    [JsonIgnore] public string OwnSpeechEndpoint { get; set; } = "";
+    [JsonIgnore] public string IncomingSpeechEndpoint { get; set; } = "";
+    [JsonIgnore] public string OwnTranslationEndpoint { get; set; } = "";
+    [JsonIgnore] public string IncomingTranslationEndpoint { get; set; } = "";
     public string OwnTranslatorBaseUrl { get; set; } = "http://localhost:1234/v1";
     public string Glossary { get; set; } = "";
     public bool PauseOnMinimize { get; set; } = false;
@@ -142,6 +155,16 @@ internal sealed class AppSettings
         OwnManagedModelId = OwnManagedModelId,
         IncomingManagedModelId = IncomingManagedModelId,
         ManagedRuntimeId = ManagedRuntimeId,
+        AutomaticManagedPorts = AutomaticManagedPorts,
+        OwnSpeechPort = OwnSpeechPort,
+        IncomingSpeechPort = IncomingSpeechPort,
+        OwnTranslationPort = OwnTranslationPort,
+        IncomingTranslationPort = IncomingTranslationPort,
+        GroupsSpeechPort = GroupsSpeechPort,
+        OwnSpeechEndpoint = OwnSpeechEndpoint,
+        IncomingSpeechEndpoint = IncomingSpeechEndpoint,
+        OwnTranslationEndpoint = OwnTranslationEndpoint,
+        IncomingTranslationEndpoint = IncomingTranslationEndpoint,
         OwnTranslatorBaseUrl = OwnTranslatorBaseUrl,
         Glossary = Glossary,
         PauseOnMinimize = PauseOnMinimize,
@@ -476,6 +499,9 @@ internal static partial class SettingsStore
         AppearanceTheme.Normalize(settings);
         NormalizeSubtitleAppearance(settings);
         IncomingListening.Normalize(settings);
+        // Keep invalid fixed values visible rather than silently changing their
+        // meaning. ManagedPortAllocator validates them when fixed mode is used;
+        // automatic mode does not depend on inactive manual choices.
         settings.OwnRecognitionEngine = settings.OwnRecognitionEngine == "voxtral" ? "voxtral" : "nemotron";
         settings.OwnMicrophoneDeviceId = string.IsNullOrWhiteSpace(settings.OwnMicrophoneDeviceId) ? "default" : settings.OwnMicrophoneDeviceId.Trim();
         settings.SourceLanguages ??= new List<string> { "Chinese" };
@@ -509,16 +535,41 @@ internal static partial class SettingsStore
         string.IsNullOrWhiteSpace(value) || string.Equals(value.Trim(), "Automatic", StringComparison.OrdinalIgnoreCase)
             ? "Automatic" : AppSettings.CanonicalTranslationLanguage(value) ?? value.Trim();
 
+    // This override is process-local and installed only by an owned, ready runtime.
+    // Generic preference saves must not redirect an active capture host to the old default port.
+    private static string? _ownRuntimeSpeechEndpoint;
+    private static string? _ownRuntimeTranslationEndpoint;
+
+    internal static void WriteOwnVoiceConfig(AppSettings settings, string speechEndpoint, string? translatorEndpoint = null)
+    {
+        speechEndpoint = SessionEndpoints.Validate(speechEndpoint);
+        translatorEndpoint = SessionEndpoints.Validate(translatorEndpoint ?? SessionEndpoints.OwnTranslation(settings));
+        lock (SettingsGate)
+        {
+            _ownRuntimeSpeechEndpoint = speechEndpoint;
+            _ownRuntimeTranslationEndpoint = translatorEndpoint;
+            UpdateOwnVoiceConfig(settings, AppPaths.FastConfigPath);
+            UpdateOwnVoiceConfig(settings, AppPaths.FoxTransConfigPath);
+        }
+    }
+
+    internal static void ClearOwnRuntimeEndpoints()
+    {
+        lock (SettingsGate) { _ownRuntimeSpeechEndpoint = null; _ownRuntimeTranslationEndpoint = null; }
+    }
+
     private static void UpdateOwnVoiceConfig(AppSettings settings, string path)
     {
+        string speechEndpoint = _ownRuntimeSpeechEndpoint ?? SessionEndpoints.OwnSpeech(settings);
+        string translatorEndpoint = _ownRuntimeTranslationEndpoint ?? SessionEndpoints.OwnTranslation(settings);
         if (!File.Exists(path) && AppPaths.IsPackagedApplication)
         {
             var template = new JsonObject {
                 ["version"] = 1,
                 ["audio"] = new JsonObject { ["device"] = "default" },
                 ["pipeline"] = new JsonObject {
-                    ["speech"] = new JsonObject { ["type"]="voxtral-fox", ["baseUrl"]="http://127.0.0.1:8080", ["delayMs"]=240 },
-                    ["translation"] = new JsonObject { ["type"]="openai-chat", ["baseUrl"]=settings.OwnTranslatorBaseUrl, ["model"]=settings.OwnTranslatorModel },
+                    ["speech"] = new JsonObject { ["type"]="voxtral-fox", ["baseUrl"]=speechEndpoint, ["delayMs"]=240 },
+                    ["translation"] = new JsonObject { ["type"]="openai-chat", ["baseUrl"]=translatorEndpoint, ["model"]=settings.OwnTranslatorModel },
                     ["realtime"] = new JsonObject { ["preset"]="responsive", ["newUtteranceAfterMs"]=settings.OwnVoiceEndPauseMilliseconds }
                 },
                 ["outputs"] = new JsonArray(new JsonObject { ["type"]="vrchat-osc", ["address"]="127.0.0.1:9010", ["typingIndicator"]=true })
@@ -531,7 +582,10 @@ internal static partial class SettingsStore
             JsonNode? root = JsonNode.Parse(File.ReadAllText(path), null, documentOptions);
             if (root?["audio"] is JsonObject audio) audio["device"] = settings.OwnMicrophoneDeviceId;
             if (root?["pipeline"]?["speech"] is JsonObject speech)
+            {
                 speech["delayMs"] = settings.RecognitionDelayMilliseconds;
+                speech["baseUrl"] = speechEndpoint;
+            }
             if (root?["pipeline"]?["realtime"] is JsonObject realtime)
             {
                 realtime["newUtteranceAfterMs"] = settings.OwnVoiceEndPauseMilliseconds;
@@ -539,7 +593,7 @@ internal static partial class SettingsStore
                 {
                     translation["prompt"] = $"Translate the source speech from any language into concise, natural {TargetDescription(settings.OwnVoiceTargetLanguage)} suitable for casual VRChat conversation. Preserve meaning and tone. Output only the translation with no label, explanation, alternatives, or extra text. /no_think";
                     translation["model"] = settings.OwnTranslatorModel;
-                    translation["baseUrl"] = settings.OwnTranslatorBaseUrl;
+                    translation["baseUrl"] = translatorEndpoint;
                     if(!string.IsNullOrWhiteSpace(settings.Glossary)) translation["prompt"] = translation["prompt"]!.GetValue<string>() + " Use this glossary only for matching source terms; do not invent missing words: " + settings.Glossary[..Math.Min(2000,settings.Glossary.Length)];
                     if(settings.OwnTranslatorModel.Contains("hy-mt",StringComparison.OrdinalIgnoreCase))
                     {

@@ -33,10 +33,19 @@ cache. There is no separate user-installed UI/service to manage.
 
 Start and Stop use a retained random owner token. Stop validates the PID birth
 time, interpreter, adapter path, owner and port before terminating anything.
-The service binds **127.0.0.1:8082 only**. Inference forces HuggingFace/Transformers
+The service binds **127.0.0.1 only**, using the managed port selected for this
+session. Automatic selection is the app default; advanced fixed-port mode starts
+with 8082 for Groups. Clients use the effective address passed by the controller,
+not an assumed port. Inference forces HuggingFace/Transformers
 offline mode. No hosted inference or fallback is implemented. The adapter never
 writes raw captured audio or text transcripts to disk. Logs contain startup,
 timing and error information, not normal recognised conversation text.
+
+The wrapper uses Python's standard-library socket bind check before starting a
+model process. It does not send a request to an existing listener. A proven local
+address conflict is reported with the retained owner token and selected port;
+other preparation/model failures are not classified as port conflicts. Start
+and Stop retain that same port in the ownership marker and command verification.
 
 Preparation runs in a separately owned process group, so cancellation stops its
 package/download children too. Downloads report actual bytes, including resumed
@@ -50,7 +59,8 @@ disk size is meaningful progress rather than a preallocated file size.
 and lookahead, and active session count. A live HTTP server is not synonymous
 with a loaded model. The app must verify engine/protocol/owner/model and ready.
 
-Open `ws://127.0.0.1:8082/v1/realtime`, send:
+Open `/v1/realtime` over WebSocket at that session's Groups address (for example,
+`ws://127.0.0.1:8082/v1/realtime` when fixed mode uses port 8082), then send:
 
 ```json
 {"type":"session.start","protocol":1,"sample_rate":16000,"channels":1,"format":"pcm_s16le","max_tokens":256}
@@ -89,9 +99,19 @@ make overload visible; the service does not silently discard old audio.
 
 ## Offline verification
 
+`python -m unittest discover -s Packaging/vibevoice -p test_ports.py` validates
+safe port arguments using only the Python standard library, without HTTP or
+inference dependencies.
+
 `python -m unittest discover -s Packaging/vibevoice -p test_protocol.py`
 tests trained chunk configuration, packet-boundary-safe resampling, labels,
 continuations, rollover and incomplete setup. These checks download nothing and
 do not use a microphone, GPU, WSL or any inference dependencies. Runtime GPU
 accuracy, latency, Windows↔WSL forwarding and coexistence with VRChat still need
 an explicit real-model test; offline protocol checks cannot establish those.
+
+On Linux with Bash and a C compiler,
+`python Packaging/ProvisioningTests/test-managed-ports.py` builds an isolated
+socket fixture to check owned-listener receipts, foreign-port conflicts and
+owner/port-scoped cleanup. It starts no WSL distribution or AI model and touches
+no existing service. Windows skips that Linux-only fixture explicitly.

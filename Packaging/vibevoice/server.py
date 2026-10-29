@@ -253,12 +253,21 @@ def create_app(model_path, model_id, owner, device="cuda"):
     return app
 
 
+def managed_port(value):
+    if not value.isascii() or not value.isdecimal() or not 4 <= len(value) <= 5 or value.startswith("0"):
+        raise argparse.ArgumentTypeError("port must be an integer from 1024 to 65535")
+    port = int(value)
+    if not 1024 <= port <= 65535:
+        raise argparse.ArgumentTypeError("port must be an integer from 1024 to 65535")
+    return port
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-path", required=True)
     parser.add_argument("--model-id", choices=MODELS, required=True)
     parser.add_argument("--owner", required=True)
-    parser.add_argument("--port", type=int, default=8082, choices=[8082])
+    parser.add_argument("--port", type=managed_port, default=8082)
     args = parser.parse_args()
     if len(args.owner) != 32 or any(c not in "0123456789abcdef" for c in args.owner):
         parser.error("owner must be a 32-character lowercase hexadecimal ownership token")

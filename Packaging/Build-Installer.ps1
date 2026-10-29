@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '0.2.10',
+    [string]$Version = '0.2.11',
     [string]$CompilerPath,
     [switch]$SkipPublish,
     [string]$AppPublishDirectory,
@@ -186,6 +186,9 @@ $sourceArchive = [IO.Compression.ZipFile]::OpenRead((Join-Path $installedSource 
 try {
     foreach ($required in @('LICENSE','Packaging/SOURCE-AND-LICENSES.md',
         'LocalTalk/Provisioning.cs','LocalTalk/MainWindow.cs','LocalTalk/RuntimeController.cs',
+        'IncomingTranslator/ManagedServicePorts.cs','IncomingTranslator/SessionEndpoints.cs','LocalTalk/RuntimeController.Ports.cs',
+        'LocalTalk/MainWindowConnections.cs','LocalTalk/ManagedServicePortTests.cs','LocalTalk/SessionEndpointTests.cs','Packaging/ProvisioningTests/test-managed-ports.py','Packaging/vibevoice/test_ports.py',
+        'Packaging/ManagedPortTests/ManagedPortTests.csproj','Packaging/ManagedPortTests/Program.cs','Packaging/ManagedPortTests/fixtures/owned-http.ps1',
         'LocalTalk/NativeSpeechProvisioner.cs','LocalTalk/NativeSpeechProvisionerTests.cs','LocalTalk/OwnRecognitionCatalog.cs',
         'LocalTalk/FireRedSpeechProvisioner.cs','LocalTalk/SherpaSpeechRecognizer.cs','LocalTalk/FireRedIncomingSpeech.cs','LocalTalk/FireRedSpeechTests.cs',
         'LocalTalk/SubtitleSpeechUi.cs','LocalTalk/SubtitleSpeechText.cs','LocalTalk/SubtitleSpeechUiTests.cs',

@@ -13,7 +13,7 @@ namespace IncomingTranslator;
 
 // Construction is inert. Only explicit UI Start calls may start installed local engines.
 // All cleanup is scoped to retained Process objects and token-owned WSL wrappers, never ports/PIDs discovered elsewhere.
-internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
+internal sealed partial class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
 {
     private readonly LocalTalkProvisioner _provisioner;
     private readonly Func<Version> _audioWindowsVersion;
@@ -75,25 +75,25 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         phases.Report("Checking translation tools");
         RequirePreviousCleanup();
         ValidateOwnSource(settings);
-        RuntimePlan plan = BuildPlan(settings, incoming: false);
+        RuntimePlan plan = ResolveRetainedTranslatorPlan(BuildPlan(settings, incoming: false));
+        ManagedPortAllocator.ValidateConfiguration(settings, ManagedServiceKind.OwnSpeech, ManagedServiceKind.OwnTranslation);
         CheckSharedCompatibility(plan, _incomingPlan);
         ValidateManagedAssets(plan);
         ValidateOwnCaptureHelpers();
         if (settings.OwnRecognitionEngine == "voxtral") ValidateSpeechHelpers(RequireSpeechRegistration(), 8080);
         else _ = new NativeSpeechProvisioner(_provisioner.DataRoot).BuildStartInfo(settings, 8080);
-        await RequireTcpPortFreeAsync(8080, token);
+        if (!settings.AutomaticManagedPorts) ManagedPortAllocator.EnsureBindable(settings.OwnSpeechPort, "Your voice recognition");
         RequireUdpPortFree(9010); RequireUdpPortFree(9001); RequireUdpPortFree(9011);
-        ApplyPlan(settings, plan, incoming: false);
-        SettingsStore.Save(settings);
-        if (!File.Exists(AppPaths.FastConfigPath))
-            throw new FileNotFoundException("The microphone configuration is missing. Complete SayWhat? setup first.", AppPaths.FastConfigPath);
         try
         {
-            _ownTranslatorPort = await AcquireTranslatorAsync(plan, token, phases);
+            plan = await AcquireTranslatorAsync(plan, settings, incoming: false, token, phases);
+            _ownTranslatorPort = plan.Managed ? plan.Port : null;
+            ApplyPlan(settings, plan, incoming: false);
+            SaveControllerSettings(settings);
             if (settings.OwnRecognitionEngine == "voxtral")
-                _ownSpeech = await StartSpeechAsync(RequireSpeechRegistration(), 8080, token, phases);
+                _ownSpeech = await StartManagedVoxtralAsync(RequireSpeechRegistration(), settings, incoming: false, token, phases);
             else await StartNativeOwnSpeechAsync(settings, token, phases);
-            await StartOwnCaptureCoreAsync(token, phases);
+            await StartOwnCaptureCoreAsync(settings, token, phases);
             token.ThrowIfCancellationRequested();
             _ownPlan = plan; _ownSettings = settings.Copy(); _ownRunning = true;
             if (_ownSpeech is not null) WatchOwn(_ownSpeech.Process);
@@ -129,16 +129,22 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
     {
         if (_nativeOwnSpeech is not null) throw new InvalidOperationException("The previous speech recognizer has not stopped yet. Retry Stop all.");
         phases.Report("Starting speech recognition", "Loading the selected Windows speech model.");
-        _nativeOwnSpeech = StartOwned(new NativeSpeechProvisioner(_provisioner.DataRoot).BuildStartInfo(settings, 8080), "Windows speech recognition");
-        // Retain the exact job/process before the first await, including failed
-        // readiness and incomplete shutdown. No port-discovered process is adopted.
-        await WaitHealthAsync(new Uri("http://127.0.0.1:8080/ready"), _nativeOwnSpeech, TimeSpan.FromSeconds(120),
-            root => root.TryGetProperty("ready", out JsonElement ready) && ready.ValueKind == JsonValueKind.True, token);
+        var started = await StartManagedWindowsAsync(settings, ManagedServiceKind.OwnSpeech,
+            port => new NativeSpeechProvisioner(_provisioner.DataRoot).BuildStartInfo(settings, port), "Windows speech recognition",
+            port => LocalEndpoint(port) + "/ready",
+            root => root.TryGetProperty("ready", out JsonElement ready) && ready.ValueKind == JsonValueKind.True,
+            TimeSpan.FromSeconds(120),
+            (port, process) => { _nativeOwnSpeech = process; _ownSpeechPort = port; },
+            (_, process) => { if (ReferenceEquals(_nativeOwnSpeech, process)) { _nativeOwnSpeech = null; _ownSpeechPort = null; } }, token);
+        settings.OwnSpeechEndpoint = LocalEndpoint(started.Port);
     }
 
-    private async Task StartOwnCaptureCoreAsync(CancellationToken token, RuntimePhaseProgress phases)
+    private async Task StartOwnCaptureCoreAsync(AppSettings settings, CancellationToken token, RuntimePhaseProgress phases)
     {
         ValidateOwnCaptureHelpers();
+        ApplyRetainedSessionEndpoints(settings);
+        SettingsStore.WriteOwnVoiceConfig(settings, settings.OwnSpeechEndpoint,
+            string.IsNullOrWhiteSpace(settings.OwnTranslationEndpoint) ? settings.OwnTranslatorBaseUrl : settings.OwnTranslationEndpoint);
         RequireUdpPortFree(9010); RequireUdpPortFree(9001); RequireUdpPortFree(9011);
         phases.Report("Connecting your microphone", "Connecting the microphone and VRChat chat output.");
         string proxyLog = Path.Combine(AppPaths.Root, "foxtrans-osc-sentence.log");
@@ -165,7 +171,8 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
     }
 
     internal static bool CanReuseOwnModels(AppSettings previous, AppSettings next) =>
-        previous.OwnRecognitionEngine == next.OwnRecognitionEngine && SameTranslator(BuildPlan(previous, false), BuildPlan(next, false));
+        previous.OwnRecognitionEngine == next.OwnRecognitionEngine && SameOwnSpeechPortPolicy(previous, next) &&
+        SameTranslator(BuildPlan(previous, false), BuildPlan(next, false));
 
     private static bool SameTranslator(RuntimePlan previous, RuntimePlan next) => previous.TranslationKey == next.TranslationKey &&
         previous.Managed == next.Managed && previous.Shared == next.Shared;
@@ -191,18 +198,20 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         try
         {
             ThrowIfDisposed(); RequirePreviousCleanup(); ValidateOwnSource(settings);
-            RuntimePlan plan = BuildPlan(settings, incoming: false);
+            ManagedPortAllocator.ValidateConfiguration(settings, ManagedServiceKind.OwnSpeech, ManagedServiceKind.OwnTranslation);
+            RuntimePlan plan = ResolveRetainedTranslatorPlan(BuildPlan(settings, incoming: false));
+            ApplyRetainedSessionEndpoints(settings);
             CheckSharedCompatibility(plan, _incomingPlan);
             if (!_ownRunning)
             {
-                ApplyPlan(settings, plan, incoming: false); SettingsStore.Save(settings);
+                ApplyPlan(settings, plan, incoming: false); SaveControllerSettings(settings);
                 return; // Saving a stopped feature never loads recognition or translation.
             }
             AppSettings previous = _ownSettings?.Copy() ?? SettingsStore.Load();
             if (SameOwnCaptureChoices(previous, settings))
             {
                 phases.Report("Applying voice settings", "The current speech and translation models stay loaded.");
-                ApplyPlan(settings, plan, incoming: false); SettingsStore.Save(settings);
+                ApplyPlan(settings, plan, incoming: false); SaveControllerSettings(settings);
                 SendBooleanControl(9011, "/foxtrans/control/reload", true);
                 _ownPlan = plan; _ownSettings = settings.Copy();
                 Log("Own-voice timing, progressive-message and VRChat mute preferences saved live without restarting capture or models; the controller observes mute-policy changes from preferences.");
@@ -224,8 +233,8 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
                     phases.Report("Updating your voice translation", "Keeping the speech and translation models loaded.");
                     captureStopped = true;
                     await StopOwnCaptureCoreAsync();
-                    ApplyPlan(settings, plan, incoming: false); SettingsStore.Save(settings);
-                    await StartOwnCaptureCoreAsync(token, phases);
+                    ApplyPlan(settings, plan, incoming: false); SaveControllerSettings(settings);
+                    await StartOwnCaptureCoreAsync(settings, token, phases);
                     _ownPlan = plan; _ownSettings = settings.Copy();
                     Log("Own-voice capture restarted with the selected languages/microphone; speech and translation models stayed resident.");
                     NotifyState(); return;
@@ -235,7 +244,7 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
                 else _ = new NativeSpeechProvisioner(_provisioner.DataRoot).BuildStartInfo(settings, 8080);
                 captureStopped = true;
                 await StopOwnCoreAsync(phases);
-                ApplyPlan(settings, plan, incoming: false); SettingsStore.Save(settings);
+                ApplyPlan(settings, plan, incoming: false); SaveControllerSettings(settings);
                 await StartOwnCoreAsync(settings, token, phases);
             }
             catch (Exception applyError)
@@ -249,7 +258,7 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
                 }
                 if (applyError is OperationCanceledException || token.IsCancellationRequested || _disposeRequested)
                 {
-                    SettingsStore.Save(previous);
+                    SaveControllerSettings(previous);
                     await StopOwnCoreAsync(phases);
                     throw;
                 }
@@ -259,14 +268,14 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
                     using var recovery = new CancellationTokenSource(TimeSpan.FromSeconds(150));
                     if (reuse)
                     {
-                        await StopOwnCaptureCoreAsync(); SettingsStore.Save(previous);
-                        await StartOwnCaptureCoreAsync(recovery.Token, phases);
+                        await StopOwnCaptureCoreAsync(); SaveControllerSettings(previous);
+                        await StartOwnCaptureCoreAsync(previous, recovery.Token, phases);
                         _ownPlan = BuildPlan(previous, incoming: false); _ownSettings = previous.Copy(); _ownRunning = true;
                         NotifyState();
                     }
                     else
                     {
-                        await StopOwnCoreAsync(phases); SettingsStore.Save(previous);
+                        await StopOwnCoreAsync(phases); SaveControllerSettings(previous);
                         await StartOwnCoreAsync(previous, recovery.Token, phases);
                     }
                 }
@@ -461,38 +470,41 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
             WslSpeechRegistration? speech = IncomingRecognitionCatalog.UsesNative(settings) ? null : RequireSpeechRegistration();
             RuntimeProfiles.ValidateIncomingSpeech(settings);
             IncomingListening.Validate(settings);
-            RuntimePlan plan = BuildPlan(settings, incoming: true);
+            RuntimePlan plan = ResolveRetainedTranslatorPlan(BuildPlan(settings, incoming: true));
+            ValidateIncomingPortSelection(settings);
             CheckSharedCompatibility(plan, _ownPlan);
             ValidateManagedAssets(plan);
             if (RuntimeProfiles.UsesGroups(settings))
             {
                 await RequireGroupsPreparedCoreAsync(settings, speech!, cancellationToken);
                 ValidateGroupsHelpers(speech!, settings);
-                await RequireTcpPortFreeAsync(VibeVoiceRuntime.Port, cancellationToken);
+                if (!settings.AutomaticManagedPorts) ManagedPortAllocator.EnsureBindable(settings.GroupsSpeechPort, "Groups speech recognition");
             }
             else if (IncomingRecognitionCatalog.UsesNative(settings))
             {
                 ValidateNativeIncomingSpeech(settings);
-                if (!IncomingRecognitionCatalog.UsesFireRed(settings)) await RequireTcpPortFreeAsync(8081, cancellationToken);
+                if (!IncomingRecognitionCatalog.UsesFireRed(settings) && !settings.AutomaticManagedPorts)
+                    ManagedPortAllocator.EnsureBindable(settings.IncomingSpeechPort, "Subtitle speech recognition");
             }
             else
             {
                 ValidateSpeechHelpers(speech!, 8081);
-                await RequireTcpPortFreeAsync(8081, cancellationToken);
+                if (!settings.AutomaticManagedPorts) ManagedPortAllocator.EnsureBindable(settings.IncomingSpeechPort, "Subtitle speech recognition");
             }
             RuntimeProfiles.ValidateSpeakerRecognitionAssets(settings);
-            ApplyPlan(settings, plan, incoming: true);
-            SettingsStore.Save(settings); // SubtitleWindow reads this saved selection before opening any audio.
             try
             {
-                _incomingTranslatorPort = await AcquireTranslatorAsync(plan, cancellationToken, phases);
+                plan = await AcquireTranslatorAsync(plan, settings, incoming: true, cancellationToken, phases);
+                _incomingTranslatorPort = plan.Managed ? plan.Port : null;
+                ApplyPlan(settings, plan, incoming: true);
                 await StartIncomingSpeechCoreAsync(settings, speech, cancellationToken, phases);
+                SaveControllerSettings(settings);
                 cancellationToken.ThrowIfCancellationRequested();
                 if (Application.Current is null) throw new InvalidOperationException("Start subtitles from the SayWhat? application.");
                 phases.Report("Opening subtitles", "Opening the subtitle window.");
                 await Application.Current.Dispatcher.InvokeAsync(() =>
                 {
-                    _overlay = new SubtitleWindow { OpenOptionsRequested = openOptions, OpenSpeakerSettingsRequested = openSpeakerSettings,
+                    _overlay = new SubtitleWindow(settings.Copy()) { OpenOptionsRequested = openOptions, OpenSpeakerSettingsRequested = openSpeakerSettings,
                         CorrectSpeakerRequested = SpeakerQuickPicker.ShowAsync,
                         EnsureSpeakerLearningRequested = SpeakerSuggestionReviewUi.EnsureLearningAcknowledgedAsync,
                         ProfileChangeRequested = profileCallback };
@@ -618,9 +630,11 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
             // Applying settings while subtitles are off must not start capture/models.
             if (!_incomingRunning || _overlay is null) return;
             SubtitleWindow overlay = _overlay;
-            AppSettings previous = _incomingSettings?.Copy() ?? SettingsStore.Load();
+            settings = PreferenceSettings(settings);
+            AppSettings previous = PreferenceSettings(_incomingSettings?.Copy() ?? SettingsStore.Load());
             RuntimePlan previousPlan = _incomingPlan ?? BuildPlan(previous, incoming: true);
-            RuntimePlan nextPlan = BuildPlan(settings, incoming: true);
+            RuntimePlan nextPlan = ResolveRetainedTranslatorPlan(BuildPlan(settings, incoming: true));
+            ValidateIncomingPortSelection(settings);
             WslSpeechRegistration? registration = IncomingRecognitionCatalog.UsesNative(settings) ? null : RequireSpeechRegistration();
             RuntimeProfiles.ValidateIncomingSpeech(settings);
             IncomingListening.Validate(settings);
@@ -634,9 +648,12 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
             }
             else if (IncomingRecognitionCatalog.UsesNative(settings)) ValidateNativeIncomingSpeech(settings);
             else ValidateSpeechHelpers(registration!, 8081);
+            bool applyLive = RuntimeProfiles.CanApplyLive(previous, settings, previousPlan, nextPlan);
+            bool reuseModels = RuntimeProfiles.CanReuseIncomingModels(previous, settings, previousPlan, nextPlan);
             ApplyPlan(settings, nextPlan, incoming: true);
-            if (RuntimeProfiles.CanApplyLive(previous, settings, previousPlan, nextPlan))
+            if (applyLive)
             {
+                ApplyRetainedSessionEndpoints(settings);
                 phases.Report("Applying subtitle settings", "Keeping the current speech and translation models loaded.");
                 try
                 {
@@ -651,7 +668,8 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
                     {
                         using var recovery = new CancellationTokenSource(TimeSpan.FromSeconds(25));
                         await overlay.Dispatcher.InvokeAsync(() => overlay.PauseForProfileAsync(recovery.Token)).Task.Unwrap();
-                        SettingsStore.SaveTranslationProfileSelection(previous);
+                        SaveControllerSettings(previous, profile: true);
+                        ApplyRetainedSessionEndpoints(previous);
                         await overlay.Dispatcher.InvokeAsync(() => overlay.ResumeProfileAsync(previous.Copy(), recovery.Token)).Task.Unwrap();
                     }
                     catch (Exception recoveryError)
@@ -669,8 +687,9 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
                 return;
             }
 
-            if (RuntimeProfiles.CanReuseIncomingModels(previous, settings, previousPlan, nextPlan))
+            if (reuseModels)
             {
+                ApplyRetainedSessionEndpoints(settings);
                 // A new application or a user-selected identity needs a fresh
                 // capture service so old audio, tracker state and person hints
                 // cannot cross the boundary. Its models need not be reloaded.
@@ -679,7 +698,7 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
                 {
                     await overlay.Dispatcher.InvokeAsync(() => overlay.PauseForProfileAsync(token)).Task.Unwrap();
                     token.ThrowIfCancellationRequested();
-                    SettingsStore.SaveTranslationProfileSelection(settings);
+                    SaveControllerSettings(settings, profile: true);
                     await overlay.Dispatcher.InvokeAsync(() => overlay.ResumeProfileAsync(settings.Copy(), token)).Task.Unwrap();
                     await overlay.Dispatcher.InvokeAsync(() => overlay.ProfileChangeRequested = profileCallback);
                     _incomingPlan = nextPlan; _incomingSettings = settings.Copy();
@@ -689,7 +708,7 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
                 }
                 catch (OperationCanceledException)
                 {
-                    SettingsStore.SaveTranslationProfileSelection(previous);
+                    SaveControllerSettings(previous, profile: true);
                     await StopIncomingCoreAsync(phases);
                     throw;
                 }
@@ -699,7 +718,8 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
                     {
                         using var recovery = new CancellationTokenSource(TimeSpan.FromSeconds(25));
                         await overlay.Dispatcher.InvokeAsync(() => overlay.PauseForProfileAsync(recovery.Token)).Task.Unwrap();
-                        SettingsStore.SaveTranslationProfileSelection(previous);
+                        SaveControllerSettings(previous, profile: true);
+                        ApplyRetainedSessionEndpoints(previous);
                         await overlay.Dispatcher.InvokeAsync(() => overlay.ResumeProfileAsync(previous.Copy(), recovery.Token)).Task.Unwrap();
                         _incomingPlan = previousPlan; _incomingSettings = previous.Copy();
                         NotifyState();
@@ -730,14 +750,14 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
                 {
                     await ReleaseTranslatorAsync(_incomingTranslatorPort, phases);
                     _incomingTranslatorPort = null; oldTranslatorReleased = true;
-                    _incomingTranslatorPort = await AcquireTranslatorAsync(nextPlan, token, phases);
+                    nextPlan = await AcquireTranslatorAsync(nextPlan, settings, incoming: true, token, phases);
+                    _incomingTranslatorPort = nextPlan.Managed ? nextPlan.Port : null;
                     nextTranslatorAcquired = true;
                 }
-                if (!IncomingRecognitionCatalog.UsesFireRed(settings))
-                    await RequireTcpPortFreeAsync(RuntimeProfiles.UsesGroups(settings) ? VibeVoiceRuntime.Port : 8081, token);
+                ApplyPlan(settings, nextPlan, incoming: true);
                 await StartIncomingSpeechCoreAsync(settings, registration, token, phases);
                 token.ThrowIfCancellationRequested();
-                SettingsStore.SaveTranslationProfileSelection(settings);
+                SaveControllerSettings(settings, profile: true);
                 await overlay.Dispatcher.InvokeAsync(() => overlay.ResumeProfileAsync(settings.Copy(), token)).Task.Unwrap();
                 await overlay.Dispatcher.InvokeAsync(() => overlay.ProfileChangeRequested = profileCallback);
                 _incomingPlan = nextPlan; _incomingSettings = settings.Copy();
@@ -752,7 +772,7 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
                 {
                     // Cancelling/closing must release the partially loaded new
                     // model, never start another GPU model as a side effect.
-                    SettingsStore.SaveTranslationProfileSelection(previous);
+                    SaveControllerSettings(previous, profile: true);
                     await StopIncomingCoreAsync(phases);
                     throw;
                 }
@@ -768,12 +788,14 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
                     RequirePreviousCleanup();
                     using var rollback = new CancellationTokenSource(TimeSpan.FromSeconds(150));
                     if (oldTranslatorReleased)
-                        _incomingTranslatorPort = await AcquireTranslatorAsync(previousPlan, rollback.Token, phases);
-                    if (!IncomingRecognitionCatalog.UsesFireRed(previous))
-                        await RequireTcpPortFreeAsync(RuntimeProfiles.UsesGroups(previous) ? VibeVoiceRuntime.Port : 8081, rollback.Token);
+                    {
+                        previousPlan = await AcquireTranslatorAsync(previousPlan, previous, incoming: true, rollback.Token, phases);
+                        _incomingTranslatorPort = previousPlan.Managed ? previousPlan.Port : null;
+                    }
+                    ApplyPlan(previous, previousPlan, incoming: true);
                     WslSpeechRegistration? previousRegistration = IncomingRecognitionCatalog.UsesNative(previous) ? null : RequireSpeechRegistration();
                     await StartIncomingSpeechCoreAsync(previous, previousRegistration, rollback.Token, phases);
-                    SettingsStore.SaveTranslationProfileSelection(previous);
+                    SaveControllerSettings(previous, profile: true);
                     await overlay.Dispatcher.InvokeAsync(() => overlay.ResumeProfileAsync(previous.Copy(), rollback.Token)).Task.Unwrap();
                     _incomingPlan = previousPlan; _incomingSettings = previous.Copy();
                     WatchActiveIncomingSpeech(); NotifyState();
@@ -901,7 +923,7 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
             foreach (OwnedSpeech speech in _pendingSpeechCleanup.Values.ToArray())
             {
                 if (speech.Owner == _ownSpeech?.Owner || speech.Owner == _incomingSpeech?.Owner) continue;
-                try { phases.Report(speech.Port == 8080 ? "Stopping your voice translator" : "Stopping subtitles", "Waiting for translation tools to stop safely."); await StopSpeechAsync(speech); }
+                try { phases.Report(speech.Incoming ? "Stopping subtitles" : "Stopping your voice translator", "Waiting for translation tools to stop safely."); await StopSpeechAsync(speech); }
                 catch (Exception error) { failures.Add(error); }
             }
             foreach (OwnedGroupSpeech groups in _pendingGroupCleanup.Values.ToArray())
@@ -916,7 +938,7 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
                 try { await CancelGroupPreparationAsync(preparation); }
                 catch (Exception error) { failures.Add(error); }
             foreach (var entry in _translators.ToArray())
-                try { phases.Report("Releasing translation models", "Waiting for translation tools to stop safely."); await entry.Value.Process.StopAsync(killTree: true); _translators.Remove(entry.Key); }
+                try { phases.Report("Releasing translation models", "Waiting for translation tools to stop safely."); await entry.Value.Process.StopAsync(killTree: true); _translators.Remove(entry.Key); ForgetTranslatorHealth(entry.Key); }
                 catch (Exception error) { failures.Add(error); }
             if (failures.Count > 0) throw new AggregateException("Some translation tools haven't finished stopping. Retry Quit to finish releasing them.", failures);
         }
@@ -930,13 +952,15 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         _ownRunning = false; _ownPlan = null; _ownSettings = null;
         // An explicit Stop discards pending sends. The separate ordinary VRC mute path can finish a captured sentence.
         var failures = new List<Exception>();
-        try { await StopOwnCaptureCoreAsync(); } catch (Exception error) { failures.Add(error); }
+        try { await StopOwnCaptureCoreAsync(); SettingsStore.ClearOwnRuntimeEndpoints(); } catch (Exception error) { failures.Add(error); }
         if (_ownSpeech is not null)
             try { await StopSpeechAsync(_ownSpeech); _ownSpeech = null; }
             catch (Exception error) { failures.Add(error); }
         if (_nativeOwnSpeech is not null)
-            try { await _nativeOwnSpeech.StopAsync(killTree: true); _nativeOwnSpeech = null; }
+            try { await _nativeOwnSpeech.StopAsync(killTree: true); _nativeOwnSpeech = null;
+                if (_ownSpeechPort is int port) ForgetHealth("windows-" + ManagedServiceKind.OwnSpeech + "-" + port); }
             catch (Exception error) { failures.Add(error); }
+        if (_nativeOwnSpeech is null && _ownSpeech is null) _ownSpeechPort = null;
         try { await ReleaseTranslatorAsync(_ownTranslatorPort, phases); _ownTranslatorPort = null; }
         catch (Exception error) { failures.Add(error); }
         if (changed) { Log("Your-voice translation stopped; only SayWhat?-owned processes were stopped."); NotifyState(); }
@@ -1045,7 +1069,7 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         if (_incomingSpeech is not null || _nativeIncomingSpeech is not null || _incomingGroupSpeech is not null)
             throw new InvalidOperationException("The previous subtitle speech engine has not stopped yet.");
         if (RuntimeProfiles.UsesGroups(settings))
-            _incomingGroupSpeech = await StartGroupsAsync(registration!, settings, token, phases);
+            _incomingGroupSpeech = await StartManagedGroupsAsync(registration!, settings, token, phases);
         else if (IncomingRecognitionCatalog.UsesFireRed(settings))
         {
             // The subtitle service owns this in-process recognizer and releases it
@@ -1055,12 +1079,16 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         else if (settings.IncomingSpeechEngine == "nemotron")
         {
             phases?.Report("Starting subtitle speech recognition", "Loading the selected Windows speech model.");
-            _nativeIncomingSpeech = StartOwned(new NativeSpeechProvisioner(_provisioner.DataRoot)
-                .BuildStartInfo(IncomingRecognitionCatalog.CreateNativeSettings(settings), 8081), "Subtitle Windows speech recognition");
-            await WaitHealthAsync(new Uri("http://127.0.0.1:8081/ready"), _nativeIncomingSpeech, TimeSpan.FromSeconds(120),
-                root => root.TryGetProperty("ready", out JsonElement ready) && ready.ValueKind == JsonValueKind.True, token);
+            var started = await StartManagedWindowsAsync(settings, ManagedServiceKind.IncomingSpeech,
+                port => new NativeSpeechProvisioner(_provisioner.DataRoot).BuildStartInfo(IncomingRecognitionCatalog.CreateNativeSettings(settings), port),
+                "Subtitle Windows speech recognition", port => LocalEndpoint(port) + "/ready",
+                root => root.TryGetProperty("ready", out JsonElement ready) && ready.ValueKind == JsonValueKind.True,
+                TimeSpan.FromSeconds(120),
+                (port, process) => { _nativeIncomingSpeech = process; _incomingSpeechPort = port; },
+                (_, process) => { if (ReferenceEquals(_nativeIncomingSpeech, process)) { _nativeIncomingSpeech = null; _incomingSpeechPort = null; } }, token);
+            settings.IncomingSpeechEndpoint = LocalEndpoint(started.Port);
         }
-        else _incomingSpeech = await StartSpeechAsync(registration!, 8081, token, phases);
+        else _incomingSpeech = await StartManagedVoxtralAsync(registration!, settings, incoming: true, token, phases);
     }
 
     private async Task StopIncomingSpeechCoreAsync()
@@ -1070,11 +1098,13 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
             try { await StopSpeechAsync(_incomingSpeech); _incomingSpeech = null; }
             catch (Exception error) { failures.Add(error); }
         if (_nativeIncomingSpeech is not null)
-            try { await _nativeIncomingSpeech.StopAsync(killTree: true); _nativeIncomingSpeech = null; }
+            try { await _nativeIncomingSpeech.StopAsync(killTree: true); _nativeIncomingSpeech = null;
+                if (_incomingSpeechPort is int port) ForgetHealth("windows-" + ManagedServiceKind.IncomingSpeech + "-" + port); }
             catch (Exception error) { failures.Add(error); }
         if (_incomingGroupSpeech is not null)
             try { await StopGroupsAsync(_incomingGroupSpeech); _incomingGroupSpeech = null; }
             catch (Exception error) { failures.Add(error); }
+        if (_incomingSpeech is null && _nativeIncomingSpeech is null && _incomingGroupSpeech is null) _incomingSpeechPort = null;
         if (failures.Count > 0) throw new AggregateException("Subtitle speech shutdown was not confirmed. Retry Stop all before starting another mode.", failures);
     }
 
@@ -1085,14 +1115,18 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         if (_incomingGroupSpeech is not null) WatchIncoming(_incomingGroupSpeech.Process);
     }
 
-    private async Task<OwnedGroupSpeech> StartGroupsAsync(WslSpeechRegistration registration, AppSettings settings,
-        CancellationToken token, RuntimePhaseProgress? phases)
+    private async Task<OwnedGroupSpeech> StartGroupsAsync(WslSpeechRegistration registration, AppSettings settings, int port,
+        CancellationToken token, RuntimePhaseProgress? phases, Action? ownershipObserved = null)
     {
         phases?.Report("Loading Groups speech model", "Loading the selected local speech model. Subtitles will resume when it is ready.");
         string owner = Guid.NewGuid().ToString("N");
+        int bindConflict = 0;
+        bool reportedOwnership = false;
         OwnedProcess process = StartOwned(VibeVoiceRuntime.BuildStartInfo(registration, _provisioner.DataRoot,
-            settings.VibeVoiceModelId, owner), "Groups speech");
-        var groups = new OwnedGroupSpeech(process, registration, owner, settings.VibeVoiceModelId);
+            settings.VibeVoiceModelId, owner, port), "Groups speech", (line, _) =>
+            { if (line == $"LOCALTALK_PORT_CONFLICT={owner}:{port}") Interlocked.Exchange(ref bindConflict, 1); });
+        var groups = new OwnedGroupSpeech(process, registration, owner, settings.VibeVoiceModelId, port);
+        TrackHealth("groups-" + owner, process, LocalEndpoint(port) + "/health");
         try
         {
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -1106,6 +1140,11 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
                 {
                     VibeVoiceHealth health = await VibeVoiceRuntime.ReadHealthAsync(_http, settings.VibeVoiceEndpoint,
                         owner, settings.VibeVoiceModelId, deadline.Token);
+                    if (!reportedOwnership)
+                    {
+                        reportedOwnership = true;
+                        ownershipObserved?.Invoke();
+                    }
                     if (health.Status == "error")
                         throw new InvalidOperationException("Groups speech could not load: " + (health.Error ?? "Unknown local model error."));
                     if (health.Ready && health.ActiveSessions == 0) return groups;
@@ -1117,8 +1156,11 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         }
         catch (Exception startupError)
         {
+            try { if (!process.IsAlive) await process.OutputDrained.WaitAsync(TimeSpan.FromSeconds(1)); } catch (TimeoutException) { }
             try { await StopGroupsAsync(groups); }
             catch (Exception cleanupError) { throw new AggregateException("Groups startup failed and model cleanup needs a retry.", startupError, cleanupError); }
+            if (Volatile.Read(ref bindConflict) != 0 && !token.IsCancellationRequested)
+                throw new ManagedPortConflictException("Groups speech recognition", port, startupError);
             if (startupError is OperationCanceledException && !token.IsCancellationRequested)
                 throw new TimeoutException("Groups speech did not become ready in time. Its owned startup process was stopped.", startupError);
             throw;
@@ -1132,7 +1174,7 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         Exception? failure = null;
         try
         {
-            stopper = StartOwned(VibeVoiceRuntime.BuildStopStartInfo(groups.Registration, groups.Owner), "Groups speech cleanup");
+            stopper = StartOwned(VibeVoiceRuntime.BuildStopStartInfo(groups.Registration, groups.Owner, groups.Port), "Groups speech cleanup");
             await stopper.Exited.WaitAsync(TimeSpan.FromSeconds(20));
             if (stopper.ExitCode is not 0)
                 throw new InvalidOperationException("Groups token-owned shutdown returned " + stopper.ExitCode + ".");
@@ -1146,6 +1188,7 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         if (failure is not null)
             throw new InvalidOperationException("Groups shutdown was not confirmed. Retry Stop all to finish releasing its speech model.", failure);
         _pendingGroupCleanup.Remove(groups.Owner);
+        ForgetHealth("groups-" + groups.Owner);
     }
 
     private async Task CancelGroupPreparationAsync(OwnedGroupPreparation preparation)
@@ -1181,44 +1224,40 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         _provisioner.BuildLlamaStartInfo(plan.RuntimeId, _provisioner.ResolveModelPath(plan.ModelId)!, plan.ModelAlias, plan.Port);
     }
 
-    private async Task<int?> AcquireTranslatorAsync(RuntimePlan plan, CancellationToken cancellationToken,
+    private async Task<RuntimePlan> AcquireTranslatorAsync(RuntimePlan plan, AppSettings settings, bool incoming, CancellationToken cancellationToken,
         RuntimePhaseProgress? phases = null)
     {
         if (!plan.Managed)
         {
             phases?.ReportModel("Checking translation tools", plan.ModelAlias);
             await RequireAdvancedTranslatorAsync(plan, cancellationToken);
-            return null; // Existing endpoint is not owned, never stopped or automatically loaded.
+            return plan; // Existing endpoint is not owned, never stopped or automatically loaded.
         }
-        if (_translators.TryGetValue(plan.Port, out TranslatorProcess? existing))
+        foreach (var entry in _translators)
         {
-            if (!existing.Process.IsAlive || existing.Key != plan.TranslationKey)
+            TranslatorProcess existing = entry.Value;
+            if (existing.Key != plan.TranslationKey) continue;
+            if (!existing.Process.IsAlive)
                 throw new InvalidOperationException("A running translator uses different settings or exited. Stop the active features before changing their model/runtime.");
             phases?.ReportModel("Checking the shared translation model", plan.ModelAlias);
-            await WaitTranslatorAsync(plan, existing.Process, TimeSpan.FromSeconds(5), cancellationToken);
+            RuntimePlan retained = AtSessionPort(plan, entry.Key);
+            await WaitTranslatorAsync(retained, existing.Process, TimeSpan.FromSeconds(5), cancellationToken);
             existing.Users++;
-            return plan.Port;
+            return retained;
         }
-        await RequireTcpPortFreeAsync(plan.Port, cancellationToken);
         string path = _provisioner.ResolveModelPath(plan.ModelId)!;
         phases?.ReportModel("Loading translation model", plan.ModelAlias);
-        var process = StartOwned(_provisioner.BuildLlamaStartInfo(plan.RuntimeId, path, plan.ModelAlias, plan.Port), "Local translator " + plan.Port);
-        var translator = new TranslatorProcess(process, plan.TranslationKey) { Users = 1 };
-        _translators.Add(plan.Port, translator);
-        try
-        {
-            await WaitTranslatorAsync(plan, process, TimeSpan.FromSeconds(90), cancellationToken);
-            _ = process.Exited.ContinueWith(_ => _ = HandleTranslatorExitAsync(plan.Port, process), TaskScheduler.Default);
-            Log($"Installed local translator ready on port {plan.Port}; model {plan.ModelId}. No external model manager was changed.");
-            return plan.Port;
-        }
-        catch
-        {
-            _translators.Remove(plan.Port);
-            phases?.Report("Releasing translation models", "Waiting for translation tools to stop safely.");
-            await process.StopAsync(killTree: true);
-            throw;
-        }
+        ManagedServiceKind service = incoming && !plan.Shared ? ManagedServiceKind.IncomingTranslation : ManagedServiceKind.OwnTranslation;
+        var started = await StartManagedWindowsAsync(settings, service,
+            port => _provisioner.BuildLlamaStartInfo(plan.RuntimeId, path, plan.ModelAlias, port), "Local translator",
+            port => LocalEndpoint(port) + "/v1/models", root => HasModel(root, plan.ModelAlias), TimeSpan.FromSeconds(90),
+            (port, process) => _translators.Add(port, new TranslatorProcess(process, plan.TranslationKey) { Users = 1 }),
+            (port, process) => { if (_translators.TryGetValue(port, out var owned) && ReferenceEquals(owned.Process, process)) _translators.Remove(port); },
+            cancellationToken);
+        RuntimePlan resolved = AtSessionPort(plan, started.Port);
+        _ = started.Process.Exited.ContinueWith(_ => _ = HandleTranslatorExitAsync(started.Port, started.Process), TaskScheduler.Default);
+        Log($"Installed local translator ready on port {started.Port}; model {plan.ModelId}. No external model manager was changed.");
+        return resolved;
     }
 
     private async Task ReleaseTranslatorAsync(int? port, RuntimePhaseProgress? phases = null)
@@ -1229,25 +1268,47 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         phases?.Report("Releasing translation models", "Waiting for translation tools to stop safely.");
         await translator.Process.StopAsync(killTree: true);
         _translators.Remove(port.Value);
+        ForgetHealth("windows-" + ManagedServiceKind.OwnTranslation + "-" + port.Value);
+        ForgetHealth("windows-" + ManagedServiceKind.IncomingTranslation + "-" + port.Value);
         Log($"Managed translator {port} unloaded because neither selected feature uses it. Existing external endpoints were not touched.");
     }
 
     private async Task<OwnedSpeech> StartSpeechAsync(WslSpeechRegistration registration, int port, CancellationToken cancellationToken,
-        RuntimePhaseProgress? phases = null)
+        RuntimePhaseProgress? phases = null, bool incoming = false, Action? ownershipObserved = null)
     {
         phases?.Report("Starting speech recognition", "Waiting for speech recognition to be ready.");
         string owner = Guid.NewGuid().ToString("N");
-        OwnedProcess wrapper = StartOwned(_provisioner.BuildWslSpeechStartInfo(registration, port, owner), "Realtime speech " + port);
-        var speech = new OwnedSpeech(wrapper, registration, port, owner);
+        var listenerProof = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int bindConflict = 0;
+        OwnedProcess wrapper = StartOwned(_provisioner.BuildWslSpeechStartInfo(registration, port, owner), "Realtime speech " + port,
+            (line, _) =>
+            {
+                if (line == $"SAYWHAT_OWNED_LISTENER {owner} {port}") listenerProof.TrySetResult();
+                else if (line == $"LOCALTALK_PORT_CONFLICT={owner}:{port}") Interlocked.Exchange(ref bindConflict, 1);
+            });
+        var speech = new OwnedSpeech(wrapper, registration, port, owner, incoming);
+        TrackHealth("wsl-" + owner, wrapper, LocalEndpoint(port) + "/health");
         try
         {
-            await WaitSpeechAsync(port, wrapper, cancellationToken);
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            deadline.CancelAfter(TimeSpan.FromSeconds(90));
+            Task first = await Task.WhenAny(listenerProof.Task, wrapper.Exited).WaitAsync(deadline.Token);
+            if (first != listenerProof.Task || !listenerProof.Task.IsCompletedSuccessfully)
+                throw new InvalidOperationException("The owned speech wrapper exited before confirming its own listener.");
+            ownershipObserved?.Invoke();
+            await WaitSpeechAsync(port, wrapper, deadline.Token);
             return speech;
         }
-        catch
+        catch (Exception startupError)
         {
-            phases?.Report(port == 8080 ? "Stopping your voice translator" : "Stopping subtitles", "Waiting for translation tools to stop safely.");
-            await StopSpeechAsync(speech); throw;
+            try { if (!wrapper.IsAlive) await wrapper.OutputDrained.WaitAsync(TimeSpan.FromSeconds(1)); } catch (TimeoutException) { }
+            phases?.Report(incoming ? "Stopping subtitles" : "Stopping your voice translator", "Waiting for translation tools to stop safely.");
+            await StopSpeechAsync(speech);
+            if (Volatile.Read(ref bindConflict) != 0 && !cancellationToken.IsCancellationRequested)
+                throw new ManagedPortConflictException(incoming ? "Subtitle speech recognition" : "Your voice recognition", port, startupError);
+            if (startupError is OperationCanceledException && !cancellationToken.IsCancellationRequested)
+                throw new TimeoutException("The owned speech recognizer did not become ready in time.", startupError);
+            throw;
         }
     }
 
@@ -1277,6 +1338,7 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
             throw new InvalidOperationException("Speech shutdown wasn't confirmed. Retry Quit to finish releasing the speech model.", failure);
         }
         _pendingSpeechCleanup.Remove(speech.Owner);
+        ForgetHealth("wsl-" + speech.Owner);
     }
 
     private async Task WaitSpeechAsync(int port, OwnedProcess process, CancellationToken cancellationToken)
@@ -1348,7 +1410,7 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
 
     private Task WaitTranslatorAsync(RuntimePlan plan, OwnedProcess process, TimeSpan timeout, CancellationToken cancellationToken) =>
         WaitHealthAsync(new Uri(plan.Endpoint.TrimEnd('/') + "/models"), process, timeout,
-            root => HasModel(root, plan.ModelAlias), cancellationToken);
+            root => HasModel(root, plan.ModelAlias), cancellationToken, requireOwnedListener: true);
 
     private async Task RequireAdvancedTranslatorAsync(RuntimePlan plan, CancellationToken cancellationToken)
     {
@@ -1417,7 +1479,8 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
     }
 
     private async Task WaitHealthAsync(Uri endpoint, OwnedProcess? process, TimeSpan timeout,
-        Func<JsonElement, bool> accepted, CancellationToken cancellationToken)
+        Func<JsonElement, bool> accepted, CancellationToken cancellationToken, bool requireOwnedListener = false,
+        Action? ownershipObserved = null)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeout);
@@ -1429,6 +1492,13 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
                 deadline.Token.ThrowIfCancellationRequested();
                 if (process is not null && !process.IsAlive)
                     throw new InvalidOperationException($"{process.Label} exited before it was ready (code {process.ExitCode}). Review Diagnostics for startup metadata.");
+                if (requireOwnedListener && (process is null || !ManagedPortAllocator.IsOwnedTcpListener(endpoint.Port, process.ProcessId)))
+                {
+                    last = "waiting for the exact owned process to bind";
+                    await Task.Delay(100, deadline.Token);
+                    continue;
+                }
+                if (requireOwnedListener) ownershipObserved?.Invoke();
                 using var request = CancellationTokenSource.CreateLinkedTokenSource(deadline.Token);
                 request.CancelAfter(TimeSpan.FromSeconds(2));
                 try
@@ -1439,7 +1509,8 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
                     {
                         await using Stream stream = await response.Content.ReadAsStreamAsync(request.Token);
                         using JsonDocument json = await JsonDocument.ParseAsync(stream, cancellationToken: request.Token);
-                        if (accepted(json.RootElement)) return;
+                        if (accepted(json.RootElement) && (!requireOwnedListener ||
+                            process is not null && process.IsAlive && ManagedPortAllocator.IsOwnedTcpListener(endpoint.Port, process.ProcessId))) return;
                         last = "endpoint responded but selected model/capacity is not ready";
                     }
                 }
@@ -1518,8 +1589,11 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         if (!LocalTalkProvisioner.RuntimeCatalog.Any(runtime => runtime.Id == settings.ManagedRuntimeId))
             throw new ArgumentException("Choose a local translation runtime from Setup first.");
         ValidateTranslationSelection(settings, model.ApiAlias, incoming, managed: true);
-        int port = incoming && !settings.ShareTranslationModel ? 1236 : 1235;
-        return new(true, port, settings.ManagedRuntimeId, model.Id, model.ApiAlias, $"http://127.0.0.1:{port}/v1", settings.ShareTranslationModel);
+        int port = incoming && !settings.ShareTranslationModel
+            ? settings.AutomaticManagedPorts ? 1236 : settings.IncomingTranslationPort
+            : settings.AutomaticManagedPorts ? 1235 : settings.OwnTranslationPort;
+        return new(true, port, settings.ManagedRuntimeId, model.Id, model.ApiAlias, $"http://127.0.0.1:{port}/v1", settings.ShareTranslationModel)
+            { ConfiguredPort = port, AutomaticPort = settings.AutomaticManagedPorts };
     }
 
     private static void ValidateTranslationSelection(AppSettings settings, string alias, bool incoming, bool managed)
@@ -1534,6 +1608,19 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
 
     private static void ApplyPlan(AppSettings settings, RuntimePlan plan, bool incoming)
     {
+        if (plan.Managed)
+        {
+            if (plan.Shared)
+            {
+                settings.OwnTranslationEndpoint = settings.IncomingTranslationEndpoint = plan.Endpoint;
+                settings.OwnTranslatorModel = settings.TranslatorModel = plan.ModelAlias;
+            }
+            else if (incoming) { settings.IncomingTranslationEndpoint = plan.Endpoint; settings.TranslatorModel = plan.ModelAlias; }
+            else { settings.OwnTranslationEndpoint = plan.Endpoint; settings.OwnTranslatorModel = plan.ModelAlias; }
+            return;
+        }
+        if (plan.Shared) settings.OwnTranslationEndpoint = settings.IncomingTranslationEndpoint = "";
+        else if (incoming) settings.IncomingTranslationEndpoint = ""; else settings.OwnTranslationEndpoint = "";
         if (plan.Shared)
         {
             settings.OwnTranslatorBaseUrl = settings.TranslatorBaseUrl = plan.Endpoint;
@@ -1573,7 +1660,8 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         {
             UseManagedTranslator = true, ShareTranslationModel = true,
             OwnManagedModelId = "qwen3-8b-q4_k_m", IncomingManagedModelId = "qwen3-4b-q4_k_m",
-            ManagedRuntimeId = "llama-vulkan", OwnVoiceTargetLanguage = "Chinese", IncomingTargetLanguage = "English"
+            ManagedRuntimeId = "llama-vulkan", OwnVoiceTargetLanguage = "Chinese", IncomingTargetLanguage = "English",
+            OwnTranslatorBaseUrl = "http://127.0.0.1:15000/v1", TranslatorBaseUrl = "http://127.0.0.1:15001/v1"
         };
         RuntimePlan own = BuildPlan(settings, false), incoming = BuildPlan(settings, true);
         Require(own.Port == 1235 && incoming.Port == 1235, "shared port");
@@ -1582,15 +1670,30 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         Require(own.ModelAlias == "qwen/qwen3-8b", "catalog API alias");
         Require(own.Endpoint == "http://127.0.0.1:1235/v1", "managed loopback endpoint");
         Require(settings.OwnVoiceTargetLanguage == "Chinese" && settings.IncomingTargetLanguage == "English", "targets unchanged by planning");
+        AppSettings shared = settings.Copy(); RuntimePlan sharedSession = AtSessionPort(own, 50500);
+        ApplyPlan(shared, sharedSession, incoming: false);
+        Require(shared.OwnTranslationEndpoint == sharedSession.Endpoint && shared.IncomingTranslationEndpoint == sharedSession.Endpoint &&
+            shared.OwnTranslatorModel == own.ModelAlias && shared.TranslatorModel == own.ModelAlias,
+            "a managed shared session supplies the same resolved endpoint and model to both directions");
+        Require(shared.OwnTranslatorBaseUrl == settings.OwnTranslatorBaseUrl && shared.TranslatorBaseUrl == settings.TranslatorBaseUrl,
+            "managed shared selection preserves both configured external server URLs");
         settings.ShareTranslationModel = false;
         own = BuildPlan(settings, false); incoming = BuildPlan(settings, true);
         Require(own.Port == 1235 && incoming.Port == 1236, "separate ports");
         Require(own.TranslationKey != incoming.TranslationKey, "separate residency keys");
         Require(incoming.ModelAlias == "qwen/qwen3-4b", "independent incoming model");
-        AppSettings changed = settings.Copy(); ApplyPlan(changed, incoming, true);
-        Require(changed.TranslatorBaseUrl == incoming.Endpoint && changed.OwnTranslatorBaseUrl == settings.OwnTranslatorBaseUrl, "incoming plan leaves own endpoint unchanged");
-        changed = settings.Copy(); ApplyPlan(changed, own, false);
-        Require(changed.OwnTranslatorBaseUrl == own.Endpoint && changed.TranslatorBaseUrl == settings.TranslatorBaseUrl, "own plan leaves incoming endpoint unchanged");
+        AppSettings changed = settings.Copy(); changed.OwnTranslationEndpoint = "http://127.0.0.1:14100/v1";
+        RuntimePlan incomingSession = AtSessionPort(incoming, 50501); ApplyPlan(changed, incomingSession, true);
+        Require(changed.IncomingTranslationEndpoint == incomingSession.Endpoint && changed.OwnTranslationEndpoint == "http://127.0.0.1:14100/v1" &&
+            changed.TranslatorBaseUrl == settings.TranslatorBaseUrl && changed.OwnTranslatorBaseUrl == settings.OwnTranslatorBaseUrl &&
+            changed.TranslatorModel == incoming.ModelAlias && changed.OwnTranslatorModel == settings.OwnTranslatorModel,
+            "incoming session updates only its runtime endpoint and alias, preserving own runtime and configured external URLs");
+        changed = settings.Copy(); changed.IncomingTranslationEndpoint = "http://127.0.0.1:14101/v1";
+        RuntimePlan ownSession = AtSessionPort(own, 50502); ApplyPlan(changed, ownSession, false);
+        Require(changed.OwnTranslationEndpoint == ownSession.Endpoint && changed.IncomingTranslationEndpoint == "http://127.0.0.1:14101/v1" &&
+            changed.OwnTranslatorBaseUrl == settings.OwnTranslatorBaseUrl && changed.TranslatorBaseUrl == settings.TranslatorBaseUrl &&
+            changed.OwnTranslatorModel == own.ModelAlias && changed.TranslatorModel == settings.TranslatorModel,
+            "own session updates only its runtime endpoint and alias, preserving incoming runtime and configured external URLs");
         settings.UseManagedTranslator = false;
         settings.OwnTranslatorBaseUrl = "http://localhost:1234/v1";
         settings.TranslatorBaseUrl = "http://127.0.0.1:5000/v1";
@@ -1697,19 +1800,6 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         Directory.CreateDirectory(AppPaths.Root);
         return new OwnedProcess(info, label, output);
     }
-    private static async Task RequireTcpPortFreeAsync(int port, CancellationToken cancellationToken)
-    {
-        using var client = new TcpClient();
-        using var probe = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        probe.CancelAfter(500);
-        try
-        {
-            await client.ConnectAsync(IPAddress.Loopback, port, probe.Token);
-            throw new InvalidOperationException($"Local port {port} is already in use. Stop that existing tool yourself or use its advanced endpoint. SayWhat? will not stop or adopt a process merely because it uses this port.");
-        }
-        catch (SocketException) { }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { }
-    }
     private static void RequireUdpPortFree(int port)
     {
         try { using var socket = new UdpClient(new IPEndPoint(IPAddress.Loopback, port)); }
@@ -1805,6 +1895,7 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
             foreach (OwnedGroupPreparation preparation in _pendingGroupPreparationCleanup.Values.ToArray()) await CancelGroupPreparationAsync(preparation);
             foreach (TranslatorProcess translator in _translators.Values.ToArray()) await translator.Process.StopAsync(killTree: true);
             _translators.Clear();
+            _sessionHealth.Clear();
             _http.Dispose();
             _disposed = true;
         }
@@ -1815,10 +1906,12 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
     internal sealed record RuntimePlan(bool Managed, int Port, string RuntimeId, string ModelId,
         string ModelAlias, string Endpoint, bool Shared)
     {
-        public string TranslationKey => Managed ? $"{Port}|{RuntimeId}|{ModelId}|{ModelAlias}" : $"external|{Endpoint}|{ModelAlias}";
+        internal int ConfiguredPort { get; init; }
+        internal bool AutomaticPort { get; init; }
+        public string TranslationKey => Managed ? $"{(AutomaticPort ? "auto" : "fixed")}|{(ConfiguredPort > 0 ? ConfiguredPort : Port)}|{RuntimeId}|{ModelId}|{ModelAlias}" : $"external|{Endpoint}|{ModelAlias}";
     }
-    private sealed record OwnedSpeech(OwnedProcess Process, WslSpeechRegistration Registration, int Port, string Owner);
-    private sealed record OwnedGroupSpeech(OwnedProcess Process, WslSpeechRegistration Registration, string Owner, string ModelId);
+    private sealed record OwnedSpeech(OwnedProcess Process, WslSpeechRegistration Registration, int Port, string Owner, bool Incoming);
+    private sealed record OwnedGroupSpeech(OwnedProcess Process, WslSpeechRegistration Registration, string Owner, string ModelId, int Port);
     private sealed record OwnedGroupPreparation(OwnedProcess Process, WslSpeechRegistration Registration, string Owner);
     private sealed class TranslatorProcess(OwnedProcess process, string key)
     {
@@ -1836,6 +1929,7 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         private long _stdoutLines, _stderrLines;
         private bool _disposed;
         public string Label { get; }
+        public int ProcessId => _process.Id;
         public bool StopRequested { get; private set; }
         public Task Exited { get; }
         public Task OutputDrained => Task.WhenAll(_stdout, _stderr);

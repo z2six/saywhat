@@ -70,6 +70,27 @@ internal static class UiText
         var values = new Dictionary<string, string[]>(StringComparer.Ordinal);
         void Add(string english, string chinese, string japanese, string korean) => values.Add(english, [chinese, japanese, korean]);
 
+        Add("Connection settings", "连接设置", "接続設定", "연결 설정");
+        Add("Your voice recognition", "我的语音识别", "自分の声の認識", "내 음성 인식");
+        Add("Subtitle speech recognition", "字幕语音识别", "字幕の音声認識", "자막 음성 인식");
+        Add("Your voice translator", "我的语音翻译器", "自分の声の翻訳", "내 음성 번역기");
+        Add("Subtitle translator", "字幕翻译器", "字幕の翻訳", "자막 번역기");
+        Add("Groups speech recognition", "群组语音识别", "グループの音声認識", "그룹 음성 인식");
+        Add("Windows couldn't reserve a local connection for {0}. Try again or open Troubleshooting.", "Windows 无法为{0}预留本地连接。请重试或打开“故障排查”。", "Windowsが「{0}」のローカル接続を確保できませんでした。もう一度試すか、トラブルシューティングを開いてください。", "Windows에서 {0}의 로컬 연결을 확보하지 못했습니다. 다시 시도하거나 문제 해결을 여세요.");
+        Add("{0} couldn't use local port {1}. Another app or Windows may be using it. Choose Automatic in Connection settings, or select another port.", "{0}无法使用本地端口 {1}。其他应用或 Windows 可能正在使用它。请在“连接设置”中选择自动，或选择其他端口。", "「{0}」がローカルポート{1}を使えませんでした。ほかのアプリやWindowsが使用している可能性があります。接続設定で自動を選ぶか、別のポートを指定してください。", "{0}에서 로컬 포트 {1}을 사용할 수 없습니다. 다른 앱이나 Windows에서 사용 중일 수 있습니다. 연결 설정에서 자동을 선택하거나 다른 포트를 지정하세요.");
+        Add("Choose a local port from {0} to {1} for {2}, or turn on Automatic in Connection settings.", "请为{2}选择 {0} 到 {1} 之间的本地端口，或在“连接设置”中启用自动。", "「{2}」のローカルポートを{0}から{1}の範囲で指定するか、接続設定で自動を有効にしてください。", "{2}의 로컬 포트를 {0}~{1} 범위에서 선택하거나 연결 설정에서 자동을 켜세요.");
+        Add("{0} and {1} use the same local port {2}. Choose different ports, or turn on Automatic in Connection settings.", "{0}和{1}使用相同的本地端口 {2}。请选择不同的端口，或在“连接设置”中启用自动。", "「{0}」と「{1}」が同じローカルポート{2}を使っています。異なるポートを指定するか、接続設定で自動を有効にしてください。", "{0}과(와) {1}에서 같은 로컬 포트 {2}을(를) 사용합니다. 서로 다른 포트를 선택하거나 연결 설정에서 자동을 켜세요.");
+        Add("Automatic connections avoid conflicts with other apps. VRChat OSC addresses and existing external translators keep their configured connections.", "自动连接可避免与其他应用冲突。VRChat OSC 地址和现有外部翻译器仍使用各自配置的连接。", "自動接続でほかのアプリとの競合を避けます。VRChat OSCと既存の外部翻訳アプリの接続設定は維持されます。", "자동 연결로 다른 앱과의 충돌을 방지합니다. VRChat OSC와 기존 외부 번역기의 연결 설정은 유지됩니다.");
+        Add("Choose local ports automatically (recommended)", "自动选择本地端口（推荐）", "ローカルポートを自動で選ぶ（推奨）", "로컬 포트 자동 선택(권장)");
+        Add("Your voice recognition port", "我的语音识别端口", "自分の声の認識ポート", "내 음성 인식 포트");
+        Add("Subtitle speech recognition port", "字幕语音识别端口", "字幕の音声認識ポート", "자막 음성 인식 포트");
+        Add("Your voice translator port", "我的语音翻译端口", "自分の声の翻訳ポート", "내 음성 번역 포트");
+        Add("Separate subtitle translator port", "独立字幕翻译端口", "字幕専用の翻訳ポート", "별도 자막 번역 포트");
+        Add("Groups recognition port", "群组识别端口", "グループ認識ポート", "그룹 인식 포트");
+        Add("Fixed ports must be different and between 1024 and 65535. Save all applies changes to running translation tools.", "固定端口必须互不相同，且在 1024 至 65535 之间。点击“全部保存”将更改应用于正在运行的翻译工具。", "固定ポートは1024～65535の範囲で別々の番号にしてください。「すべて保存」で実行中の翻訳ツールに変更を適用します。", "고정 포트는 1024~65535 사이에서 서로 달라야 합니다. 모두 저장을 누르면 실행 중인 번역 도구에 적용됩니다.");
+        Add("Active local connections", "当前本地连接", "使用中のローカル接続", "활성 로컬 연결");
+        Add("No translation tools are running.", "没有正在运行的翻译工具。", "翻訳ツールは実行されていません。", "실행 중인 번역 도구가 없습니다.");
+
         // Navigation, short controls and accessible labels. Internal navigation keys remain English.
         Add("Subtitle appearance", "字幕外观", "字幕の表示", "자막 모양");
         Add("Visible messages", "显示消息数", "表示するメッセージ数", "표시할 메시지 수");

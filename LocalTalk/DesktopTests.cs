@@ -47,8 +47,11 @@ internal static class DesktopTests
                 SettingsStore.Save(unchanged);
                 Require(true,"Starting a second feature can save identical settings with the first host reading them");
             }
+            checks+=SessionEndpointTests.Run(window);
             checks+=RuntimeController.RunOfflineSelfTests();
+            checks+=RuntimeController.RunManagedPortWiringOfflineChecks();
             checks+=RuntimeController.RunVoiceFirstOfflineChecks();
+            checks+=Task.Run(() => ManagedServicePortTests.RunAsync()).GetAwaiter().GetResult();
             checks+=NativeSpeechProvisionerTests.Run();
             checks+=FireRedSpeechTests.Run();
             checks+=RecognitionTextFilterTests.Run();

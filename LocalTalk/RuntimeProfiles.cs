@@ -38,6 +38,8 @@ internal static class RuntimeProfiles
 
     internal static bool SameIncomingSpeech(AppSettings previous, AppSettings next) =>
         previous.IncomingSpeechEngine == next.IncomingSpeechEngine &&
+        previous.AutomaticManagedPorts == next.AutomaticManagedPorts &&
+        (next.AutomaticManagedPorts || (UsesGroups(next) ? previous.GroupsSpeechPort == next.GroupsSpeechPort : previous.IncomingSpeechPort == next.IncomingSpeechPort)) &&
         (!UsesGroups(next) || previous.VibeVoiceModelId == next.VibeVoiceModelId &&
             string.Equals(previous.VibeVoiceEndpoint, next.VibeVoiceEndpoint, StringComparison.OrdinalIgnoreCase));
 

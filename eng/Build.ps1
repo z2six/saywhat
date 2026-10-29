@@ -188,6 +188,12 @@ try {
             }
             Get-Content -LiteralPath $resultFile
             Invoke-OwnedTest (Join-Path $hostOutput 'FoxTrans.LocalHost.exe') @('--self-test', '--root', $hostReport)
+            # Process/socket handoff fixtures are a separate developer executable,
+            # never compiled into or copied beside the distributed application.
+            $portTestOutput = Join-Path $managedOutput 'managed-port-tests'
+            Invoke-BuildTool $dotnet @('build', (Join-Path $repoRoot 'Packaging\ManagedPortTests\ManagedPortTests.csproj'),
+                '-c', $Configuration, '-r', 'win-x64', '-p:SelfContained=false', '-p:UseSharedCompilation=false', '-m:1', '-o', $portTestOutput)
+            Invoke-OwnedTest (Join-Path $portTestOutput 'LocalTalk.exe') @($appOutput, (Join-Path $testRoot 'managed-port-readiness'))
             $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
             Invoke-BuildTool $windowsPowerShell @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
                 (Join-Path $repoRoot 'Packaging\Test-VRChatMuteSync-Discovery.ps1'))

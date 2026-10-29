@@ -135,8 +135,9 @@ internal sealed partial class SubtitleWindow : Window
         RefreshSpeakerNames(await (_service is ISpeakerFeedbackHost host ? host.GetSpeakerFeedbackStateAsync(token) : Task.FromResult(new SpeakerFeedbackState(Array.Empty<SpeakerPerson>(), false))));
     }
 
-    public SubtitleWindow()
+    public SubtitleWindow(AppSettings? initialSettings = null)
     {
+        if (initialSettings is not null) _settings = initialSettings.Copy();
         AppearanceTheme.Apply(_settings); ThemeBackground.Apply(_settings);
         Title = AppBrand.DisplayName + " · Subtitles"; Icon = WindowIconProvider?.Invoke();
         FontFamily = ConversationFont; UseLayoutRounding = true; SnapsToDevicePixels = true;
@@ -604,7 +605,7 @@ internal sealed partial class SubtitleWindow : Window
             try
             {
                 await ApplySpeakerRecognitionAsync(settings.UseAiSpeakerRecognition, _shutdown.Token);
-                _settings = settings.Copy();
+                _settings = SessionEndpoints.PreserveRuntime(_settings, settings);
                 ApplyAlwaysOnTop(settings.SubtitlesAlwaysOnTop);
                 _service?.UpdateSettings(settings);
                 RenderHistory();
@@ -930,7 +931,7 @@ internal readonly record struct TranslationDisplay(string Speaker, string Source
 
 internal sealed partial class IncomingTranslationService : IDisposable, ISpeakerFeedbackHost
 {
-    private const string VoxtralSocket = "ws://127.0.0.1:8081/v1/realtime/transcription";
+    private Uri VoxtralSocket => SessionEndpoints.SpeechUri(CurrentSettings(), "/v1/realtime/transcription", socket: true);
     private const int AudioChunkBytes = 2560;
     private static readonly string LogPath = Path.Combine(AppPaths.Root,"incoming-translator.log");
     private readonly Func<string, bool, Task> _status;
@@ -1088,7 +1089,7 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
         AppSettings previous = CurrentSettings();
         lock (_settingsGate)
         {
-            AppSettings next = settings.Copy();
+            AppSettings next = SessionEndpoints.PreserveRuntime(_settings, settings);
             // Model admission/unload needs an awaited acknowledgement. Generic options updates
             // cannot silently re-enable it or strand an extractor after switching a checkbox off.
             next.UseAiSpeakerRecognition = _settings.UseAiSpeakerRecognition;
@@ -1551,7 +1552,7 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
         });
         string created = await AwaitSessionCreatedAsync(async handshakeToken =>
         {
-            await socket.ConnectAsync(new Uri(VoxtralSocket), handshakeToken);
+            await socket.ConnectAsync(VoxtralSocket, handshakeToken);
             await socket.SendAsync(configure, WebSocketMessageType.Text, true, handshakeToken);
             return await ReceiveTextAsync(socket, handshakeToken);
         }, TimeSpan.FromSeconds(5), sessionCancellation.Token);
@@ -1890,7 +1891,7 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
         {
             using var probeCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             probeCancellation.CancelAfter(TimeSpan.FromSeconds(2));
-            using HttpResponseMessage response = await _http.GetAsync("http://127.0.0.1:8081/health", probeCancellation.Token);
+            using HttpResponseMessage response = await _http.GetAsync(SessionEndpoints.SpeechUri(CurrentSettings(), "/health"), probeCancellation.Token);
             response.EnsureSuccessStatusCode();
             using JsonDocument document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(probeCancellation.Token), cancellationToken: probeCancellation.Token);
             JsonElement health = document.RootElement;
@@ -2245,7 +2246,7 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
         object payload = IncomingTranslationPayload(source, prompt, settings, maxTokens, strictRetry);
         using var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         requestCancellation.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
-        string endpoint = settings.TranslatorBaseUrl.TrimEnd('/') + "/chat/completions";
+        string endpoint = SessionEndpoints.IncomingTranslation(settings) + "/chat/completions";
         using HttpResponseMessage response = await _http.PostAsJsonAsync(endpoint, payload, requestCancellation.Token);
         string body = await response.Content.ReadAsStringAsync(requestCancellation.Token);
         if (!response.IsSuccessStatusCode)

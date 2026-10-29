@@ -271,13 +271,13 @@ internal sealed class LocalTalkProvisioner : IDisposable
 
     public ProcessStartInfo BuildLlamaStartInfo(string runtimeId, string modelPath, string apiAlias, int port = 1235)
     {
-        if (port is not 1235 and not 1236) throw new ArgumentOutOfRangeException(nameof(port), "Managed translators use ports 1235 and 1236.");
+        if (port is < 1024 or > 65535) throw new ArgumentOutOfRangeException(nameof(port), "Managed service ports must be between 1024 and 65535.");
         string executable = FindRuntimeExecutable(runtimeId) ?? throw new FileNotFoundException("Install the selected local runtime first.");
         modelPath = Path.GetFullPath(modelPath);
         if (!File.Exists(modelPath)) throw new FileNotFoundException("The selected GGUF model is missing.", modelPath);
         if (string.IsNullOrWhiteSpace(apiAlias)) throw new ArgumentException("Enter a model API alias.", nameof(apiAlias));
         var info = NewProcess(executable);
-        string[] args = { "--model", modelPath, "--alias", apiAlias, "--host", "127.0.0.1", "--port", port.ToString(),
+        string[] args = { "--model", modelPath, "--alias", apiAlias, "--host", "127.0.0.1", "--port", port.ToString(System.Globalization.CultureInfo.InvariantCulture),
             "--ctx-size", TranslationModelPrompts.IsTranslateGemma(apiAlias) ? "2048" : "4096", "--parallel", "1", "--batch-size", "128", "--ubatch-size", "64",
             "--threads", "4", "--threads-batch", "4", "--n-gpu-layers", runtimeId == "llama-cpu" ? "0" : "99",
             "--flash-attn", "auto", "--jinja", "--reasoning", "off" };
@@ -345,9 +345,9 @@ internal sealed class LocalTalkProvisioner : IDisposable
         ValidateLinuxPath(speech.ModelPath);
         ValidateBackend(speech.Backend);
         ValidateOwner(ownerGuid);
-        if (port is not 8080 and not 8081) throw new ArgumentOutOfRangeException(nameof(port));
+        if (port is < 1024 or > 65535) throw new ArgumentOutOfRangeException(nameof(port));
         var info = WithUser(WslCommand(speech.Distribution, "/bin/bash", WindowsPathToWsl(BundledScript("run-voxtral.sh")),
-            speech.ServerPath, speech.ModelPath, speech.Backend, port.ToString(), ownerGuid), speech.RunAsRoot);
+            speech.ServerPath, speech.ModelPath, speech.Backend, port.ToString(System.Globalization.CultureInfo.InvariantCulture), ownerGuid), speech.RunAsRoot);
         // Migration occurs only when the user has already requested speech to
         // start. Idle app startup never opens WSL or loads an inference model.
         if (IsManagedSpeechRegistration(speech)) info.ArgumentList.Add("--hide-desktop-integration");
@@ -363,9 +363,9 @@ internal sealed class LocalTalkProvisioner : IDisposable
         ValidateDistribution(speech.Distribution);
         ValidateLinuxPath(speech.ServerPath);
         ValidateOwner(ownerGuid);
-        if (port is not 8080 and not 8081) throw new ArgumentOutOfRangeException(nameof(port));
+        if (port is < 1024 or > 65535) throw new ArgumentOutOfRangeException(nameof(port));
         return WithUser(WslCommand(speech.Distribution, "/bin/bash", WindowsPathToWsl(BundledScript("stop-voxtral.sh")),
-            speech.ServerPath, port.ToString(), ownerGuid), speech.RunAsRoot);
+            speech.ServerPath, port.ToString(System.Globalization.CultureInfo.InvariantCulture), ownerGuid), speech.RunAsRoot);
     }
 
     public async Task<WslSpeechRegistration> BootstrapWslSpeechAsync(string distribution, string backend,

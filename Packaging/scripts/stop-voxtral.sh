@@ -4,7 +4,7 @@ server=${1:?server path required}
 port=${2:?port required}
 owner=${3:?owned GUID required}
 [[ "$owner" =~ ^[a-f0-9]{32}$ ]] || exit 2
-case "$port" in 8080|8081) ;; *) exit 2 ;; esac
+[[ "$port" =~ ^[1-9][0-9]{3,4}$ ]] && (( 10#$port >= 1024 && 10#$port <= 65535 )) || exit 2
 pidfile="${XDG_DATA_HOME:-$HOME/.local/share}/localtalk/pids/voxtral-$port-$owner.pid"
 [[ -f "$pidfile" ]] || exit 0
 pid=$(head -n 1 "$pidfile")

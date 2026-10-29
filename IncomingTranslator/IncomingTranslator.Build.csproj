@@ -15,6 +15,7 @@
     <Compile Include="../FoxTransSource/FoxTrans/Providers/TranslationModelCapabilities.cs" Link="Core/TranslationModelCapabilities.cs" />
     <Compile Include="../FoxTransSource/FoxTrans/Providers/RecognitionTextFilter.cs" Link="Core/RecognitionTextFilter.cs" />
     <Compile Include="AppSettings.cs" />
+    <Compile Include="SessionEndpoints.cs" />
     <Compile Include="TranslationProfiles.cs" />
     <Compile Include="IncomingPipelineProfiles.cs" />
     <Compile Include="IncomingSpeakerReviews.cs" />
@@ -27,6 +28,7 @@
     <Compile Include="AudioRouting.cs" />
     <Compile Include="IncomingSourceFilter.cs" />
     <Compile Include="IncomingSourceFiltering.cs" />
+    <Compile Include="ManagedServicePorts.cs" />
     <Compile Include="ProcessLoopbackCapture.cs" />
     <Compile Include="IncomingCaptureCapabilities.cs" />
     <Compile Include="LocalModelManager.cs" />

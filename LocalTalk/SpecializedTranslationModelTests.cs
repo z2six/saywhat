@@ -73,6 +73,19 @@ internal static class SpecializedTranslationModelTests
             Require(other[Array.IndexOf(other, "--ctx-size") + 1] == "4096" && !other.Contains("--chat-template-file"),
                 "other models retain existing context and embedded chat template");
         }
+        foreach (int port in new[] { 1024, 25347, 65535 })
+        {
+            string[] selected = provisioner.BuildLlamaStartInfo(runtime.Id, modelPath, liquid.ApiAlias, port).ArgumentList.ToArray();
+            Require(selected[Array.IndexOf(selected, "--port") + 1] == port.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                "managed translator accepts a selected safe port without loading a model");
+        }
+        foreach (int port in new[] { -1, 0, 1023, 65536, int.MaxValue })
+        {
+            bool refused = false;
+            try { provisioner.BuildLlamaStartInfo(runtime.Id, modelPath, liquid.ApiAlias, port); }
+            catch (ArgumentOutOfRangeException) { refused = true; }
+            Require(refused, "managed translator rejects unsafe ports before runtime construction");
+        }
         Console.WriteLine($"PASS: {checks} specialized desktop model catalog, incoming adapter and inert launch checks; no model loaded or process started.");
         return checks;
     }

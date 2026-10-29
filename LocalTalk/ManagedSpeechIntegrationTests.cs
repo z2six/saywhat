@@ -43,6 +43,26 @@ internal static class ManagedSpeechIntegrationTests
                 owned with { RunAsRoot = false }, owned with { ServerPath = "/opt/user/voxtral-server" } })
                 Check(!provisioner.BuildWslSpeechStartInfo(imported, 8080, "0123456789abcdef0123456789abcdef").ArgumentList.Contains("--hide-desktop-integration"),
                     "imported or non-owned speech starts never modify desktop metadata");
+            foreach (int port in new[] { 1024, 25347, 65535 })
+            {
+                string expected = port.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                Check(provisioner.BuildWslSpeechStartInfo(owned, port, "0123456789abcdef0123456789abcdef").ArgumentList.Contains(expected),
+                    "WSL start passes a safe selected port without shell interpolation");
+                Check(provisioner.BuildWslSpeechStopInfo(owned, port, "0123456789abcdef0123456789abcdef").ArgumentList.TakeLast(2)
+                    .SequenceEqual(new[] { expected, "0123456789abcdef0123456789abcdef" }),
+                    "WSL cleanup retains the exact selected port and owner token");
+            }
+            foreach (int port in new[] { -1, 0, 1023, 65536, int.MaxValue })
+            {
+                foreach (Action construct in new Action[] {
+                    () => provisioner.BuildWslSpeechStartInfo(owned, port, "0123456789abcdef0123456789abcdef"),
+                    () => provisioner.BuildWslSpeechStopInfo(owned, port, "0123456789abcdef0123456789abcdef") })
+                {
+                    bool refused = false;
+                    try { construct(); } catch (ArgumentOutOfRangeException) { refused = true; }
+                    Check(refused, "invalid WSL start/stop ports fail before any process or filesystem work");
+                }
+            }
             Check(!Directory.Exists(provisioner.DataRoot), "start-info construction starts no processes or filesystem changes");
         }
 

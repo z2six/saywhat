@@ -2,9 +2,11 @@
 # Stop only the process whose token, executable, birth time and command match.
 set -euo pipefail
 owner=${1:?owned GUID required}
+port=${2:-8082}
 [[ "$owner" =~ ^[a-f0-9]{32}$ ]] || exit 2
+[[ "$port" =~ ^[1-9][0-9]{3,4}$ ]] && (( 10#$port >= 1024 && 10#$port <= 65535 )) || exit 2
 scriptroot=$(cd -- "$(dirname -- "$0")" && pwd -P)
-pidfile="${XDG_DATA_HOME:-$HOME/.local/share}/saywhat/pids/vibevoice-8082-$owner.pid"
+pidfile="${XDG_DATA_HOME:-$HOME/.local/share}/saywhat/pids/vibevoice-$port-$owner.pid"
 [[ -f "$pidfile" ]] || exit 0
 pid=$(head -n 1 "$pidfile")
 birth=$(sed -n '2p' "$pidfile")
@@ -17,9 +19,9 @@ matches() {
     [[ $(awk '{print $22}' "/proc/$pid/stat" 2>/dev/null) == "$birth" ]] &&
     [[ $(readlink -f "/proc/$pid/exe" 2>/dev/null) == $(readlink -f "$runtime/venv/bin/python") ]] &&
     [[ $(sed -n '4p' "$pidfile") == "$scriptroot/server.py" ]] &&
-    tr '\0' '\n' < "/proc/$pid/cmdline" | awk -v owner="$owner" -v script="$scriptroot/server.py" '
+    tr '\0' '\n' < "/proc/$pid/cmdline" | awk -v owner="$owner" -v port="$port" -v script="$scriptroot/server.py" '
         $0 == script { script_found=1 } previous == "--owner" && $0 == owner { owner_found=1 }
-        previous == "--port" && $0 == "8082" { port_found=1 } { previous=$0 }
+        previous == "--port" && $0 == port { port_found=1 } { previous=$0 }
         END { exit !(script_found && owner_found && port_found) }'
 }
 if ! running; then rm -- "$pidfile"; exit 0; fi

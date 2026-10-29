@@ -9,7 +9,7 @@
     <AssemblyName>SayWhat</AssemblyName>
     <StartupObject>IncomingTranslator.LocalTalkEntry</StartupObject>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <Version>0.2.10</Version>
+    <Version>0.2.11</Version>
     <ApplicationIcon>Assets/SayWhat.ico</ApplicationIcon>
     <Product>SayWhat?</Product>
     <Title>SayWhat?</Title>
@@ -25,6 +25,7 @@
     <Compile Include="../FoxTransSource/FoxTrans/Providers/TranslationModelCapabilities.cs" Link="Core/TranslationModelCapabilities.cs" />
     <Compile Include="../FoxTransSource/FoxTrans/Providers/RecognitionTextFilter.cs" Link="Core/RecognitionTextFilter.cs" />
     <Compile Include="../IncomingTranslator/AppSettings.cs" Link="Core/AppSettings.cs" />
+    <Compile Include="../IncomingTranslator/SessionEndpoints.cs" Link="Core/SessionEndpoints.cs" />
     <Compile Include="../IncomingTranslator/TranslationProfiles.cs" Link="Core/TranslationProfiles.cs" />
     <Compile Include="../IncomingTranslator/IncomingPipelineProfiles.cs" Link="Core/IncomingPipelineProfiles.cs" />
     <Compile Include="../IncomingTranslator/IncomingRecognitionCatalog.cs" Link="Core/IncomingRecognitionCatalog.cs" />
@@ -41,6 +42,7 @@
     <Compile Include="../IncomingTranslator/IncomingListening.cs" Link="Core/IncomingListening.cs" />
     <Compile Include="../IncomingTranslator/IncomingSourceFilter.cs" Link="Core/IncomingSourceFilter.cs" />
     <Compile Include="../IncomingTranslator/IncomingSourceFiltering.cs" Link="Core/IncomingSourceFiltering.cs" />
+    <Compile Include="../IncomingTranslator/ManagedServicePorts.cs" Link="Core/ManagedServicePorts.cs" />
     <Compile Include="../IncomingTranslator/IncomingCaptureCapabilities.cs" Link="Core/IncomingCaptureCapabilities.cs" />
     <Compile Include="../IncomingTranslator/IncomingListeningPipeline.cs" Link="Core/IncomingListeningPipeline.cs" />
     <Compile Include="../IncomingTranslator/IncomingListeningTests.cs" Link="Tests/IncomingListeningTests.cs" />

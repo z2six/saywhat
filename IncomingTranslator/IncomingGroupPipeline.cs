@@ -27,12 +27,12 @@ internal sealed partial class IncomingTranslationService
         AppSettings settings = CurrentSettings();
         using var probeCancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
         probeCancellation.CancelAfter(TimeSpan.FromSeconds(5));
-        using HttpResponseMessage health = await _http.GetAsync(GroupSpeechProtocol.Endpoint(settings.VibeVoiceEndpoint), probeCancellation.Token);
+        using HttpResponseMessage health = await _http.GetAsync(GroupSpeechProtocol.Endpoint(string.IsNullOrWhiteSpace(settings.IncomingSpeechEndpoint) ? settings.VibeVoiceEndpoint : settings.IncomingSpeechEndpoint), probeCancellation.Token);
         health.EnsureSuccessStatusCode();
         using JsonDocument readiness = JsonDocument.Parse(await health.Content.ReadAsStringAsync(probeCancellation.Token));
         if (!readiness.RootElement.TryGetProperty("status", out var status) || status.GetString() != "ready")
             throw new InvalidOperationException("Group speech recognition is not ready. Prepare it in Settings.");
-        await socket.ConnectAsync(GroupSpeechProtocol.Endpoint(settings.VibeVoiceEndpoint, socket: true), probeCancellation.Token);
+        await socket.ConnectAsync(GroupSpeechProtocol.Endpoint(string.IsNullOrWhiteSpace(settings.IncomingSpeechEndpoint) ? settings.VibeVoiceEndpoint : settings.IncomingSpeechEndpoint, socket: true), probeCancellation.Token);
         await socket.SendAsync(JsonSerializer.SerializeToUtf8Bytes(new
         { type = "session.start", protocol = 1, sample_rate = 16000, format = "pcm_s16le", max_tokens = 256 }),
             WebSocketMessageType.Text, true, probeCancellation.Token);

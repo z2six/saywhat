@@ -21,7 +21,7 @@ internal static class SettingsSaveState
     {
         AppSettings result = draft.Copy(), latest = latestApplied.Copy();
         foreach (PropertyInfo property in typeof(AppSettings).GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Where(property => property.CanRead && property.CanWrite))
+            .Where(property => property.CanRead && property.CanWrite && property.GetCustomAttribute<System.Text.Json.Serialization.JsonIgnoreAttribute>() is null))
         {
             JsonNode? current = JsonSerializer.SerializeToNode(property.GetValue(draft), property.PropertyType);
             JsonNode? previous = JsonSerializer.SerializeToNode(property.GetValue(previousApplied), property.PropertyType);

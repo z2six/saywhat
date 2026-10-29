@@ -134,7 +134,7 @@ internal sealed partial class SubtitleWindow
     internal Task ResumeProfileAsync(AppSettings settings, CancellationToken token = default) => Dispatcher.InvokeAsync(() =>
     {
         token.ThrowIfCancellationRequested();
-        _settings = settings.Copy();
+        _settings = SessionEndpoints.PreserveRuntime(_settings, settings);
         _receivedSource = false;
         RefreshInterfaceLanguage();
         StartOverlayService();
@@ -155,7 +155,7 @@ internal sealed partial class SubtitleWindow
         await Dispatcher.InvokeAsync(() =>
         {
             token.ThrowIfCancellationRequested();
-            _settings = settings.Copy();
+            _settings = SessionEndpoints.PreserveRuntime(_settings, settings);
             RefreshInterfaceLanguage();
             RenderHistory();
         }).Task.ConfigureAwait(false);

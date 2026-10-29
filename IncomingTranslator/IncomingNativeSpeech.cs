@@ -76,7 +76,7 @@ internal sealed partial class IncomingTranslationService
         {
             await AwaitSessionCreatedAsync(async startup =>
             {
-                await socket.ConnectAsync(new Uri("ws://127.0.0.1:8081/v1/audio/transcriptions/realtime"), startup);
+                await socket.ConnectAsync(SessionEndpoints.SpeechUri(CurrentSettings(), "/v1/audio/transcriptions/realtime", socket: true), startup);
                 await ConfigureNativeSubtitleSessionAsync(receiveToken => ReceiveNativeSubtitleJsonAsync(socket, receiveToken),
                     (bytes, sendToken) => socket.SendAsync(bytes, WebSocketMessageType.Text, true, sendToken).AsTask(),
                     CurrentSettings().IncomingSourceLanguage, startup);

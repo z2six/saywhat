@@ -86,6 +86,10 @@ if ([version]($Version -split '-', 2)[0] -ge [version]'0.1.23') {
     $requiredSource += @('LocalTalk/Diagnostics.cs','LocalTalk/MainWindow.Diagnostics.cs','LocalTalk/DiagnosticsTests.cs',
         'IncomingTranslator/Program.Fixed.cs','IncomingTranslator/SmokeTests.cs','FoxTransLocalHost/Program.cs')
 }
+if ([version]($Version -split '-', 2)[0] -ge [version]'0.2.11') {
+    $requiredSource += @('IncomingTranslator/ManagedServicePorts.cs','IncomingTranslator/SessionEndpoints.cs','LocalTalk/RuntimeController.Ports.cs','LocalTalk/MainWindowConnections.cs','LocalTalk/ManagedServicePortTests.cs','LocalTalk/SessionEndpointTests.cs','Packaging/ProvisioningTests/test-managed-ports.py','Packaging/vibevoice/test_ports.py',
+        'Packaging/ManagedPortTests/ManagedPortTests.csproj','Packaging/ManagedPortTests/Program.cs','Packaging/ManagedPortTests/fixtures/owned-http.ps1')
+}
 $privateNames += '|(^|[\\/])people-photos[\\/]'
 if ([version]($Version -split '-', 2)[0] -ge [version]'0.1.25') {
     $requiredSource += @('LocalTalk/HomeTargetLanguageUi.cs','LocalTalk/HomeTargetLanguageUiTests.cs',

@@ -12,6 +12,7 @@ export XDG_DATA_HOME="$fixture_root"
 mkdir -p -- "$fixture_root/localtalk/pids"
 declare -a fixture_pids=() fixture_births=() fixture_files=()
 checks=0
+fixture_port=25347
 
 is_alive() {
     [[ -d "/proc/$1" ]] && [[ $(awk '{print $3}' "/proc/$1/stat" 2>/dev/null) != Z ]]
@@ -22,7 +23,7 @@ owned_dummy() {
     [[ $(readlink -f "/proc/$candidate/exe" 2>/dev/null) == /usr/bin/bash ]] &&
     [[ $(awk '{print $22}' "/proc/$candidate/stat" 2>/dev/null) == "$expected_birth" ]] &&
     tr '\0' '\n' < "/proc/$candidate/cmdline" |
-        awk 'previous == "--port" && $0 == "8080" { found=1 } { previous=$0 } END { exit !found }'
+        awk -v port="$fixture_port" 'previous == "--port" && $0 == port { found=1 } { previous=$0 } END { exit !found }'
 }
 cleanup() {
     local result=$? candidate index file
@@ -60,28 +61,28 @@ new_dummy() {
         if [[ "$1" == graceful ]]; then trap "exit 0" TERM; else trap "" TERM; fi
         printf ready > "$2"
         while :; do sleep 0.1; done
-    ' localtalk-stop-test "$mode" "$ready" --port 8080 &
+    ' localtalk-stop-test "$mode" "$ready" --port "$fixture_port" &
     pid=$!
     birth=$(awk '{print $22}' "/proc/$pid/stat")
     fixture_pids+=("$pid"); fixture_births+=("$birth")
     for index in $(seq 1 100); do [[ -f "$ready" ]] && break; sleep 0.02; done
     check test -f "$ready"
     check owned_dummy "$pid" "$birth"
-    marker="$fixture_root/localtalk/pids/voxtral-8080-$owner.pid"
+    marker="$fixture_root/localtalk/pids/voxtral-$fixture_port-$owner.pid"
     fixture_files+=("$marker")
 }
 write_marker() { printf '%s\n%s\n%s\n' "$pid" "$1" "$2" > "$marker"; }
 expect_refusal() {
     local expected=$1 server=$2 code=0 output="$fixture_root/refusal-$owner.txt"
     fixture_files+=("$output")
-    bash "$stop_script" "$server" 8080 "$owner" > "$output" 2>&1 || code=$?
+    bash "$stop_script" "$server" "$fixture_port" "$owner" > "$output" 2>&1 || code=$?
     check test "$code" -eq "$expected"
     check is_alive "$pid"
     check test -f "$marker"
 }
 finish_owned_dummy() {
     write_marker "$birth" "$owner"
-    bash "$stop_script" /usr/bin/bash 8080 "$owner"
+    bash "$stop_script" /usr/bin/bash "$fixture_port" "$owner"
     wait "$pid" 2>/dev/null || true
     check test ! -d "/proc/$pid"
     check test ! -f "$marker"
@@ -89,7 +90,7 @@ finish_owned_dummy() {
 
 new_dummy graceful
 write_marker "$birth" "$owner"
-bash "$stop_script" /usr/bin/bash 8080 "$owner"
+bash "$stop_script" /usr/bin/bash "$fixture_port" "$owner"
 wait "$pid"
 check test ! -d "/proc/$pid"
 check test ! -f "$marker"
@@ -97,7 +98,7 @@ echo 'PASS: graceful TERM exits and removes its marker.'
 
 new_dummy ignored
 write_marker "$birth" "$owner"
-bash "$stop_script" /usr/bin/bash 8080 "$owner"
+bash "$stop_script" /usr/bin/bash "$fixture_port" "$owner"
 wait "$pid" 2>/dev/null || true
 check test ! -d "/proc/$pid"
 check test ! -f "$marker"
@@ -121,5 +122,31 @@ write_marker "$birth" "$owner"
 expect_refusal 4 /usr/bin/sleep
 finish_owned_dummy
 echo 'PASS: a mismatched executable is refused without stopping the fixture.'
+
+new_dummy graceful
+write_marker "$birth" "$owner"
+wrong_port=$((fixture_port + 1))
+wrong_marker="$fixture_root/localtalk/pids/voxtral-$wrong_port-$owner.pid"
+fixture_files+=("$wrong_marker")
+cp -- "$marker" "$wrong_marker"
+code=0
+bash "$stop_script" /usr/bin/bash "$wrong_port" "$owner" > /dev/null 2>&1 || code=$?
+check test "$code" -eq 4
+check is_alive "$pid"
+check test -f "$marker"
+check test -f "$wrong_marker"
+rm -- "$wrong_marker"
+finish_owned_dummy
+echo 'PASS: a different selected port cannot stop or adopt the fixture process.'
+
+for invalid in 0 1023 65536 -1 +25347 025347 '25347;echo' '25347 ' 99999999999999999999; do
+    code=0
+    bash "$stop_script" /usr/bin/bash "$invalid" 0123456789abcdef0123456789abcdef > /dev/null 2>&1 || code=$?
+    check test "$code" -eq 2
+done
+for valid in 1024 65535; do
+    bash "$stop_script" /usr/bin/bash "$valid" 0123456789abcdef0123456789abcdef
+    checks=$((checks + 1))
+done
 
 echo "PASS: $checks isolated stop checks; all owned dummy processes reaped."

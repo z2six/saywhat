@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- AppPaths recognizes this existing developer-host identity, so every
+         log stays under the explicitly isolated test data directory. -->
+    <AssemblyName>LocalTalk</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="fixtures/owned-http.ps1" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

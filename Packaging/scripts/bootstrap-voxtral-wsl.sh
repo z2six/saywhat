@@ -33,7 +33,7 @@ export DEBIAN_FRONTEND=noninteractive
 export LC_ALL=C
 apt_progress=(-q -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0)
 apt-get "${apt_progress[@]}" update
-apt-get "${apt_progress[@]}" install -y --no-install-recommends build-essential cmake ninja-build git curl ca-certificates libboost-json-dev
+apt-get "${apt_progress[@]}" install -y --no-install-recommends build-essential cmake ninja-build git curl ca-certificates libboost-json-dev python3-minimal
 
 cuda_options=()
 vulkan_options=(-DGGML_VULKAN=OFF)

@@ -49,11 +49,12 @@ internal static class VibeVoiceRuntime
     internal static ProcessStartInfo CreateCheckStartInfo(WslSpeechRegistration registration, string dataRoot, string modelId) =>
         CreateInfo(registration, "bootstrap-vibevoice.sh", "--check", DataPath(dataRoot), ValidateModel(modelId));
 
-    internal static ProcessStartInfo BuildStartInfo(WslSpeechRegistration registration, string dataRoot, string modelId, string owner) =>
-        CreateInfo(registration, "run-vibevoice.sh", DataPath(dataRoot), ValidateModel(modelId), ValidateOwner(owner));
+    internal static ProcessStartInfo BuildStartInfo(WslSpeechRegistration registration, string dataRoot, string modelId, string owner,
+        int port = Port) =>
+        CreateInfo(registration, "run-vibevoice.sh", DataPath(dataRoot), ValidateModel(modelId), ValidateOwner(owner), PortArgument(port));
 
-    internal static ProcessStartInfo BuildStopStartInfo(WslSpeechRegistration registration, string owner) =>
-        CreateInfo(registration, "stop-vibevoice.sh", ValidateOwner(owner));
+    internal static ProcessStartInfo BuildStopStartInfo(WslSpeechRegistration registration, string owner, int port = Port) =>
+        CreateInfo(registration, "stop-vibevoice.sh", ValidateOwner(owner), PortArgument(port));
 
     internal static ProcessStartInfo BuildCancelPreparationInfo(WslSpeechRegistration registration, string owner) =>
         CreateInfo(registration, "cancel-prepare.sh", ValidateOwner(owner));
@@ -85,11 +86,11 @@ internal static class VibeVoiceRuntime
 
     internal static Uri ValidateEndpoint(string endpoint)
     {
-        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out Uri? uri) || uri.Scheme != "http" || uri.Port != Port ||
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out Uri? uri) || uri.Scheme != "http" || uri.Port is < 1024 or > 65535 ||
             uri.UserInfo.Length != 0 || uri.AbsolutePath != "/" || uri.Query.Length != 0 || uri.Fragment.Length != 0 ||
             !(uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
               (IPAddress.TryParse(uri.Host, out IPAddress? address) && IPAddress.IsLoopback(address))))
-            throw new ArgumentException("Groups speech must use the local endpoint http://127.0.0.1:8082.", nameof(endpoint));
+            throw new ArgumentException("Groups speech must use a loopback HTTP endpoint on a port from 1024 to 65535.", nameof(endpoint));
         return uri;
     }
 
@@ -106,7 +107,7 @@ internal static class VibeVoiceRuntime
         if (root.GetProperty("engine").GetString() != "vibevoice" || root.GetProperty("protocol").GetInt32() != 1 ||
             root.GetProperty("owner").GetString() != expectedOwner || root.GetProperty("model_id").GetString() != expectedModelId ||
             root.GetProperty("word_timestamps").GetBoolean())
-            throw new InvalidOperationException("Port 8082 did not return this app's owned Groups speech service.");
+            throw new InvalidOperationException("The selected endpoint did not return this app's owned Groups speech service.");
         double? Number(string key) => root.TryGetProperty(key, out JsonElement value) && value.ValueKind == JsonValueKind.Number ? value.GetDouble() : null;
         return new(root.GetProperty("status").GetString() ?? "error", expectedOwner, expectedModelId,
             root.TryGetProperty("error", out JsonElement error) && error.ValueKind == JsonValueKind.String ? error.GetString() : null,
@@ -155,6 +156,9 @@ internal static class VibeVoiceRuntime
     }
     private static string ValidateModel(string modelId) => IsSupportedModel(modelId) ? modelId :
         throw new ArgumentException("Choose a supported VibeVoice streaming model.", nameof(modelId));
+    private static string PortArgument(int port) => port is >= 1024 and <= 65535
+        ? port.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        : throw new ArgumentOutOfRangeException(nameof(port), "Managed service ports must be between 1024 and 65535.");
     private static string ValidateOwner(string owner) => owner is not null && Regex.IsMatch(owner, "^[a-f0-9]{32}$") ? owner :
         throw new ArgumentException("An app-owned token is required to manage Groups speech.", nameof(owner));
 }
