@@ -6,6 +6,8 @@
 
 **[Download the installer](https://saywhat.pages.dev/#download)** · [Website](https://saywhat.pages.dev/) · [Releases](https://github.com/z2six/saywhat/releases) · [Get help](SUPPORT.md)
 
+**Version 0.2.11: Bitdefender review pending.** Bitdefender currently flags an app component. It has been submitted for review; a vendor verdict is pending. See the [0.2.11 release notes](https://github.com/z2six/saywhat/releases/tag/v0.2.11) for the affected build.
+
 There are no subscriptions or paid features. Speech recognition, translation and optional familiar-voice matching run locally on your PC. Downloads and update checks need an internet connection.
 
 ## Get started

@@ -184,5 +184,7 @@
   "demo.larger": "Maior",
   "benefits.sourceGuide": "Guia técnico",
   "speakers.resources": "A identificação opcional de pessoas usa um modelo pequeno separado na CPU: CAM++ ou a opção maior ERes2Net. Ele identifica vozes, sem transcrever nem traduzir. Não usa inferência na GPU, mas o uso de CPU e memória ainda pode afetar o desempenho do jogo.",
-  "demo.apply": "Aplicar alterações"
+  "demo.apply": "Aplicar alterações",
+  "release.securityTitle": "Análise do Bitdefender pendente",
+  "release.securityBody": "O Bitdefender está sinalizando um componente da versão {version}. Ele foi enviado para análise; ainda não há um parecer."
 }

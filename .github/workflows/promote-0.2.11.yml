@@ -1,0 +1,48 @@
+name: Promote verified 0.2.11 candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      acknowledge_known_antivirus_warning:
+        description: Publish 0.2.11 with its known Bitdefender warning and pending vendor review
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: promote-saywhat-v0.2.11
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    if: ${{ github.repository == 'z2six/saywhat' && github.ref == 'refs/heads/main' && inputs.acknowledge_known_antivirus_warning == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Check out promotion tooling only
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Test archive and checksum validation
+        run: python3 eng/Promote-0.2.11.py --self-test
+      - name: Verify and publish the existing candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SAYWHAT_ACKNOWLEDGE_WARNING: ${{ inputs.acknowledge_known_antivirus_warning }}
+        run: python3 eng/Promote-0.2.11.py
+      - name: Upload publication receipt only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: SayWhat-0.2.11-promotion-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/promote-0.2.11/promotion-receipt.json
+          if-no-files-found: error
+          retention-days: 30
+
+      # No rebuild, installer execution, antivirus changes, model downloads,
+      # audio capture, website deployment or update-feed changes occur here.

@@ -14,12 +14,18 @@ let checks = 0;
 function check(condition, message) { checks++; assert.ok(condition, message); }
 check(manifest.schemaVersion === 1 && typeof manifest.ready === "boolean", "Manifest readiness is an explicit versioned boolean.");
 check(manifest.channel === "preview", "Preview status is explicit.");
+if (manifest.securityNotice != null) check(manifest.version === "0.2.11" && manifest.securityNotice.id === "bitdefender-review-pending" &&
+  manifest.securityNotice.affectedVersion === manifest.version, "A public security notice identifies the reviewed issue and exact affected release.");
 check((html.match(/<main\b/g) || []).length === 1 && (html.match(/<\/main>/g) || []).length === 1, "Exactly one main landmark exists.");
 check((html.match(/<h1\b/g) || []).length === 1, "One clear page heading exists.");
 check(html.includes('lang="en"') && html.includes('class="skip-link"'), "English page and keyboard skip link exist.");
 check(!/<style\b|<script\b[^>]*>\s*[^<\s]/.test(html), "No inline code bypasses the self-only content policy.");
 const ids = Array.from(html.matchAll(/\bid="([^"]+)"/g), (match) => match[1]);
 check(new Set(ids).size === ids.length, "Element IDs are unique.");
+check(html.includes('id="release-security-notice" class="release-security-notice" role="note" aria-labelledby="release-security-title" hidden') &&
+  html.indexOf('id="release-security-notice"') > html.indexOf('id="installer-link"') &&
+  html.indexOf('id="release-security-notice"') < html.indexOf('class="release-links"'),
+  "The download-adjacent security notice has a named note role and starts hidden until a validated release matches.");
 check((html.match(/class="person-avatar"/g) || []).length === 2, "Their voices illustrates two people with separate photos.");
 check(html.includes('assets/person-ari.svg') && html.includes('assets/person-mina.svg'), "Each illustrated person has their own local portrait.");
 const hero = html.slice(html.indexOf('<section class="hero'), html.indexOf('</section>', html.indexOf('<section class="hero')));
@@ -136,6 +142,8 @@ function assertUnavailable(fixture) {
     check(fixture.elements.get(id).href === "#release-status", `${id} does not expose an unavailable asset URL.`);
   }
   check(fixture.elements.get("checksum-panel").hidden, "Checksum panel is hidden without a verified-ready manifest.");
+  check(fixture.elements.get("release-security-notice").hidden && fixture.elements.get("installer-link").getAttribute("aria-describedby") === null,
+    "An unavailable or invalid release cannot leave a stale security notice attached to the download.");
 }
 const pending = await browserFixture({ ...manifest, ready: false });
 assertUnavailable(pending);
@@ -157,6 +165,7 @@ const ready = {
   distribution: { url: "https://github.com/z2six/saywhat/releases/download/v0.1.14/synthetic-distribution.zip", sha256: "c".repeat(64) }
 };
 const available = await browserFixture(ready);
+check(available.elements.get("release-security-notice").hidden, "A release without the optional notice keeps the warning hidden.");
 check(available.elements.get("installer-link").href === ready.installer.url, "A complete synthetic release binds the exact installer URL.");
 check(available.elements.get("source-link").href === ready.source.url, "Source uses the shared typed manifest contract.");
 check(available.elements.get("distribution-link").href === ready.distribution.url, "Complete ZIP alternative uses its actual manifest path.");
@@ -168,6 +177,43 @@ await available.elements.get("copy-checksum").events.get("click")();
 check(available.copied() === ready.installer.sha256, "Copy uses a fake clipboard and copies only the exact checksum.");
 await available.elements.get("refresh-release").events.get("click")();
 check(available.calls.length === 2, "Refresh performs one explicit additional manifest read, not background polling.");
+
+function releaseAtVersion(version) {
+  const value = structuredClone(ready);
+  value.version = version;
+  value.releaseUrl = value.releaseUrl.replace(ready.version, version);
+  for (const asset of ["installer", "source", "distribution"]) value[asset].url = value[asset].url.replaceAll(ready.version, version);
+  return value;
+}
+const noticeRelease = releaseAtVersion("0.2.11");
+noticeRelease.securityNotice = { id: "bitdefender-review-pending", affectedVersion: "0.2.11" };
+const warned = await browserFixture(noticeRelease);
+check(!warned.elements.get("release-security-notice").hidden && warned.elements.get("release-security-body").textContent.includes("0.2.11"),
+  "The exact affected release displays its version-specific Bitdefender review notice.");
+check(warned.elements.get("release-security-title").textContent === "Bitdefender review pending" &&
+  warned.elements.get("release-security-body").textContent.includes("a verdict is pending") &&
+  !/confirmed false positive|disable|turn off/i.test(warned.elements.get("release-security-body").textContent),
+  "The notice discloses pending review without asserting a vendor verdict or telling users to disable protection.");
+check(warned.elements.get("installer-link").getAttribute("aria-describedby") === "release-security-body" &&
+  warned.elements.get("installer-link").href === noticeRelease.installer.url &&
+  warned.elements.get("installer-link").getAttribute("aria-disabled") === null,
+  "The available installer exposes its warning to assistive technology while preserving the verified download URL.");
+for (const notice of [null, {}, [], "bitdefender-review-pending", { id: "unknown", affectedVersion: "0.2.11" },
+  { id: "bitdefender-review-pending", affectedVersion: "0.2.10" }, { id: "<img onerror=alert(1)>", affectedVersion: "0.2.11" }]) {
+  const unrelated = await browserFixture({ ...noticeRelease, securityNotice: notice });
+  check(unrelated.elements.get("release-security-notice").hidden && unrelated.elements.get("installer-link").getAttribute("aria-describedby") === null,
+    "Missing, malformed, unknown and mismatched optional notice metadata cannot display an unrelated or injected warning.");
+}
+for (const version of ["0.2.10", "0.2.12"]) {
+  const otherRelease = releaseAtVersion(version);
+  otherRelease.securityNotice = { id: "bitdefender-review-pending", affectedVersion: version };
+  check((await browserFixture(otherRelease)).elements.get("release-security-notice").hidden,
+    "The known 0.2.11 issue is never carried over to another version.");
+}
+for (const invalid of [{ ...noticeRelease, ready: false }, { ...noticeRelease, source: { ...noticeRelease.source, sha256: "invalid" } }])
+  assertUnavailable(await browserFixture(invalid));
+await warned.elements.get("refresh-release").events.get("click")();
+assertUnavailable(warned);
 
 for (const mutate of [
   (value) => { value.ready = false; },
@@ -231,6 +277,7 @@ const catalogs = Object.fromEntries(localeCodes.map((code) => [code, JSON.parse(
 const localized = await browserFixture(ready, false, { catalogs });
 const localizedPending = await browserFixture({ ...ready, ready: false }, false, { catalogs });
 const localizedError = await browserFixture(null, true, { catalogs });
+const localizedNotice = await browserFixture(noticeRelease, false, { catalogs });
 for (const code of localeCodes) {
   localized.setLanguage(code);
   check(localized.elements.get("installer-link").textContent === catalogs[code]["release.availableInstaller"], `${code}: ready button translates.`);
@@ -244,5 +291,12 @@ for (const code of localeCodes) {
   localizedError.setLanguage(code);
   check(localizedError.elements.get("release-status").textContent === catalogs[code]["release.errorStatus"], `${code}: failure status translates.`);
   assertUnavailable(localizedError);
+  localizedNotice.setLanguage(code);
+  check(!localizedNotice.elements.get("release-security-notice").hidden &&
+    localizedNotice.elements.get("release-security-title").textContent === catalogs[code]["release.securityTitle"] &&
+    localizedNotice.elements.get("release-security-body").textContent === catalogs[code]["release.securityBody"].replace("{version}", "0.2.11"),
+    `${code}: the active version-specific security warning repaints in the selected language.`);
+  check(localizedNotice.elements.get("installer-link").href === noticeRelease.installer.url && localizedNotice.calls.length === 1,
+    `${code}: translating the warning neither replaces the installer nor triggers another manifest request.`);
 }
 console.log(`PASS: ${checks} offline website asset/anchor/accessibility-structure/release-gate checks. No network, server, app, model, audio or real clipboard.`);

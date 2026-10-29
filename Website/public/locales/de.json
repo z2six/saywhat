@@ -184,5 +184,7 @@
   "demo.larger": "Größer",
   "benefits.sourceGuide": "Technische Dokumentation",
   "speakers.resources": "Die optionale Personenerkennung nutzt ein separates kleines CPU-Modell: CAM++ oder die größere ERes2Net-Option. Es erkennt Stimmen, statt Sprache zu verschriftlichen oder zu übersetzen. Die Inferenz läuft nicht auf der GPU, doch CPU- und Arbeitsspeichernutzung können die Spielleistung beeinflussen.",
-  "demo.apply": "Änderungen anwenden"
+  "demo.apply": "Änderungen anwenden",
+  "release.securityTitle": "Prüfung durch Bitdefender ausstehend",
+  "release.securityBody": "Bitdefender meldet derzeit eine Komponente der Version {version}. Sie wurde zur Prüfung eingereicht; ein Ergebnis steht noch aus."
 }

@@ -20,7 +20,8 @@ const englishKeys = Object.keys(catalogs.en).sort();
 check(englishKeys.length >= 183, 'complete English catalog includes voice-first setup, product benefits and the current interface illustration');
 for (const key of ['benefits.freeTitle', 'benefits.freeBody', 'benefits.localTitle', 'benefits.localBody',
   'benefits.privacyTitle', 'benefits.privacyBody', 'benefits.sourceTitle', 'benefits.sourceBody',
-  'demo.home', 'demo.panelTitle', 'demo.speak', 'demo.translate', 'demo.start', 'demo.person', 'demo.caption'])
+  'demo.home', 'demo.panelTitle', 'demo.speak', 'demo.translate', 'demo.start', 'demo.person', 'demo.caption',
+  'release.securityTitle', 'release.securityBody'])
   check(englishKeys.includes(key), `new product copy has a stable catalog key: ${key}`);
 for (const code of languages) {
   equal(Object.keys(catalogs[code]).sort(), englishKeys, `${code}: every English key has a translation`);
@@ -214,6 +215,8 @@ for (const page of ['home', 'error']) {
     const currentLinks = fixture.document.querySelectorAll('a').filter(node => node.parentNode?.hasAttribute('data-i18n-rich')).map(node => ({ href: node.getAttribute('href'), target: node.getAttribute('target'), rel: node.getAttribute('rel') }));
     equal(currentLinks, originalLinks, `${page}/${code}: original rich link destinations and isolation attributes survive`);
     const formatted = fixture.api.t('release.availableMeta', { version: '0.1.15', size: '123' }); check(formatted.includes('0.1.15') && formatted.includes('123') && !formatted.includes('{version}') && !formatted.includes('{size}'), `${code}: release parameters expand without changing keys`);
+    const securityNotice = fixture.api.t('release.securityBody', { version: '0.2.11' });
+    check(securityNotice.includes('0.2.11') && !securityNotice.includes('{version}'), `${code}: the pending vendor-review notice expands the exact affected version`);
   }
 }
 

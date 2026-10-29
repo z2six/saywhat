@@ -27,6 +27,16 @@
         : translated("release.pendingStatus", {}, "The public installer is being prepared. Downloads are not available yet.");
       byId("release-meta").textContent = translated("release.pendingMeta", {}, "Preview · Windows 10/11 x64 · Unsigned installer");
     }
+    const showSecurityNotice = releaseView.kind === "available" && releaseView.securityNotice === true;
+    byId("release-security-notice").hidden = !showSecurityNotice;
+    if (showSecurityNotice) {
+      byId("release-security-title").textContent = translated("release.securityTitle", {}, "Bitdefender review pending");
+      byId("release-security-body").textContent = translated("release.securityBody", { version: releaseView.version },
+        `Bitdefender currently flags a component in version ${releaseView.version}. It has been submitted for review; a verdict is pending.`);
+      installerLink.setAttribute("aria-describedby", "release-security-body");
+    } else {
+      installerLink.removeAttribute("aria-describedby");
+    }
     refresh.textContent = checking
       ? translated("release.checking", {}, "Checking download status…")
       : translated("release.refresh", {}, "Refresh download status");
@@ -91,7 +101,10 @@
     byId("distribution-link").href = urls.distribution;
     byId("repository-link").href = urls.repository;
     gatedLinks.forEach((link) => { link.removeAttribute("aria-disabled"); });
-    releaseView = { kind: "available", version: manifest.version, size: byteSize };
+    const notice = manifest.securityNotice;
+    const securityNotice = version === "0.2.11" && notice && typeof notice === "object" && !Array.isArray(notice) &&
+      notice.id === "bitdefender-review-pending" && notice.affectedVersion === version;
+    releaseView = { kind: "available", version: manifest.version, size: byteSize, securityNotice: securityNotice === true };
     checksum = installer.sha256.toLowerCase();
     byId("installer-sha").textContent = checksum;
     byId("checksum-panel").hidden = false;

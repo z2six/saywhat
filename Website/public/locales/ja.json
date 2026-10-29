@@ -184,5 +184,7 @@
   "demo.larger": "大型",
   "benefits.sourceGuide": "技術ガイド",
   "speakers.resources": "任意の人物識別には、音声認識や翻訳とは別の小さな CPU モデル（CAM++、または大きめの ERes2Net）を使います。声から人を見分ける機能で、言葉の聞き取りや翻訳は行いません。GPU 推論は使いませんが、CPU やメモリの使用でゲームの動作に影響する場合があります。",
-  "demo.apply": "変更を適用"
+  "demo.apply": "変更を適用",
+  "release.securityTitle": "Bitdefender による確認待ち",
+  "release.securityBody": "現在、Bitdefender がバージョン {version} の一部のコンポーネントを検出しています。確認を依頼しており、判定結果を待っています。"
 }
