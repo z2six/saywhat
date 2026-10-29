@@ -3,7 +3,7 @@
 Build SayWhat and its capture host from source, with optional offline checks.
 .DESCRIPTION
 Requires Windows x64, .NET SDKs 8 and 9, CMake 3.21+, and Visual Studio 2022
-Desktop development with C++ (or another compatible CMake generator). NuGet
+or newer with Desktop development with C++ (or a configured CMake generator). NuGet
 restore may download build dependencies. This script never downloads AI model
 weights, installs Windows features, starts translation, or opens an audio device.
 .EXAMPLE
@@ -18,7 +18,7 @@ param(
     [switch]$Publish,
     [switch]$SkipNative,
     [string]$CMakePath = 'cmake',
-    [string]$CMakeGenerator = 'Visual Studio 17 2022',
+    [string]$CMakeGenerator = '',
     [string]$DotNetPath = 'dotnet',
     [string]$NodePath = 'node'
 )
@@ -43,6 +43,26 @@ function Resolve-BuildTool([string]$Name, [string]$Help) {
 function Invoke-BuildTool([string]$FilePath, [string[]]$Arguments) {
     & $FilePath @Arguments
     if ($LASTEXITCODE -ne 0) { throw ('Build/check failed with exit code ' + $LASTEXITCODE + ': ' + [IO.Path]::GetFileName($FilePath)) }
+}
+function Select-VisualStudioGenerator([string]$CMake) {
+    if ($env:CMAKE_GENERATOR) { return $env:CMAKE_GENERATOR }
+    $installerRoot = [Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFilesX86)
+    $vswhere = Join-Path $installerRoot 'Microsoft Visual Studio\Installer\vswhere.exe'
+    if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) {
+        throw 'Install Visual Studio 2022 or newer C++ build tools, or pass a configured -CMakeGenerator.'
+    }
+    $versions = @(& $vswhere -all -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationVersion)
+    if ($LASTEXITCODE -ne 0 -or $versions.Count -eq 0) { throw 'No Visual Studio C++ toolchain was found.' }
+    $capabilitiesText = & $CMake -E capabilities
+    if ($LASTEXITCODE -ne 0) { throw 'Could not read CMake generator capabilities.' }
+    $capabilities = ($capabilitiesText -join [Environment]::NewLine) | ConvertFrom-Json
+    $majors = @($versions | ForEach-Object { if ($_ -match '^(\d+)\.') { [int]$Matches[1] } } | Sort-Object -Descending -Unique)
+    foreach ($major in $majors) {
+        if ($major -lt 17) { continue }
+        $found = @($capabilities.generators | Where-Object { $_.name -match ('^Visual Studio ' + $major + ' ') })
+        if ($found.Count -gt 0) { return $found[0].name }
+    }
+    throw 'This CMake version does not support the installed Visual Studio toolchain. Update CMake or pass a configured -CMakeGenerator.'
 }
 function Invoke-OwnedTest([string]$FilePath, [string[]]$Arguments) {
     # .NET Framework/PowerShell 5 has no ProcessStartInfo.ArgumentList. Quote
@@ -96,6 +116,8 @@ try {
     }
     else {
         $cmake = Resolve-BuildTool $CMakePath 'Install CMake 3.21+ and Visual Studio C++ build tools, or pass -CMakePath.'
+        if (-not $CMakeGenerator) { $CMakeGenerator = Select-VisualStudioGenerator $cmake }
+        Write-Host ('Native build generator: ' + $CMakeGenerator)
         Write-Host 'Building the native Windows capture library from the vendored C source.'
         $configureArguments = @('-S', (Join-Path $repoRoot 'FoxTransSource\native'), '-B', $nativeOutput, '-G', $CMakeGenerator)
         if ($CMakeGenerator.StartsWith('Visual Studio ', [StringComparison]::OrdinalIgnoreCase)) { $configureArguments += @('-A', 'x64') }

@@ -12,7 +12,8 @@ For the app build and offline checks, start with
 ## Prerequisites
 
 - Windows x64 and the app build prerequisites: .NET SDKs 8 and 9, CMake 3.21+
-  and Visual Studio C++ build tools.
+  and Visual Studio 2022 or newer C++ build tools, with a CMake version that
+  supports that Visual Studio release.
 - PowerShell 7 for the packaging scripts. They use APIs unavailable in Windows
   PowerShell 5.1; `eng/Build.ps1` itself supports 5.1.
 - Inno Setup. The release compiler used for the existing previews is 6.7.3.

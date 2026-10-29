@@ -52,7 +52,7 @@ The [documentation index](docs/README.md) covers recognition versus translation,
 
 ## Build and contribute
 
-For the main Windows build, install the **.NET 8 and 9 SDKs**, **CMake 3.21+** and **Visual Studio 2022 Desktop development with C++**, including a Windows SDK. **Node.js 22+** is needed for the website checks.
+For the main Windows build, install the **.NET 8 and 9 SDKs**, **CMake 3.21+** and **Visual Studio 2022 or newer with Desktop development with C++**, including a Windows SDK. Use a CMake version that supports your Visual Studio release. **Node.js 22+** is needed for the website checks.
 
 ```powershell
 git clone https://github.com/z2six/saywhat.git

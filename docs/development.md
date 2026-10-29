@@ -15,8 +15,9 @@ For the primary app and host:
   targets `net9.0`. A machine that builds framework-dependent output also needs
   the corresponding desktop/runtime components to run it; the SDK installers
   provide the development environment. `-Publish` produces self-contained output.
-- Visual Studio 2022's **Desktop development with C++** workload, including a
-  Windows SDK, plus **CMake 3.21+**. Native dependencies are already vendored.
+- Visual Studio 2022 or newer with **Desktop development with C++**, including
+  a Windows SDK, plus **CMake 3.21+** that supports that Visual Studio release.
+  The build selects an installed supported generator; native dependencies are vendored.
 - PowerShell 5.1 or newer for `eng/Build.ps1`.
 - Node.js 22+ for the dependency-free website and repository checks. CI uses 24.
 
