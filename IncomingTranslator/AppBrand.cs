@@ -9,7 +9,7 @@ internal static class AppBrand
 {
     public const string DisplayName = "SayWhat?";
     public const string FileName = "SayWhat";
-    public const string Version = "0.2.4";
+    public const string Version = "0.2.5";
     public const string DataEnvironmentVariable = "SAYWHAT_DATA_ROOT";
     public const string LegacyDataEnvironmentVariable = "LOCALTALK_DATA_ROOT";
     public const string DesktopMutex = "Local\\LocalTalkDesktop";

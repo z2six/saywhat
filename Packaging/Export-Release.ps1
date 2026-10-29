@@ -125,6 +125,10 @@ if ([version]($Version -split '-', 2)[0] -ge [version]'0.2.4') {
 $reviewedWebsiteImages = @('Website/public/favicon.svg','Website/public/favicon.ico',
     'Website/public/assets/person-ari.svg','Website/public/assets/person-mina.svg',
     'Website/public/assets/saywhat-icon-256.png','Website/public/assets/saywhat-lockup.png')
+if ([version]($Version -split '-', 2)[0] -ge [version]'0.2.5') {
+    $requiredSource += @('IncomingTranslator/IncomingCaptureCapabilities.cs','LocalTalk/IncomingCaptureUi.cs',
+        'LocalTalk/IncomingCaptureCapabilityTests.cs','Packaging/Test-WindowsCompatibility.ps1')
+}
 $archive = [IO.Compression.ZipFile]::OpenRead($sourceZip)
 $sha = [Security.Cryptography.SHA256]::Create()
 $sourceInventory = [Collections.Generic.List[object]]::new()
@@ -269,7 +273,8 @@ try {
     $readme = @"
 # SayWhat? $Version preview
 
-Local speech translation for VRChat on Windows 11 x64.
+Local speech translation for VRChat on Windows 10 (21H2+) and Windows 11 x64.
+Windows 10 compatibility is a preview and still needs real-PC acceptance testing.
 
 Run SayWhat-$Version-Setup.exe. Setup offers installation for you or all users.
 Then open SayWhat?, choose the language you speak and your translation languages,
@@ -283,6 +288,9 @@ No separate FoxTrans, LM Studio/Bionic or .NET installation is required.
 Your microphone can translate into up to four languages in VRChat chat. Other
 voices can appear as separate, optional subtitles. Inference and saved voice
 profiles stay on your device.
+Capturing only VRChat or another selected application's audio requires Windows 11
+on consumer PCs. Windows 10 users can explicitly choose All playback for subtitles;
+this includes other applications' audio. Capture never silently falls back to it.
 Setup downloads require internet; speech is not sent to a cloud translation API.
 Speaker matching does not separate overlapping voices into isolated audio streams.
 

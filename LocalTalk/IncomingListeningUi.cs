@@ -73,19 +73,33 @@ internal sealed partial class MainWindow
         string mode = IncomingListening.SourceMode(_settings);
         var picker = Select(choices, choices.First(choice => choice.Id == mode), choice =>
         {
-            if (!CanChangeIncomingListening()) return;
+            if (!CanChangeIncomingListening() || choice.Id != "desktop" && !SupportsApplicationSubtitles) return;
             _settings.IncomingAudioMode = choice.Id;
             _settings.CaptureVrChatOnly = choice.Id == "vrchat";
             RefreshSaveState(); Navigate("Listening");
         });
         picker.Name = "IncomingListeningModePicker";
         source.Children.Add(Field("Audio source", picker));
+        if (!SupportsApplicationSubtitles)
+        {
+            picker.IsEnabled = false;
+            source.Children.Add(CreateIncomingCaptureNotice("ListeningCaptureCompatibilityNotice"));
+            var playback = ModernTheme.Button("Use All playback", (_, _) =>
+            {
+                if (!CanChangeIncomingListening()) return;
+                _settings.IncomingAudioMode = "desktop"; _settings.CaptureVrChatOnly = false;
+                RefreshSaveState(); Navigate("Listening");
+            });
+            playback.Name = "ListeningUseAllPlaybackButton";
+            playback.IsEnabled = CanChangeIncomingListening() && mode != "desktop";
+            source.Children.Add(playback);
+        }
         if (mode == "application")
         {
             var selected = ModernTheme.Label(IncomingSourceDisplayName(_settings), 16, localize: false);
             selected.Name = "SelectedListeningApplication"; source.Children.Add(selected);
             var choose = ModernTheme.Button("Choose application…", (_, _) => OpenListeningApplicationPicker());
-            choose.Name = "ChooseListeningApplicationButton"; source.Children.Add(choose);
+            choose.Name = "ChooseListeningApplicationButton"; choose.IsEnabled = SupportsApplicationSubtitles; source.Children.Add(choose);
             source.Children.Add(ModernTheme.Label("Open the application first. Its calls, voices and other sounds may all be heard.", 12, ModernTheme.Muted));
             source.Children.Add(ModernTheme.Label("If it closes, subtitles wait for it to reopen. Other applications are never used instead.", 12, ModernTheme.Muted));
         }
@@ -133,7 +147,7 @@ internal sealed partial class MainWindow
 
     internal bool SetListeningApplication(ApplicationAudioChoice application)
     {
-        if (!CanChangeIncomingListening() || ApplicationAudioCatalog.CanonicalExecutable(application.Path).Length == 0) return false;
+        if (!CanChangeIncomingListening() || !SupportsApplicationSubtitles || ApplicationAudioCatalog.CanonicalExecutable(application.Path).Length == 0) return false;
         _settings.IncomingAudioMode = "application";
         _settings.IncomingApplicationPath = application.Path;
         _settings.IncomingApplicationName = application.Name;
@@ -155,7 +169,7 @@ internal sealed partial class MainWindow
 
     private void OpenListeningApplicationPicker()
     {
-        if (!CanChangeIncomingListening()) return;
+        if (!CanChangeIncomingListening() || !SupportsApplicationSubtitles) return;
         Window? dialog = null;
         var view = new ListeningApplicationPicker(ApplicationAudioCatalog.ListRunning, choice =>
         { if (SetListeningApplication(choice)) dialog!.DialogResult = true; });

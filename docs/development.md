@@ -9,8 +9,10 @@ source archives; see [source provenance](../SOURCE-PROVENANCE.md).
 
 For the primary app and host:
 
-- Windows x64. Real process-specific playback capture requires the supported
-  Windows 11 environment used by the app.
+- Windows 10 21H2 (build 19044) or newer, or Windows 11, x64. Your own voice and
+  explicit All playback subtitles can use Windows 10; process-specific playback
+  capture requires the Windows 11 client API (build 20348+). Windows 10 support
+  is compatibility-preview work, not a claim of verified real-Windows-10 testing.
 - .NET SDKs **8 and 9**. The dashboard targets `net8.0-windows`; the capture host
   targets `net9.0`. A machine that builds framework-dependent output also needs
   the corresponding desktop/runtime components to run it; the SDK installers
@@ -44,9 +46,11 @@ builds both managed projects and assembles their expected helper layout:
 ```text
 artifacts/
   native/                 CMake build and generated capture DLL
-  app/SayWhat.exe         Dashboard and subtitle app
-  app/tools/              Owned capture host and OSC/mute helpers
-  host/                   Capture host output
+  build/app/SayWhat.exe   Framework-dependent dashboard and subtitle app
+  build/app/tools/        Owned capture host and OSC/mute helpers
+  build/host/             Framework-dependent capture host output
+  publish/app/            Self-contained app and tools with -Publish
+  publish/host/           Self-contained capture host with -Publish
   test-results/           Isolated checks and rendered test screens
 ```
 
@@ -55,6 +59,12 @@ For self-contained Windows output:
 ```powershell
 .\eng\Build.ps1 -Publish -RunTests
 ```
+
+Build and publish outputs stay separate. Reusing one directory can leave a local
+`hostfxr.dll` beside a framework-dependent executable, causing .NET to look for
+shared frameworks in that directory and fail before the app starts. Old
+`artifacts/app` and `artifacts/host` folders are no longer used; no automatic
+cleanup deletes them.
 
 Useful options are `-Configuration Debug`, explicit `-DotNetPath`, `-NodePath`
 or `-CMakePath`, and `-CMakeGenerator` for an already-configured compatible
@@ -73,6 +83,10 @@ and uses `artifacts/dev-data` instead of the installed app's preferences. It doe
 not automatically start translation. Model preparation, downloads and capture
 still require explicit actions in the app.
 
+The launcher prefers `artifacts/build/app` and falls back to
+`artifacts/publish/app` when no development build exists. Use the path printed
+by the build script when you want a particular output.
+
 The installed app and developer copy share single-instance/port conventions.
 Close the installed copy before intentionally testing a developer UI; do not
 force-stop a live translation session or start competing local servers.
@@ -88,7 +102,7 @@ directly without an override uses the normal app data path.
 - Dashboard, settings, migration, layout, theme, model-selection, queue, identity,
   update and fake-provisioning checks through `--ui-self-test`.
 - Capture-host regressions through its `--self-test` entry point.
-- Isolated VRChat mute discovery/policy and installer-update source contracts.
+- Isolated VRChat mute discovery/policy, installer-update and Windows-version source contracts.
 - Static website release-gate and eight-language checks.
 
 The harness sets isolated `SAYWHAT_DATA_ROOT`, temporary and report directories.

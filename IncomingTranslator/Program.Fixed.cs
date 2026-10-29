@@ -1538,6 +1538,7 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
 
     public async Task RunAsync(CancellationToken cancellationToken)
     {
+        IncomingCaptureCapabilities.Validate(CurrentSettings());
         // Saved Off is applied before any capture or background sentence work. Starting subtitles
         // must not temporarily expose an enabled speaker model or load a voice-ID extractor.
         await ApplySpeakerRecognitionAsync(CurrentSettings().UseAiSpeakerRecognition, cancellationToken);
@@ -1637,6 +1638,7 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
     {
         AppSettings settings = CurrentSettings();
         IncomingListening.Validate(settings);
+        IncomingCaptureCapabilities.Validate(settings);
         if (IncomingListening.UsesProcessCapture(settings))
         {
             _captureProcessId = IncomingListening.TryResolveProcess(settings)

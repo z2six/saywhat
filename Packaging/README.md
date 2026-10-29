@@ -41,8 +41,8 @@ From the repository root in PowerShell 7:
 ```powershell
 $version = ([xml](Get-Content .\LocalTalk\LocalTalk.csproj -Raw)).Project.PropertyGroup.Version
 .\Packaging\Build-Installer.ps1 -Version $version -SkipPublish `
-  -AppPublishDirectory "$PWD\artifacts\app" `
-  -HostPublishDirectory "$PWD\artifacts\host" `
+  -AppPublishDirectory "$PWD\artifacts\publish\app" `
+  -HostPublishDirectory "$PWD\artifacts\publish\host" `
   -CompilerPath 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
 ```
 

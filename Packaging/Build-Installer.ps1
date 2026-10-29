@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '0.2.4',
+    [string]$Version = '0.2.5',
     [string]$CompilerPath,
     [switch]$SkipPublish,
     [string]$AppPublishDirectory,
@@ -192,6 +192,8 @@ try {
         'IncomingTranslator/IncomingRecognitionCatalog.cs','IncomingTranslator/IncomingNativeSpeech.cs','LocalTalk/IncomingNativeSpeechTests.cs',
         'LocalTalk/VoiceFirstHome.cs','LocalTalk/VoiceFirstText.cs','LocalTalk/VoiceFirstHomeUiTests.cs',
         'LocalTalk/HomeSubtitleControls.cs','LocalTalk/HomeSubtitleUiTests.cs',
+        'IncomingTranslator/IncomingCaptureCapabilities.cs','LocalTalk/IncomingCaptureUi.cs',
+        'LocalTalk/IncomingCaptureCapabilityTests.cs','Packaging/Test-WindowsCompatibility.ps1',
         'FoxTransSource/FoxTrans/Providers/NemotronTranscriber.cs','FoxTransLocalHost/NativeSpeechTests.cs',
         'LocalTalk/RuntimeProfiles.cs','LocalTalk/VibeVoiceRuntime.cs','LocalTalk/MainWindowProfileRuntime.cs',
         'LocalTalk/TranslationProfilesUi.cs','IncomingTranslator/TranslationProfiles.cs',

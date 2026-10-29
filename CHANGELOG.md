@@ -3,6 +3,15 @@
 Installers, full notes and matching source archives are on
 [GitHub Releases](https://github.com/z2six/saywhat/releases).
 
+## 0.2.5
+
+- Removed the Windows 11-only installer gate. Windows 10 21H2 and newer x64
+  can install this compatibility preview for microphone-to-VRChat translation.
+- Added early, visible checks for app-specific subtitle capture. On Windows 10,
+  All playback is an explicit alternative; it is never enabled as a fallback.
+- Updated requirements and added simulated OS-boundary coverage. A real Windows
+  10 install and live model run remain acceptance checks.
+
 ## 0.2.4
 
 - Added full live subtitle controls directly to Home: spoken and subtitle

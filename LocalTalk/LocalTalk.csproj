@@ -9,7 +9,7 @@
     <AssemblyName>SayWhat</AssemblyName>
     <StartupObject>IncomingTranslator.LocalTalkEntry</StartupObject>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <Version>0.2.4</Version>
+    <Version>0.2.5</Version>
     <ApplicationIcon>Assets/SayWhat.ico</ApplicationIcon>
     <Product>SayWhat?</Product>
     <Title>SayWhat?</Title>
@@ -38,6 +38,7 @@
     <Compile Include="../IncomingTranslator/AppBrand.cs" Link="Core/AppBrand.cs" />
     <Compile Include="../IncomingTranslator/AudioRouting.cs" Link="Core/AudioRouting.cs" />
     <Compile Include="../IncomingTranslator/IncomingListening.cs" Link="Core/IncomingListening.cs" />
+    <Compile Include="../IncomingTranslator/IncomingCaptureCapabilities.cs" Link="Core/IncomingCaptureCapabilities.cs" />
     <Compile Include="../IncomingTranslator/IncomingListeningPipeline.cs" Link="Core/IncomingListeningPipeline.cs" />
     <Compile Include="../IncomingTranslator/IncomingListeningTests.cs" Link="Tests/IncomingListeningTests.cs" />
     <Compile Include="../IncomingTranslator/ProcessLoopbackCapture.cs" Link="Core/ProcessLoopbackCapture.cs" />

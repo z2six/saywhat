@@ -1,6 +1,7 @@
 @echo off
 setlocal
-set "SAYWHAT_EXE=%~dp0artifacts\app\SayWhat.exe"
+set "SAYWHAT_EXE=%~dp0artifacts\build\app\SayWhat.exe"
+if not exist "%SAYWHAT_EXE%" set "SAYWHAT_EXE=%~dp0artifacts\publish\app\SayWhat.exe"
 set "SAYWHAT_DATA_ROOT=%~dp0artifacts\dev-data"
 if not exist "%SAYWHAT_EXE%" (
     echo Build the source first: powershell -File eng\Build.ps1

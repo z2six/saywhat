@@ -5,7 +5,7 @@
   #define OutputDir SourcePath + "dist"
 #endif
 #ifndef Version
-  #define Version "0.2.4"
+  #define Version "0.2.5"
 #endif
 #define DataActionHash GetSHA256OfFile(PayloadDir + "\provisioning\manage-install-data.ps1")
 
@@ -28,7 +28,9 @@ PrivilegesRequiredOverridesAllowed=dialog
 UsePreviousPrivileges=no
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-MinVersion=10.0.22000
+; Windows 10 21H2+. Process-specific subtitles have a separate runtime
+; capability check; they must not prevent microphone translation installation.
+MinVersion=10.0.19044
 WizardStyle=modern dark includetitlebar hidebevels
 WizardBackColor=#191817
 WizardImageBackColor=#191817

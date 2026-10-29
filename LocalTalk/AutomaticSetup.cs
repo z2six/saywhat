@@ -52,13 +52,16 @@ internal sealed class AutomaticSetupService
     private readonly string _statePath;
     private readonly bool _ownVoiceOnly;
     private readonly bool _incomingVoiceOnly;
+    private readonly Func<Version> _audioWindowsVersion;
     private readonly SemaphoreSlim _changes = new(1, 1);
     public AutomaticSetupService(LocalTalkProvisioner provisioner, bool ownVoiceOnly = false, bool incomingVoiceOnly = false)
         : this(new WindowsAutomaticSetupPlatform(provisioner), provisioner.DataRoot, ownVoiceOnly, incomingVoiceOnly) { }
-    internal AutomaticSetupService(IAutomaticSetupPlatform platform, string dataRoot, bool ownVoiceOnly = false, bool incomingVoiceOnly = false)
+    internal AutomaticSetupService(IAutomaticSetupPlatform platform, string dataRoot, bool ownVoiceOnly = false, bool incomingVoiceOnly = false,
+        Func<Version>? audioWindowsVersion = null)
     {
         if (ownVoiceOnly && incomingVoiceOnly) throw new ArgumentException("Choose one independent setup direction.");
         _platform = platform; _ownVoiceOnly = ownVoiceOnly; _incomingVoiceOnly = incomingVoiceOnly;
+        _audioWindowsVersion = audioWindowsVersion ?? (() => IncomingCaptureCapabilities.CurrentVersion);
         _statePath = Path.Combine(Path.GetFullPath(dataRoot), ownVoiceOnly ? "own-voice-setup-progress.json"
             : incomingVoiceOnly ? "incoming-voice-setup-progress.json" : "setup-progress.json");
     }
@@ -76,6 +79,7 @@ internal sealed class AutomaticSetupService
     // Inspection does not launch WSL, a speech engine, a translator, or an audio device.
     public async Task<AutomaticSetupPlan> PlanAsync(AppSettings settings, CancellationToken token = default)
     {
+        if (_incomingVoiceOnly) IncomingCaptureCapabilities.Validate(settings, _audioWindowsVersion());
         ValidateSelections(settings, _ownVoiceOnly, _incomingVoiceOnly);
         AutomaticSetupSnapshot snapshot = await _platform.InspectAsync(settings, token);
         bool nativeSpeech = UsesNativeSpeech(settings);
@@ -109,6 +113,7 @@ internal sealed class AutomaticSetupService
         IProgress<ProvisionProgress>? progress = null, CancellationToken token = default)
     {
         if (!explicitConsent) throw new SetupUserException("Confirm setup before downloading files or changing Windows components.");
+        if (_incomingVoiceOnly) IncomingCaptureCapabilities.Validate(settings, _audioWindowsVersion());
         ValidateSelections(settings, _ownVoiceOnly, _incomingVoiceOnly);
         await _changes.WaitAsync(token);
         try

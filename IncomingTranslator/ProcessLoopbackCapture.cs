@@ -34,7 +34,7 @@ internal sealed class ProcessLoopbackCapture : IWaveIn
         TargetProcessId = processId;
     }
 
-    public static bool IsSupported => OperatingSystem.IsWindowsVersionAtLeast(10, 0, 20348);
+    public static bool IsSupported => OperatingSystem.IsWindows() && IncomingCaptureCapabilities.SupportsProcessLoopback(IncomingCaptureCapabilities.CurrentVersion);
     public int TargetProcessId { get; }
     public long CapturedBytes => Interlocked.Read(ref _capturedBytes);
     public event EventHandler<WaveInEventArgs>? DataAvailable;

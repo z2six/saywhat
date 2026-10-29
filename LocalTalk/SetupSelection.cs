@@ -58,14 +58,16 @@ internal sealed record SetupSelection(
 // prerequisite installers, settings writes, engine launches or audio capture.
 internal sealed class TranslationSelectionPreparation
 {
+    private readonly bool _ownVoiceOnly;
     private readonly Func<string, bool> _modelReady;
     private readonly Func<string, bool> _runtimeReady;
     private readonly Func<string, IProgress<ProvisionProgress>?, CancellationToken, Task> _ensureModel;
     private readonly Func<string, IProgress<ProvisionProgress>?, CancellationToken, Task> _ensureRuntime;
 
-    internal TranslationSelectionPreparation(LocalTalkProvisioner provisioner)
+    internal TranslationSelectionPreparation(LocalTalkProvisioner provisioner, bool ownVoiceOnly = false)
     {
         ArgumentNullException.ThrowIfNull(provisioner);
+        _ownVoiceOnly = ownVoiceOnly;
         _modelReady = id => provisioner.ResolveModelPath(id) is not null;
         _runtimeReady = id => LocalTalkProvisioner.FindPinnedRuntimeExecutable(
             Path.Combine(provisioner.RuntimesRoot, id + "-" + LocalTalkProvisioner.LlamaVersion), id) is not null ||
@@ -75,10 +77,11 @@ internal sealed class TranslationSelectionPreparation
     }
 
     internal TranslationSelectionPreparation(Func<string, bool> modelReady, Func<string, bool> runtimeReady,
-        Func<string, CancellationToken, Task> ensureModel, Func<string, CancellationToken, Task> ensureRuntime)
+        Func<string, CancellationToken, Task> ensureModel, Func<string, CancellationToken, Task> ensureRuntime, bool ownVoiceOnly = false)
     {
         ArgumentNullException.ThrowIfNull(modelReady); ArgumentNullException.ThrowIfNull(runtimeReady);
         ArgumentNullException.ThrowIfNull(ensureModel); ArgumentNullException.ThrowIfNull(ensureRuntime);
+        _ownVoiceOnly = ownVoiceOnly;
         _modelReady = modelReady; _runtimeReady = runtimeReady;
         _ensureModel = (id, _, token) => ensureModel(id, token);
         _ensureRuntime = (id, _, token) => ensureRuntime(id, token);
@@ -88,8 +91,8 @@ internal sealed class TranslationSelectionPreparation
     {
         ArgumentNullException.ThrowIfNull(settings);
         if (!settings.UseManagedTranslator) return Array.Empty<string>();
-        AutomaticSetupService.ValidateSelections(settings);
-        return AutomaticSetupService.TranslationIds(settings).Where(id => !_modelReady(id)).ToArray();
+        AutomaticSetupService.ValidateSelections(settings, ownVoiceOnly: _ownVoiceOnly);
+        return AutomaticSetupService.TranslationIds(settings, ownVoiceOnly: _ownVoiceOnly).Where(id => !_modelReady(id)).ToArray();
     }
 
     internal bool NeedsDownload(AppSettings settings)
@@ -113,10 +116,10 @@ internal sealed class TranslationSelectionPreparation
     {
         ArgumentNullException.ThrowIfNull(settings);
         token.ThrowIfCancellationRequested();
-        AutomaticSetupService.ValidateSelections(settings);
+        AutomaticSetupService.ValidateSelections(settings, ownVoiceOnly: _ownVoiceOnly);
         if (!settings.UseManagedTranslator) return;
         // Freeze this operation's choices before its first asynchronous wait.
-        string[] models = AutomaticSetupService.TranslationIds(settings);
+        string[] models = AutomaticSetupService.TranslationIds(settings, ownVoiceOnly: _ownVoiceOnly);
         string runtime = settings.ManagedRuntimeId;
         foreach (string id in models)
         {

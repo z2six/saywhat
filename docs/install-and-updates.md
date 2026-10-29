@@ -6,6 +6,10 @@
 
 The Windows x64 installer supports current-user and all-users installations. All-users program changes need administrator permission; each user still has their own settings/People/cache data. Existing installations are detected so update/maintenance and uninstall choices can be presented instead of blindly creating another copy.
 
+The minimum installation version is **Windows 10 21H2, build 19044, x64**; Windows 11 is also accepted. Your microphone-to-VRChat translation uses native Windows recognition and translation by default. Windows 10 compatibility is a preview and has **not** been verified on a real Windows 10 PC.
+
+Subtitles have a separate audio-capture requirement. **VRChat only** and **Another application** require the process-loopback API available on Windows 11 clients (build 20348+). On Windows 10, **All playback** can be selected explicitly instead; it includes audio from other applications. The app does not silently substitute All playback when application-only capture is unavailable. Optional WSL speech engines retain their own Windows/hardware prerequisites.
+
 The post-install **open SayWhat?** option is selected by default and opens the UI, not active translation. First setup chooses the interface language, the language you speak and one to four output languages. Theme selection is optional. It checks hardware locally, suggests models, reviews downloads/permissions and prepares your own voice translation. A nonrecommended translator asks for confirmation before the separate download review and preparation action.
 
 The default microphone recognizer runs directly on Windows and does not require WSL. Windows runtime prerequisites may still need permission or a restart when missing. Optional subtitles and the legacy Voxtral engine have separate preparation; only those paths need the additional managed Linux components where applicable. Resumable progress retains setup choices, and the review reflects the actual permission/restart requirements.

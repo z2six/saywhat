@@ -30,8 +30,13 @@ if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT -or -not [Enviro
 }
 $repoRoot = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
 $artifactsRoot = Join-Path $repoRoot 'artifacts'
-$appOutput = Join-Path $artifactsRoot 'app'
-$hostOutput = Join-Path $artifactsRoot 'host'
+# A framework-dependent apphost can mistake stale self-contained hostfxr.dll
+# for its .NET installation and fail before managed tests even start. Keep
+# build modes separate instead of deleting or recycling an unknown old folder.
+$outputMode = if ($Publish) { 'publish' } else { 'build' }
+$managedOutput = Join-Path $artifactsRoot $outputMode
+$appOutput = Join-Path $managedOutput 'app'
+$hostOutput = Join-Path $managedOutput 'host'
 $nativeOutput = Join-Path $artifactsRoot 'native'
 $nativeDestination = Join-Path $repoRoot 'FoxTransLocalHost\Native\FoxTrans.Native.dll'
 
@@ -139,6 +144,13 @@ try {
         if ($Publish) { $buildArguments += @('--self-contained', 'true', '-p:PublishSingleFile=false') }
         else { $buildArguments += '-p:SelfContained=false' }
         Invoke-BuildTool $dotnet $buildArguments
+        foreach ($runtimeFile in @('hostfxr.dll', 'hostpolicy.dll', 'coreclr.dll')) {
+            $present = Test-Path -LiteralPath (Join-Path $project.Output $runtimeFile) -PathType Leaf
+            if ($present -ne [bool]$Publish) {
+                throw ('Build output has an unexpected runtime layout: ' + $project.Output +
+                    '. Keep framework-dependent build and self-contained publish output separate. File: ' + $runtimeFile)
+            }
+        }
     }
 
     # The dashboard locates packaged helpers relative to itself. Assemble the
@@ -181,6 +193,8 @@ try {
                 (Join-Path $repoRoot 'Packaging\Test-VRChatMuteSync-Discovery.ps1'))
             Invoke-BuildTool $windowsPowerShell @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
                 (Join-Path $repoRoot 'Packaging\Test-UpdateInstallerContract.ps1'), '-SourceRoot', $repoRoot)
+            Invoke-BuildTool $windowsPowerShell @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
+                (Join-Path $repoRoot 'Packaging\Test-WindowsCompatibility.ps1'), '-SourceRoot', $repoRoot)
             Invoke-BuildTool $node @((Join-Path $repoRoot 'Website\check.mjs'))
             Invoke-BuildTool $node @((Join-Path $repoRoot 'Website\i18n-check.mjs'))
         }

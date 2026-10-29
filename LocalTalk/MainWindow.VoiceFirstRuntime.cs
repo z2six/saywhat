@@ -266,6 +266,7 @@ internal sealed partial class MainWindow
         try
         {
             AppSettings candidate = ReadVoiceFirstSavedSettings();
+            if (!IncomingCaptureCapabilities.SupportsSource(candidate, SubtitleWindowsVersion)) return false;
             return VoiceFirstIncomingNeedsPreparationFor(candidate);
         }
         catch (ArgumentException) { return false; } // Start reports a precise language/model selection error.
@@ -287,6 +288,7 @@ internal sealed partial class MainWindow
             // model draft on another page. Preparing this optional feature must
             // leave the active microphone configuration and model untouched.
             AppSettings candidate = ReadVoiceFirstSavedSettings();
+            IncomingCaptureCapabilities.Validate(candidate, SubtitleWindowsVersion);
             _ = RuntimeController.BuildPlan(candidate, incoming: true);
             IncomingListening.Validate(candidate);
             RuntimeProfiles.ValidateIncomingSpeech(candidate);

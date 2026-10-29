@@ -17,7 +17,9 @@ There are no subscriptions or paid features. Speech recognition, translation and
 
 No separate LM Studio or FoxTrans installation is needed. The default speech recognizer runs directly on Windows. Optional Voxtral and Groups modes use additional local tools; setup explains their requirements before preparing them. Nothing starts listening merely because you open the app.
 
-SayWhat? targets **Windows 11 x64**. The recommended translation runtime needs compatible GPU acceleration, and downloaded models require additional disk space. This is an **unsigned preview**; hardware compatibility and fresh-PC installation are still being tested. See the [requirements](https://saywhat.pages.dev/#requirements) and [installation guide](docs/install-and-updates.md).
+SayWhat? accepts **Windows 10 21H2 (build 19044) or newer, and Windows 11, x64** for your own voice-to-VRChat translation. VRChat-only and selected-application subtitles require Windows 11; on Windows 10, you can explicitly choose **All playback**, which also hears other applications. It never switches to that wider capture scope automatically.
+
+Windows 10 compatibility is a **preview and has not been verified on a real Windows 10 PC**. The recommended translation runtime needs compatible GPU acceleration, and downloaded models require additional disk space. The installer is unsigned; hardware compatibility and fresh-PC installation are still being tested. See the [requirements](https://saywhat.pages.dev/#requirements) and [installation guide](docs/install-and-updates.md).
 
 ## Features
 
@@ -60,7 +62,7 @@ cd saywhat
 powershell -NoProfile -ExecutionPolicy Bypass -File .\eng\Build.ps1 -RunTests
 ```
 
-The script builds the native capture library from the included C source, builds the app and host, and runs isolated checks. It does not install SayWhat?, load AI models, capture audio or send live OSC messages. NuGet restore can download build dependencies. The runnable development app is written to `artifacts/app/SayWhat.exe`; `-Publish` produces self-contained Windows output.
+The script builds the native capture library from the included C source, builds the app and host, and runs isolated checks. It does not install SayWhat?, load AI models, capture audio or send live OSC messages. NuGet restore can download build dependencies. The runnable development app is written to `artifacts/build/app/SayWhat.exe`; `-Publish` produces self-contained Windows output under `artifacts/publish/`. The separate directories prevent mixed runtime files when switching build modes.
 
 Read [development and build instructions](docs/development.md) before building installers or changing runtime behavior, and [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Bug reports and feature requests belong in [Issues](https://github.com/z2six/saywhat/issues).
 

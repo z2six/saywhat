@@ -16,6 +16,7 @@ namespace IncomingTranslator;
 internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
 {
     private readonly LocalTalkProvisioner _provisioner;
+    private readonly Func<Version> _audioWindowsVersion;
     private readonly SemaphoreSlim _changes = new(1, 1);
     private readonly HttpClient _http = new() { Timeout = Timeout.InfiniteTimeSpan };
     private readonly Dictionary<int, TranslatorProcess> _translators = new();
@@ -38,7 +39,8 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
     private volatile bool _disposeRequested;
     private volatile bool _ownRunning, _incomingRunning;
 
-    public RuntimeController(LocalTalkProvisioner provisioner) => _provisioner = provisioner;
+    public RuntimeController(LocalTalkProvisioner provisioner, Func<Version>? audioWindowsVersion = null)
+    { _provisioner = provisioner; _audioWindowsVersion = audioWindowsVersion ?? (() => IncomingCaptureCapabilities.CurrentVersion); }
     public bool OwnRunning => _ownRunning;
     public bool IncomingRunning => _incomingRunning;
     internal IncomingHealthSnapshot? IncomingHealth => _overlay?.HealthSnapshot;
@@ -448,6 +450,7 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         try
         {
             ThrowIfDisposed();
+            IncomingCaptureCapabilities.Validate(settings, _audioWindowsVersion());
             if (_incomingRunning)
             {
                 if (_overlay is not null) await _overlay.Dispatcher.InvokeAsync(() => { _overlay.Show(); _overlay.Activate(); });
@@ -518,6 +521,7 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         try
         {
             ThrowIfDisposed();
+            IncomingCaptureCapabilities.Validate(settings, _audioWindowsVersion());
             RuntimeProfiles.ValidateIncomingSpeech(settings);
             WslSpeechRegistration registration = RequireSpeechRegistration();
             return (await CheckGroupsPreparedCoreAsync(settings, registration, token)).Prepared;
@@ -536,7 +540,7 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         bool completed = false;
         try
         {
-            ThrowIfDisposed(); RequirePreviousCleanup();
+            ThrowIfDisposed(); IncomingCaptureCapabilities.Validate(settings, _audioWindowsVersion()); RequirePreviousCleanup();
             RuntimeProfiles.ValidateIncomingSpeech(settings);
             WslSpeechRegistration registration = RequireSpeechRegistration();
             string owner = Guid.NewGuid().ToString("N");
@@ -610,7 +614,7 @@ internal sealed class RuntimeController : IAsyncDisposable, ISpeakerFeedbackHost
         var phases = new RuntimePhaseProgress(progress);
         try
         {
-            ThrowIfDisposed(); RequirePreviousCleanup();
+            ThrowIfDisposed(); IncomingCaptureCapabilities.Validate(settings, _audioWindowsVersion()); RequirePreviousCleanup();
             // Applying settings while subtitles are off must not start capture/models.
             if (!_incomingRunning || _overlay is null) return;
             SubtitleWindow overlay = _overlay;

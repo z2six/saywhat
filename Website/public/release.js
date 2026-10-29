@@ -19,13 +19,13 @@
       const { version, size } = releaseView;
       installerLink.textContent = translated("release.availableInstaller", {}, "Download for Windows ↓");
       status.textContent = translated("release.availableStatus", { version }, `Preview ${version} is available. Review the requirements before installing.`);
-      byId("release-meta").textContent = translated("release.availableMeta", { version, size }, `Version ${version} · ${size} MiB · Windows 11 x64 · Unsigned installer`);
+      byId("release-meta").textContent = translated("release.availableMeta", { version, size }, `Version ${version} · ${size} MiB · Windows 10/11 x64 · Unsigned installer`);
     } else {
       installerLink.textContent = translated("release.pendingInstaller", {}, "Installer being prepared ↓");
       status.textContent = releaseView.kind === "error"
         ? translated("release.errorStatus", {}, "Download status could not be checked. Try refreshing; no installer link has been enabled.")
         : translated("release.pendingStatus", {}, "The public installer is being prepared. Downloads are not available yet.");
-      byId("release-meta").textContent = translated("release.pendingMeta", {}, "Preview · Windows 11 x64 · Unsigned installer");
+      byId("release-meta").textContent = translated("release.pendingMeta", {}, "Preview · Windows 10/11 x64 · Unsigned installer");
     }
     refresh.textContent = checking
       ? translated("release.checking", {}, "Checking download status…")

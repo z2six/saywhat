@@ -151,7 +151,7 @@ internal sealed partial class MainWindow
             download.Name = "SubtitleSpeechDownloadSize"; body.Children.Add(download);
         }
         var apply = SubtitleSpeechButton(missing ? "Download & apply" : "Apply subtitle choices", async (_, _) => await ApplySubtitleSpeechSelectionAsync());
-        apply.Name = "ApplySubtitleSpeechChoicesButton"; apply.IsEnabled = CanEditSubtitleSpeech() && (changed || missing);
+        apply.Name = "ApplySubtitleSpeechChoicesButton"; apply.IsEnabled = CanEditSubtitleSpeech() && SupportsSelectedSubtitleSource && (changed || missing);
         apply.Background = apply.IsEnabled ? ModernTheme.Accent : ModernTheme.Raised;
         apply.Foreground = apply.IsEnabled ? ModernTheme.Ink : ModernTheme.Muted; body.Children.Add(apply);
         body.Children.Add(SubtitleSpeechLabel(_runtime.IncomingRunning
@@ -197,6 +197,8 @@ internal sealed partial class MainWindow
     {
         if (_preview || !CanEditSubtitleSpeech()) return;
         AppSettings saved = SettingsStore.Load(), draft = _settings.Copy();
+        try { IncomingCaptureCapabilities.Validate(SubtitleSpeechCandidate(saved, draft), SubtitleWindowsVersion); }
+        catch (IncomingListeningSelectionException error) { Error("Apply subtitle choices", error); return; }
         await ApplyTranslationSettingsAsync(SubtitleSpeechCandidate(saved, draft), applyingProfile: false);
         AppSettings latest = SettingsStore.Load();
         // Keep unrelated edits staged elsewhere; this action applies only the

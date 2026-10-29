@@ -252,8 +252,11 @@ internal sealed partial class MainWindow
         var copy = new StackPanel(); copy.Children.Add(VoiceFirstHeading("Optional · live subtitles", 21));
         copy.Children.Add(VoiceFirstLabel("Read other people’s translated speech in a separate window.", 12, ModernTheme.Muted));
         row.Children.Add(copy); incoming.Children.Add(row);
-        _subtitlesTourTarget.IsEnabled = CanEditSubtitleSpeech() && (_runtime.IncomingRunning || !HasPendingHomeSubtitleChoices());
-        if (!_runtime.IncomingRunning && HasPendingHomeSubtitleChoices())
+        if (!SupportsApplicationSubtitles) incoming.Children.Add(CreateIncomingCaptureNotice("HomeSubtitleCaptureCompatibilityNotice"));
+        _subtitlesTourTarget.IsEnabled = CanEditSubtitleSpeech() && (_runtime.IncomingRunning || SupportsSelectedSubtitleSource && !HasPendingHomeSubtitleChoices());
+        if (!_runtime.IncomingRunning && !SupportsSelectedSubtitleSource)
+            _subtitlesTourTarget.ToolTip = UiText.T(IncomingCaptureCapabilities.UnavailableMessage);
+        if (!_runtime.IncomingRunning && SupportsSelectedSubtitleSource && HasPendingHomeSubtitleChoices())
             _subtitlesTourTarget.ToolTip = SubtitleSpeechText.T("Apply your subtitle choices below before starting.");
         ToolTipService.SetShowOnDisabled(_subtitlesTourTarget, true);
         incoming.Children.Add(CreateSubtitleSpeechCard(onHome: true));

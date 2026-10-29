@@ -3,6 +3,15 @@ SayWhat? preview installation
 SayWhat? is an unofficial VRChat companion, not made or endorsed by VRChat or
 the projects providing its translation components.
 
+The installer accepts Windows 10 21H2 (build 19044) or newer, and Windows 11, x64.
+Your own voice-to-VRChat translation uses native Windows tools by default.
+Windows 10 compatibility is a preview and has not been verified on a real
+Windows 10 PC.
+
+VRChat-only and selected-application subtitles require Windows 11 clients.
+On Windows 10 you can explicitly choose All playback, which also hears sounds
+from other applications. The app never switches to this wider scope automatically.
+
 The installer uses SayWhat? styling and offers English, Simplified
 Chinese, Japanese and Korean. English is initially selected. The selected language
 is the fresh app's display-language default, not a translation target. Existing
@@ -10,7 +19,10 @@ saved display preferences are kept on ordinary launches. You can change display
 language in the app. The software license screen keeps the English original.
 
 The finish-page Open SayWhat? choice is optional and checked by default. It opens the
-dashboard with translation stopped. Silent setup does not launch the app.
+dashboard with translation stopped. A manually requested silent installation does
+not launch the app. A verified update started from the app can automatically reopen
+SayWhat? with translation stopped after installation succeeds. If automatic reopening
+is unavailable, open SayWhat? from Start.
 Updates and removal can safely ask a compatible open app to quit, even from the
 tray. If it cannot finish closing, quit from the tray and retry. Setup never
 force-kills the app's tools or unloads an unrelated application's models.

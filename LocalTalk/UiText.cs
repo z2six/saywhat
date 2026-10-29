@@ -1395,6 +1395,8 @@ internal static class UiText
         Add("Picture generated from a saved voice example. You can choose a photo instead.", "根据保存的语音样本生成的图片。你也可以自行选择照片。", "保存された声のサンプルから作成した画像です。写真に変更することもできます。", "저장된 음성 예시로 만든 그림입니다. 원하는 사진으로 바꿀 수도 있습니다.");
         Add("Temporary picture. It will change after the first confirmed voice example.", "临时图片。确认第一个语音样本后会更改。", "仮の画像です。最初の声のサンプルを確認すると変わります。", "임시 그림입니다. 첫 음성 예시를 확인하면 바뀝니다.");
         Add("Starting update", "开始更新", "更新を開始", "업데이트 시작");
+        Add("This version of Windows cannot listen to just one application. Your voice translation still works. Choose All playback if you want subtitles from all audio.", "此 Windows 版本无法只监听一个应用。你的语音翻译仍可使用。如需为所有声音显示字幕，请选择“所有播放音频”。", "この Windows では、1 つのアプリだけの音声を取得できません。自分の音声の翻訳は使えます。すべての音声を字幕にする場合は「すべての再生音声」を選んでください。", "이 Windows 버전에서는 한 앱의 소리만 들을 수 없습니다. 내 음성 번역은 계속 사용할 수 있습니다. 모든 소리를 자막으로 보려면 ‘모든 재생 소리’를 고르세요.");
+        Add("Use All playback", "使用所有播放音频", "すべての再生音声を使う", "모든 재생 소리 사용");
         Add("SayWhat? will close and stop translation before installing. It will reopen without starting models.", "SayWhat? 将关闭并停止翻译后再安装。完成后会重新打开，但不会启动模型。", "インストール前に SayWhat? を閉じて翻訳を停止します。更新後はモデルを起動せずに再び開きます。", "설치 전에 SayWhat?을 닫고 번역을 중지합니다. 완료 후 모델을 시작하지 않고 앱을 다시 엽니다.");
     }
 }

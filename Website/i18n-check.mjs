@@ -20,6 +20,10 @@ const englishKeys = Object.keys(catalogs.en).sort();
 equal(englishKeys.length, 148, 'complete English catalog includes voice-first setup and separate speech/translation model guidance');
 for (const code of languages) {
   equal(Object.keys(catalogs[code]).sort(), englishKeys, `${code}: every English key has a translation`);
+  for (const key of ['hero.local', 'release.pendingMeta', 'release.availableMeta'])
+    check(catalogs[code][key].includes('Windows 10/11 x64'), `${code}: ${key} does not retain a Windows-11-only download claim`);
+  check(catalogs[code]['requirements.windowsTitle'].includes('21H2') && catalogs[code]['requirements.windowsTitle'].includes('Windows 11'), `${code}: requirements state the supported Windows 10 release and Windows 11`);
+  check(catalogs[code]['requirements.windowsDescription'].includes('19044') && catalogs[code]['requirements.windowsDescription'].includes('Windows 11'), `${code}: detailed requirements keep the own-voice floor separate from application-only capture`);
   for (const key of englishKeys) {
     check(typeof catalogs[code][key] === 'string' && catalogs[code][key].trim().length > 0, `${code}: ${key} is nonempty text`);
     equal(tokens(catalogs[code][key]), tokens(catalogs.en[key]), `${code}: ${key} retains placeholders and limited rich markup`);

@@ -236,7 +236,7 @@ internal sealed partial class MainWindow
             download.Name = "HomeSubtitleDownloadSize"; body.Children.Add(download);
         }
         var apply = SubtitleSpeechButton(missing ? "Download & apply" : "Apply subtitle choices", async (_, _) => await ApplyHomeSubtitleChoicesAsync());
-        apply.Name = "ApplyHomeSubtitleChoicesButton"; apply.IsEnabled = CanEditSubtitleSpeech() && (changed || missing);
+        apply.Name = "ApplyHomeSubtitleChoicesButton"; apply.IsEnabled = CanEditSubtitleSpeech() && SupportsSelectedSubtitleSource && (changed || missing);
         apply.Background = apply.IsEnabled ? ModernTheme.Accent : ModernTheme.Raised;
         apply.Foreground = apply.IsEnabled ? ModernTheme.Ink : ModernTheme.Muted; body.Children.Add(apply);
         body.Children.Add(SubtitleSpeechLabel(saved.ShareTranslationModel != selection.ShareTranslationModel
@@ -254,10 +254,12 @@ internal sealed partial class MainWindow
             string id = source.Id;
             var button = SubtitleSpeechButton(source.Label, (_, _) =>
             {
-                if (!CanEditSubtitleSpeech()) return;
+                if (!CanEditSubtitleSpeech() || id != "desktop" && !SupportsApplicationSubtitles) return;
                 _settings.IncomingAudioMode = id; _settings.CaptureVrChatOnly = id == "vrchat"; RefreshHomeSubtitleChoices();
             });
-            button.Name = "HomeSubtitleAudioSourceChoice"; button.Tag = id; button.IsEnabled = CanEditSubtitleSpeech();
+            button.Name = "HomeSubtitleAudioSourceChoice"; button.Tag = id; button.IsEnabled = CanEditSubtitleSpeech() && (id == "desktop" || SupportsApplicationSubtitles);
+            if (id != "desktop" && !SupportsApplicationSubtitles) button.ToolTip = UiText.T(IncomingCaptureCapabilities.UnavailableMessage);
+            ToolTipService.SetShowOnDisabled(button, true);
             SetHomeSubtitleSelected(button, IncomingListening.SourceMode(_settings) == id); sources.Children.Add(button);
         }
         body.Children.Add(sources);
@@ -266,7 +268,7 @@ internal sealed partial class MainWindow
             var selected = ModernTheme.Label(IncomingSourceDisplayName(_settings), 13, ModernTheme.Text, localize: false);
             selected.Name = "HomeSubtitleSelectedApplication"; body.Children.Add(selected);
             var choose = SubtitleSpeechButton("Choose application…", (_, _) => OpenHomeSubtitleApplicationPicker());
-            choose.Name = "HomeSubtitleChooseApplicationButton"; choose.IsEnabled = CanEditSubtitleSpeech(); body.Children.Add(choose);
+            choose.Name = "HomeSubtitleChooseApplicationButton"; choose.IsEnabled = CanEditSubtitleSpeech() && SupportsApplicationSubtitles; body.Children.Add(choose);
         }
         else if (IncomingListening.SourceMode(_settings) == "desktop")
             body.Children.Add(SubtitleSpeechLabel("All playback includes music, browsers and notifications. Choose an application to exclude them.", 12, ModernTheme.Warning));
@@ -334,6 +336,8 @@ internal sealed partial class MainWindow
     {
         if (_preview || !CanEditSubtitleSpeech()) return;
         AppSettings saved = SettingsStore.Load(), draft = _settings.Copy();
+        try { IncomingCaptureCapabilities.Validate(HomeSubtitleCandidate(saved, draft), SubtitleWindowsVersion); }
+        catch (IncomingListeningSelectionException error) { Error("Apply subtitle choices", error); return; }
         await ApplyTranslationSettingsAsync(HomeSubtitleCandidate(saved, draft), applyingProfile: false);
         TranslationProfiles.CopyInto(SettingsSaveState.Rebase(draft, saved, SettingsStore.Load()), _settings);
         RefreshSaveState(reloadSaved: true); if (!_closing) Navigate(_page);
@@ -341,11 +345,11 @@ internal sealed partial class MainWindow
 
     private void OpenHomeSubtitleApplicationPicker()
     {
-        if (!CanEditSubtitleSpeech()) return;
+        if (!CanEditSubtitleSpeech() || !SupportsApplicationSubtitles) return;
         Window? dialog = null;
         var view = new ListeningApplicationPicker(ApplicationAudioCatalog.ListRunning, choice =>
         {
-            if (!CanEditSubtitleSpeech() || ApplicationAudioCatalog.CanonicalExecutable(choice.Path).Length == 0) return;
+            if (!CanEditSubtitleSpeech() || !SupportsApplicationSubtitles || ApplicationAudioCatalog.CanonicalExecutable(choice.Path).Length == 0) return;
             _settings.IncomingAudioMode = "application"; _settings.CaptureVrChatOnly = false;
             _settings.IncomingApplicationPath = choice.Path; _settings.IncomingApplicationName = choice.Name;
             dialog!.DialogResult = true; RefreshHomeSubtitleChoices();

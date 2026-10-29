@@ -25,6 +25,7 @@
     <Compile Include="AppBrand.cs" />
     <Compile Include="AudioRouting.cs" />
     <Compile Include="ProcessLoopbackCapture.cs" />
+    <Compile Include="IncomingCaptureCapabilities.cs" />
     <Compile Include="LocalModelManager.cs" />
     <Compile Include="AiSpeakerIdentifier.cs" />
     <Compile Include="SpeakerFeedback.cs" />

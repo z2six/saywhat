@@ -1584,7 +1584,8 @@ internal sealed partial class MainWindow : Window
     private async Task ApplySettingsCoreAsync(bool own, bool incoming, CancellationToken token, bool applyingProfile = false, AppSettings? previousSettings = null)
     {
         AppSettings previous = previousSettings?.Copy() ?? SettingsStore.Load();
-        SettingsRuntimeChanges changes = SettingsRuntimeChanges.Between(previous, _settings);
+        SettingsRuntimeChanges changes = SettingsRuntimeChanges.Between(previous, _settings,
+            includeIncoming: incoming || IncomingCaptureCapabilities.SupportsSource(_settings, SubtitleWindowsVersion));
         bool restartOwn = own && changes.OwnChanged;
         bool applyIncoming = incoming && changes.IncomingChanged;
         bool sharedRestart = own && incoming && changes.SharedTranslatorChanged;

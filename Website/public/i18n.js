@@ -17,10 +17,10 @@
   let english = Object.assign(Object.create(null), {
     "release.pendingStatus": "The public installer is being prepared. Downloads are not available yet.",
     "release.pendingInstaller": "Installer being prepared ↓",
-    "release.pendingMeta": "Preview · Windows 11 x64 · Unsigned installer",
+    "release.pendingMeta": "Preview · Windows 10/11 x64 · Unsigned installer",
     "release.availableStatus": "Preview {version} is available. Review the requirements before installing.",
     "release.availableInstaller": "Download for Windows ↓",
-    "release.availableMeta": "Version {version} · {size} MiB · Windows 11 x64 · Unsigned installer",
+    "release.availableMeta": "Version {version} · {size} MiB · Windows 10/11 x64 · Unsigned installer",
     "release.errorStatus": "Download status could not be checked. Try refreshing; no installer link has been enabled.",
     "release.checking": "Checking download status…",
     "release.refresh": "Refresh download status",

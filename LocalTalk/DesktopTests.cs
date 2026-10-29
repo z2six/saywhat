@@ -70,6 +70,8 @@ internal static class DesktopTests
             checks+=IncomingListeningUiTests.Run(window, directory);
             checks+=SubtitleSpeechUiTests.Run(window, directory);
             checks+=HomeSubtitleUiTests.Run(window, directory);
+            checks+=IncomingCaptureCapabilityTests.RunUi(window);
+            checks+=Task.Run(() => IncomingCaptureCapabilityTests.RunRuntimeAsync(Path.Combine(directory, "windows-capture-capabilities"))).GetAwaiter().GetResult();
             checks+=SaveStateUiTests.Run(window);
             checks+=SpecializedTranslationModelTests.Run(directory);
             checks+=Task.Run(() => TimingDefaultsTests.RunAsync(directory)).GetAwaiter().GetResult();

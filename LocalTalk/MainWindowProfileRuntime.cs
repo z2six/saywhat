@@ -6,20 +6,20 @@ namespace IncomingTranslator;
 // unloading the microphone or an unchanged, shared translation model.
 internal sealed record SettingsRuntimeChanges(bool OwnChanged, bool IncomingChanged, bool SharedTranslatorChanged)
 {
-    internal static SettingsRuntimeChanges Between(AppSettings previous, AppSettings next)
+    internal static SettingsRuntimeChanges Between(AppSettings previous, AppSettings next, bool includeIncoming = true)
     {
         RuntimeController.RuntimePlan newOwn = RuntimeController.BuildPlan(next, incoming: false);
-        RuntimeController.RuntimePlan newIncoming = RuntimeController.BuildPlan(next, incoming: true);
+        RuntimeController.RuntimePlan newIncoming = includeIncoming ? RuntimeController.BuildPlan(next, incoming: true) : newOwn;
         RuntimeController.RuntimePlan oldOwn, oldIncoming;
         try
         {
             oldOwn = RuntimeController.BuildPlan(previous, incoming: false);
-            oldIncoming = RuntimeController.BuildPlan(previous, incoming: true);
+            oldIncoming = includeIncoming ? RuntimeController.BuildPlan(previous, incoming: true) : oldOwn;
         }
         catch (ArgumentException)
         {
             // An invalid old selection must not prevent applying a valid replacement.
-            return new(true, true, true);
+            return new(true, includeIncoming, true);
         }
         static bool TranslatorChanged(RuntimeController.RuntimePlan left, RuntimeController.RuntimePlan right) =>
             left.TranslationKey != right.TranslationKey || left.Shared != right.Shared || left.Managed != right.Managed;
@@ -30,7 +30,7 @@ internal sealed record SettingsRuntimeChanges(bool OwnChanged, bool IncomingChan
             || previous.OwnVoiceEndPauseMilliseconds != next.OwnVoiceEndPauseMilliseconds || previous.OwnVoiceSendEarlyPreviews != next.OwnVoiceSendEarlyPreviews
             || previous.FinishCapturedSentenceOnMute != next.FinishCapturedSentenceOnMute || previous.RecognitionDelayMilliseconds != next.RecognitionDelayMilliseconds
             || previous.TranslationQuality != next.TranslationQuality || previous.Glossary != next.Glossary;
-        bool incoming = TranslatorChanged(oldIncoming, newIncoming)
+        bool incoming = includeIncoming && (TranslatorChanged(oldIncoming, newIncoming)
             || previous.IncomingSpeechEngine != next.IncomingSpeechEngine || previous.VibeVoiceModelId != next.VibeVoiceModelId || previous.VibeVoiceEndpoint != next.VibeVoiceEndpoint
             || previous.IncomingTargetLanguage != next.IncomingTargetLanguage || previous.IncomingSourceLanguage != next.IncomingSourceLanguage
             || previous.IncomingSettleMilliseconds != next.IncomingSettleMilliseconds || previous.SubtitlePreviewStableMilliseconds != next.SubtitlePreviewStableMilliseconds
@@ -43,7 +43,7 @@ internal sealed record SettingsRuntimeChanges(bool OwnChanged, bool IncomingChan
             || previous.TranslationQuality != next.TranslationQuality || previous.Glossary != next.Glossary
             || previous.OverlayMode != next.OverlayMode || previous.HistoryLinesPerSpeaker != next.HistoryLinesPerSpeaker
             || previous.VisibleSpeakerRows != next.VisibleSpeakerRows || previous.SubtitlesAlwaysOnTop != next.SubtitlesAlwaysOnTop
-            || previous.ActiveTranslationProfileId != next.ActiveTranslationProfileId;
+            || previous.ActiveTranslationProfileId != next.ActiveTranslationProfileId);
         bool shared = oldOwn.Shared != newOwn.Shared || oldOwn.Managed != newOwn.Managed
             || ((oldOwn.Shared || newOwn.Shared) && TranslatorChanged(oldOwn, newOwn));
         return new(own, incoming, shared);
@@ -73,11 +73,7 @@ internal sealed partial class MainWindow
         AppSettings previous = SettingsStore.Load();
         try
         {
-            // Validate both directions before any live process is stopped.
-            _ = RuntimeController.BuildPlan(candidate, incoming: false);
-            _ = RuntimeController.BuildPlan(candidate, incoming: true);
-            IncomingListening.Validate(candidate);
-            RuntimeProfiles.ValidateIncomingSpeech(candidate);
+            ValidateTranslationSettingsForWindows(candidate, _runtime.IncomingRunning, SubtitleWindowsVersion);
             if (_runtime.IncomingRunning && RuntimeProfiles.UsesSpeakerRecognition(candidate) && !File.Exists(candidate.SpeakerModelPath))
                 throw new ModelSelectionUserException("Download or choose a voice recognition model first, then enable recognition.");
         }
@@ -101,7 +97,8 @@ internal sealed partial class MainWindow
         }
         AppSettings draftBefore = _settings.Copy();
         bool own = _runtime.OwnRunning, incoming = _runtime.IncomingRunning;
-        SettingsRuntimeChanges changes = SettingsRuntimeChanges.Between(previous, candidate);
+        SettingsRuntimeChanges changes = SettingsRuntimeChanges.Between(previous, candidate,
+            includeIncoming: incoming || IncomingCaptureCapabilities.SupportsSource(candidate, SubtitleWindowsVersion));
         if (!applyingProfile && (own && changes.OwnChanged || own && incoming && changes.SharedTranslatorChanged)
             && !Confirm("Apply your changes? Translation will briefly pause, and an unfinished sentence may be lost.")) return;
         await RunTask(async token =>
@@ -125,7 +122,11 @@ internal sealed partial class MainWindow
 
     private async Task PrepareTranslationProfileAssetsAsync(AppSettings candidate, CancellationToken token)
     {
-        var preparation = new TranslationSelectionPreparation(_provisioner);
+        bool prepareIncoming = IncomingCaptureCapabilities.SupportsSource(candidate, SubtitleWindowsVersion);
+        if (_runtime.IncomingRunning) IncomingCaptureCapabilities.Validate(candidate, SubtitleWindowsVersion);
+        // Saving an unused subtitle preference on Windows 10 must not block
+        // microphone setup or download an unavailable optional speech engine.
+        var preparation = new TranslationSelectionPreparation(_provisioner, ownVoiceOnly: !prepareIncoming);
         bool download = preparation.NeedsDownload(candidate);
         foreach (string id in preparation.MissingModelIds(candidate))
         {
@@ -135,8 +136,21 @@ internal sealed partial class MainWindow
         if (download && !Confirm(UiText.Format("Download required translation files ({0:0.0} GB) and apply these choices?", preparation.MissingDownloadBytes(candidate) / 1e9)))
             throw new OperationCanceledException();
         await preparation.PrepareAsync(candidate, ProvisionProgress(), token, allowDownload: download);
-        await PrepareSubtitleSpeechFilesAsync(candidate, token);
-        await EnsureGroupSpeechReadyForProfileAsync(candidate, token);
+        if (prepareIncoming)
+        {
+            await PrepareSubtitleSpeechFilesAsync(candidate, token);
+            await EnsureGroupSpeechReadyForProfileAsync(candidate, token);
+        }
+    }
+
+    internal static void ValidateTranslationSettingsForWindows(AppSettings candidate, bool incomingRunning, Version windowsVersion)
+    {
+        if (incomingRunning) IncomingCaptureCapabilities.Validate(candidate, windowsVersion);
+        _ = RuntimeController.BuildPlan(candidate, incoming: false);
+        if (!incomingRunning && !IncomingCaptureCapabilities.SupportsSource(candidate, windowsVersion)) return;
+        _ = RuntimeController.BuildPlan(candidate, incoming: true);
+        IncomingListening.Validate(candidate);
+        RuntimeProfiles.ValidateIncomingSpeech(candidate);
     }
 
     private async Task EnsureGroupSpeechReadyForProfileAsync(AppSettings candidate, CancellationToken token)
