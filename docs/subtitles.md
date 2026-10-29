@@ -11,6 +11,25 @@ early translations** is optional: it can display a translation before the senten
 is finished and revise it as more words arrive. This is separate from early
 VRChat messages for your own microphone. Listening continues in either mode.
 
+## Show Chinese speech only
+
+**Only show Chinese speech** is beside **They speak** on Home and in Listening.
+It skips recognized speech in other languages before translation. Switching the
+spoken-language choice to **Chinese** turns it on; you can turn it off to allow
+other languages again. Choosing another language or **Any language** clears it.
+Switching to Groups preserves the filter, so it can still restrict subtitles when
+the speech model detects languages automatically.
+
+Choose **Apply subtitle choices** after changing it. Changing only this filter
+updates running subtitles without reloading models. It does not affect your
+microphone translator, and skipped speech does not stop listening.
+
+The filter checks the words recognized by the speech model, not a guaranteed
+language label from the original audio. Short phrases, names and mixed-language
+speech can be missed. Japanese written only with shared Chinese characters can
+slip through, as can incorrect recognition that already looks like Chinese. Use
+the original text to distinguish recognition mistakes from translation mistakes.
+
 ## Compact overlay
 
 New messages appear **at the top**. The overlay shows **three messages** by default;

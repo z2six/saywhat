@@ -210,9 +210,11 @@ internal sealed partial class IncomingTranslationService
         {
             Interlocked.Exchange(ref _lastWordTicks, now.UtcTicks);
             Interlocked.Increment(ref _transcriptEvents);
-            string live = string.Join("  ·  ", chunk.Segments.Select(item => GroupSpeechProtocol.VoiceLabel(GroupSpeechProtocol.Key(chunk, item.VoiceId)) + ": " + item.Text));
-            await _source(live);
+            var visible = chunk.Segments.Where(item => IncomingSourceFilter.EvaluateChinese(item.Text, CurrentSettings().IncomingChineseOnly).Allowed).ToArray();
+            string live = string.Join("  ·  ", visible.Select(item => GroupSpeechProtocol.VoiceLabel(GroupSpeechProtocol.Key(chunk, item.VoiceId)) + ": " + item.Text));
+            string raw = string.Join(" ", visible.Length > 0 ? visible.Select(item => item.Text) : chunk.Segments.Select(item => item.Text));
             await ReportHealthAsync("listening", ListeningStatus(CurrentSettings()));
+            await PublishIncomingSourceAsync(raw, live);
         }
         await SettleGroupSentencesCoreAsync(token);
     }
@@ -270,6 +272,7 @@ internal sealed partial class IncomingTranslationService
         }
         foreach (var item in ready)
         {
+            if (!await AdmitIncomingSourceAsync(item.Segment.Text, item.Id, now)) continue;
             SpeakerAttribution speaker = item.Candidate with { SessionVoiceKey = item.Key };
             lock (_feedbackGate)
             {

@@ -120,6 +120,13 @@ internal static class HomeSubtitleUiTests
                     nodes.OfType<Button>().Count(button => button.Name == "HomeSubtitlePauseChoice") == 4 &&
                     nodes.OfType<CheckBox>().Any(check => check.Name == "HomeSubtitlePersonRecognitionToggle"),
                     "audio source, sentence timing and optional people recognition are on Home");
+                var chineseOnly = nodes.OfType<CheckBox>().Single(check => check.Name == "SubtitleChineseOnlyToggle");
+                Check(chineseOnly.IsEnabled && chineseOnly.Visibility == Visibility.Visible &&
+                    chineseOnly.Content?.ToString() == UiText.T("Only show Chinese speech") &&
+                    AutomationProperties.GetName(chineseOnly) == UiText.T("Only show Chinese speech") &&
+                    nodes.OfType<TextBlock>().Any(text => text.Text == UiText.T("Skip other languages. Short or mixed-language speech may sometimes be missed.")) &&
+                    nodes.OfType<TextBlock>().Any(text => text.Text == UiText.T("Changing only this filter does not restart models.")),
+                    "Home exposes the translated Chinese filter, limits and live-apply behavior beside spoken-language choices: " + language);
                 Check(nodes.OfType<TextBlock>().Any(text => text.Text == SubtitleSpeechText.T("Translation model · translates their words")) &&
                     nodes.OfType<Button>().Where(button => button.Name == "HomeSubtitleTargetChoice")
                         .All(button => AutomationProperties.GetName(button).StartsWith(UiText.T("Translate their voices to") + ": ", StringComparison.Ordinal)),
@@ -128,14 +135,25 @@ internal static class HomeSubtitleUiTests
                     "optional subtitle controls do not disable own-voice start");
             }
             UiText.Language = "en"; window.Navigate("Home");
+            Nodes(window).OfType<CheckBox>().Single(check => check.Name == "SubtitleChineseOnlyToggle")
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(settings.IncomingChineseOnly && settings.OwnVoiceSourceLanguage == saved.OwnVoiceSourceLanguage &&
+                settings.OwnVoiceTargetLanguage == saved.OwnVoiceTargetLanguage,
+                "Home's filter is a staged incoming-only change without applying microphone drafts");
             Click("SubtitleSourceLanguageChoice", "Automatic");
-            Check(settings.IncomingSpeechEngine == "nemotron" && settings.IncomingSourceLanguage == "Automatic", "Home switches to a multilingual recognizer for Any language");
+            Check(settings.IncomingSpeechEngine == "nemotron" && settings.IncomingSourceLanguage == "Automatic" && !settings.IncomingChineseOnly,
+                "Home switches to a multilingual recognizer and unrestricted filtering for Any language");
             Check(!Choice("HomeSubtitleTranslatorChoice", "translategemma-4b-q4_k_m").IsEnabled, "TranslateGemma explains its explicit-language requirement before selection");
             Click("SubtitleSourceLanguageChoice", "English"); Click("HomeSubtitleTranslatorChoice", "lfm2-350m-enjp-mt-q4_k_m");
             Check(!settings.ShareTranslationModel && settings.IncomingManagedModelId == "lfm2-350m-enjp-mt-q4_k_m" &&
                 settings.OwnManagedModelId == saved.OwnManagedModelId && !Choice("HomeSubtitleTargetChoice", "Chinese").IsEnabled,
                 "Home keeps the own translator and disables unsupported targets after choosing Liquid");
             ownFlag.SetValue(runtime, true); incomingFlag.SetValue(runtime, true); window.Navigate("Home");
+            var liveFilter = Nodes(window).OfType<CheckBox>().Single(check => check.Name == "SubtitleChineseOnlyToggle");
+            Check(liveFilter.IsEnabled, "the filter remains editable while both synthetic directions are running");
+            liveFilter.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(settings.IncomingChineseOnly && runtime.OwnRunning && runtime.IncomingRunning,
+                "staging a live filter choice does not stop either direction");
             Click("HomeSubtitlePauseChoice", 1800);
             Check(settings.IncomingSettleMilliseconds == 1800 && runtime.OwnRunning && runtime.IncomingRunning &&
                 Choice("HomeSubtitleAudioSourceChoice", "application").IsEnabled,
@@ -152,6 +170,8 @@ internal static class HomeSubtitleUiTests
             {
                 Field("_busy").SetValue(window, busy); Field("_closing").SetValue(window, closing); window.Navigate("Home");
                 Check(Choice("HomeSubtitlePauseChoice", 1200).IsEnabled == (!busy && !closing), "staging respects busy and closing guards");
+                Check(Nodes(window).OfType<CheckBox>().Single(check => check.Name == "SubtitleChineseOnlyToggle").IsEnabled == (!busy && !closing),
+                    "the Chinese filter respects busy and closing guards");
             }
             Field("_busy").SetValue(window, false); Field("_closing").SetValue(window, false); ownFlag.SetValue(runtime, false);
             TranslationProfiles.CopyInto(saved, settings); window.Navigate("Home");

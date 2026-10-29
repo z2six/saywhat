@@ -34,6 +34,7 @@ internal sealed record SettingsRuntimeChanges(bool OwnChanged, bool IncomingChan
             || previous.IncomingSpeechEngine != next.IncomingSpeechEngine || previous.VibeVoiceModelId != next.VibeVoiceModelId || previous.VibeVoiceEndpoint != next.VibeVoiceEndpoint
             || previous.IncomingTargetLanguage != next.IncomingTargetLanguage || previous.IncomingSourceLanguage != next.IncomingSourceLanguage
             || previous.IncomingSendEarlyPreviews != next.IncomingSendEarlyPreviews
+            || previous.IncomingChineseOnly != next.IncomingChineseOnly
             || previous.IncomingSettleMilliseconds != next.IncomingSettleMilliseconds || previous.SubtitlePreviewStableMilliseconds != next.SubtitlePreviewStableMilliseconds
             || previous.RecognitionDelayMilliseconds != next.RecognitionDelayMilliseconds || previous.CaptureVrChatOnly != next.CaptureVrChatOnly
             || previous.PlaybackDeviceId != next.PlaybackDeviceId || previous.NormalizeQuietPlayback != next.NormalizeQuietPlayback

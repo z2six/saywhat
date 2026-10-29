@@ -155,24 +155,32 @@ internal sealed partial class IncomingTranslationService
                 display = ResolveDisplayIdentityLocked(display);
                 _publishedDisplays[bubbleId] = display;
             }
+            if (!IncomingSourceFilter.EvaluateChinese(display.Source, CurrentSettings().IncomingChineseOnly).Allowed) return;
             await _translation(display).ConfigureAwait(false);
         }
         finally { _displayPublicationGate.Release(); }
     }
 
-    private async Task PublishTranslationDisplayAsync(TranslationDisplay display)
+    private Task<bool> PublishTranslationDisplayAsync(TranslationDisplay display) => PublishSourceFilteredDisplayAsync(display, null);
+
+    private async Task<bool> PublishSourceFilteredDisplayAsync(TranslationDisplay display, TranslationRequest? sourceRequest)
     {
         await _displayPublicationGate.WaitAsync().ConfigureAwait(false);
         try
         {
+            // Recheck inside the publication lease: an option can change while
+            // HTTP or an earlier identity update is still completing.
+            if (sourceRequest is TranslationRequest request && !await AdmitIncomingRequestAsync(request)) return false;
+            if (!IncomingSourceFilter.EvaluateChinese(display.Source, CurrentSettings().IncomingChineseOnly).Allowed) return false;
             lock (_feedbackGate)
             {
-                if (_publishedDisplays.TryGetValue(display.UtteranceId, out TranslationDisplay latest) && latest.At > display.At) return;
+                if (_publishedDisplays.TryGetValue(display.UtteranceId, out TranslationDisplay latest) && latest.At > display.At) return false;
                 display = ResolveDisplayIdentityLocked(display);
                 _publishedDisplays[display.UtteranceId] = display;
                 PruneIdentityMetadataLocked();
             }
             await _translation(display).ConfigureAwait(false);
+            return true;
         }
         finally { _displayPublicationGate.Release(); }
     }
@@ -227,6 +235,7 @@ internal sealed partial class IncomingTranslationService
     private async Task QueueTranslationAsync(TranslationRequest request, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        if (!await AdmitIncomingRequestAsync(request)) return;
         // Live opt-out also covers drafts already produced by a decoder before
         // its next settings snapshot. Finished sentences are never discarded.
         if (!request.IsCommitted && !CurrentSettings().IncomingSendEarlyPreviews) return;

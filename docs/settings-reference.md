@@ -69,6 +69,29 @@ For subtitles, **Any language** requires a compatible multilingual recognizer su
 
 ## Timing, microphone and playback
 
+### Incoming language filter
+
+**Only show Chinese speech** / `IncomingChineseOnly` defaults to `false` for new
+settings and Any-language conversations. It filters recognized incoming text
+before translation, independently of the recognition model's spoken-language
+choice. It can therefore stay enabled with Groups or automatic Voxtral detection.
+It does not restrict your microphone or change its English-to-other-language
+translation.
+
+On upgrade, a missing flag migrates to `true` only for an explicitly saved Chinese
+incoming source, or an automatic source with saved `DetectAnySourceLanguage=false`
+and a single Chinese `SourceLanguages` entry. A stored explicit `false` always
+wins. Bilingual lists and unrestricted defaults remain unrestricted. Switching the
+source choice to Chinese enables the filter; clicking an already-selected Chinese
+choice preserves a manual opt-out. Other explicit language/Any-language choices
+clear it, while profile-driven automatic detection preserves it.
+
+The checkbox is visible on Home and in Listening. **Apply subtitle choices** uses
+the existing live settings path when only this flag changes, retaining loaded
+models and leaving microphone choices alone. The filter is a practical text
+heuristic: very short/mixed speech may be rejected, while Han-only Japanese or
+hallucinated Chinese may pass. It is not a guarantee of audio-language detection.
+
 | Setting / key | Default | Dashboard range / effect |
 | --- | --- | --- |
 | My voice: silence before finalizing / `OwnVoiceEndPauseMilliseconds` | `1200` ms | 900–3,500 ms, 100 ms UI steps. Shorter finalizes earlier but splits natural pauses; longer waits for more context. Actual PCM quiet must reach the threshold. |

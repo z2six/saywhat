@@ -3,6 +3,17 @@
 Installers, full notes and matching source archives are on
 [GitHub Releases](https://github.com/z2six/saywhat/releases).
 
+## 0.2.8
+
+- Added Only show Chinese speech on Home and Listening, filtering clearly
+  incompatible or English-dominated recognition before identification and translation.
+- Kept raw recognition and decoder progress intact while consuming skipped
+  sections, preventing them from blocking or replaying into later subtitles.
+- Rechecked queued and in-flight requests when filtering changes; filter-only
+  updates keep the current speech/translation models running.
+- Enabled the filter on upgrade for existing Chinese-only source choices,
+  preserving explicit opt-outs and unrestricted automatic/bilingual choices.
+
 ## 0.2.7
 
 - Put the newest subtitles and transcript messages at the top.

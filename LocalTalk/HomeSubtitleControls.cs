@@ -33,6 +33,7 @@ internal sealed partial class MainWindow
         candidate.IncomingPersonId = draft.IncomingPersonId;
         candidate.IncomingSettleMilliseconds = draft.IncomingSettleMilliseconds;
         candidate.IncomingSendEarlyPreviews = draft.IncomingSendEarlyPreviews;
+        candidate.IncomingChineseOnly = draft.IncomingChineseOnly;
         // Profile selection here changes only the incoming recognizer. In
         // particular, it must not apply a preset's global recognition delay.
         if (draft.IncomingSpeechEngine == "vibevoice") candidate.ActiveTranslationProfileId = TranslationProfiles.GroupsId;

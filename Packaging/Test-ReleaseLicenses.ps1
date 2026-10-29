@@ -3,6 +3,7 @@ param([string]$PayloadDirectory)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $reviewed = [ordered]@{
+    'Unicode-License-V3.txt' = 'e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96'
     'NAudio-MIT.txt' = '7c57209555296e73faa34fe38740aa4a86aa8250d969ab73a6e37de57c36c0a5'
     'sherpa-onnx-Apache-2.0.txt' = 'cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30'
     'ONNX-Runtime-ThirdPartyNotices.txt' = '0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2'

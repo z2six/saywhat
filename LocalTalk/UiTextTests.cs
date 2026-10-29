@@ -43,6 +43,8 @@ internal static class UiTextTests
             string[] required = ["Home", "Languages", "Speakers", "Settings", "Setup", "Advanced", "Interface language",
                 "Subtitle appearance", "Visible messages", "Font size", "Bubble width", "Background", "Background opacity", "Original text", "Show original text",
                 "Show early translations", "Show a translation before the sentence is finished. It may change as more words arrive.",
+                "Only show Chinese speech", "Skip other languages. Short or mixed-language speech may sometimes be missed.",
+                "Changing only this filter does not restart models.", "Skipping non-Chinese speech. Still listening…",
                 "Couldn't show the overlay. Open Logs to read subtitles, or restart subtitles.",
                 "Transcript", "Open transcript", "Close transcript", "Copy all", "Copy", "Follow latest", "No subtitles yet.", "Copied", "Couldn't copy text. Try again.",
                 "My VRChat messages", "Show translations while I speak", "Adjust sentence timing",

@@ -6,6 +6,8 @@ namespace IncomingTranslator;
 
 internal sealed partial class SubtitleWindow
 {
+    private const string FilteredSourceUiMessage = "Skipping non-Chinese speech. Still listening…";
+    private bool _sourceIsFilteredStatus;
     internal Func<string, Task>? ProfileChangeRequested { get; set; }
     private Button? _normalProfileButton, _groupsProfileButton;
     private TextBlock? _subtitleProfileCaption;
@@ -89,7 +91,12 @@ internal sealed partial class SubtitleWindow
         var runCancellation = _serviceRunCancellation;
         long lastId = _displayHistory.Count == 0 ? 0 : _displayHistory.Max(display => display.UtteranceId);
         var service = new IncomingTranslationService(_settings, SetStatus,
-            text => Dispatcher.InvokeAsync(new Action(() => { _receivedSource = true; _source.Text = text; })).Task,
+            text => Dispatcher.InvokeAsync(new Action(() =>
+            {
+                _receivedSource = true;
+                _sourceIsFilteredStatus = text == FilteredSourceUiMessage;
+                _source.Text = _sourceIsFilteredStatus ? Ui(FilteredSourceUiMessage) : text;
+            })).Task,
             result => Dispatcher.InvokeAsync(new Action(() => Publish(result))).Task, initialBubbleId: lastId);
         _service = service;
         _serviceRunTask = RunOverlayServiceAsync(service, runCancellation);

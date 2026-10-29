@@ -129,6 +129,11 @@ if ([version]($Version -split '-', 2)[0] -ge [version]'0.2.5') {
     $requiredSource += @('IncomingTranslator/IncomingCaptureCapabilities.cs','LocalTalk/IncomingCaptureUi.cs',
         'LocalTalk/IncomingCaptureCapabilityTests.cs','Packaging/Test-WindowsCompatibility.ps1')
 }
+if ([version]($Version -split '-', 2)[0] -ge [version]'0.2.8') {
+    $requiredSource += @('IncomingTranslator/IncomingSourceFilter.cs','IncomingTranslator/IncomingSourceFiltering.cs',
+        'LocalTalk/ChineseSubtitleFilterTests.cs','LocalTalk/IncomingChineseOnlyPreferenceTests.cs','LocalTalk/IncomingSourceFilterPipelineTests.cs',
+        'Packaging/licenses/Unicode-License-V3.txt')
+}
 if ([version]($Version -split '-', 2)[0] -ge [version]'0.2.7') {
     $requiredSource += @('IncomingTranslator/SubtitleActionSurface.cs','LocalTalk/SubtitleActionSurfaceTests.cs',
         'LocalTalk/CompactPersonCorrectionTests.cs')

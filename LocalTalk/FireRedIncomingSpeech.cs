@@ -204,34 +204,49 @@ internal sealed partial class IncomingTranslationService
                 if (queue.IsObsoletePreview(job!) || !job!.Final && !CurrentSettings().IncomingSendEarlyPreviews) continue;
                 string text = await recognizer.DecodeAsync(job!.Samples, settings.IncomingSourceLanguage, cancellation);
                 if (queue.IsObsoletePreview(job) || !job.Final && !CurrentSettings().IncomingSendEarlyPreviews) continue;
-                Interlocked.Increment(ref _transcriptEvents);
-                Interlocked.Exchange(ref _lastDecoderProgressTicks, DateTimeOffset.UtcNow.UtcTicks);
-                if (string.IsNullOrWhiteSpace(text))
-                {
-                    if (job.Final && bubbles.Remove(job.Segment))
-                        await ReportHealthAsync("speech-empty", "Some speech wasn't recognized. Still listening.", true,
-                            "A final FireRed speech section returned no words after an earlier draft.");
-                    continue;
-                }
-                MarkMeaningfulProgress();
-                _lastTranscriptAt = DateTimeOffset.UtcNow;
-                Interlocked.Exchange(ref _lastWordTicks, _lastTranscriptAt.UtcTicks);
-                _lastMeaningfulAudioEnd = job.End;
-                _awaitingRecognitionProgress = false;
-                _lastTextAudioEnd = job.End;
-                await ReportHealthAsync("listening", ListeningStatus(CurrentSettings()));
-                if (!bubbles.TryGetValue(job.Segment, out long bubble)) bubbles[job.Segment] = bubble = Interlocked.Increment(ref _nextUtteranceId);
-                long epoch = Interlocked.Read(ref _speakerRecognitionEpoch);
-                SpeakerAttribution speaker = QueueSpeakerIdentification(bubble, text, job.Start, job.End, job.End, epoch);
-                TranslationRequest request = CreateTranslationRequest(text, speaker, job.Start, job.End, bubble, epoch) with { IsCommitted = job.Final };
-                // End timestamps for a final can equal the last draft (e.g. hard
-                // bound); the final flag still commits the same visible bubble.
-                await _source($"{LiveSpeakerLabel(speaker)}: {text}");
-                await QueueTranslationAsync(request, cancellation);
-                Log($"FireRed subtitle section: id={bubble}; final={job.Final}; audioMs={(job.End - job.Start).TotalMilliseconds:0}; sourceChars={text.Length}.");
-                if (job.Final) bubbles.Remove(job.Segment);
-                while (bubbles.Count > 16) bubbles.Remove(bubbles.Keys.Min());
+                await ObserveFireRedTranscriptAsync(job, text, bubbles, cancellation);
             }
         }
+    }
+
+    // Keep the actual decoded-result boundary testable without loading a model
+    // or audio device. Filtered words still acknowledge the original PCM range.
+    private async Task ObserveFireRedTranscriptAsync(FireRedDecodeJob job, string text,
+        Dictionary<long, long> bubbles, CancellationToken cancellation)
+    {
+        cancellation.ThrowIfCancellationRequested();
+        Interlocked.Increment(ref _transcriptEvents);
+        Interlocked.Exchange(ref _lastDecoderProgressTicks, DateTimeOffset.UtcNow.UtcTicks);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            if (job.Final && bubbles.Remove(job.Segment))
+                await ReportHealthAsync("speech-empty", "Some speech wasn't recognized. Still listening.", true,
+                    "A final FireRed speech section returned no words after an earlier draft.");
+            return;
+        }
+        MarkMeaningfulProgress();
+        _lastTranscriptAt = DateTimeOffset.UtcNow;
+        Interlocked.Exchange(ref _lastWordTicks, _lastTranscriptAt.UtcTicks);
+        _lastMeaningfulAudioEnd = job.End;
+        _awaitingRecognitionProgress = false;
+        _lastTextAudioEnd = job.End;
+        await ReportHealthAsync("listening", ListeningStatus(CurrentSettings()));
+        bubbles.TryGetValue(job.Segment, out long bubble);
+        // Filter only after acknowledgements, before voice evidence or work.
+        if (!await AdmitIncomingSourceAsync(text, bubble, job.End))
+        {
+            await PublishIncomingSourceAsync(text);
+            if (job.Final) bubbles.Remove(job.Segment);
+            return;
+        }
+        if (bubble == 0) bubbles[job.Segment] = bubble = Interlocked.Increment(ref _nextUtteranceId);
+        long epoch = Interlocked.Read(ref _speakerRecognitionEpoch);
+        SpeakerAttribution speaker = QueueSpeakerIdentification(bubble, text, job.Start, job.End, job.End, epoch);
+        TranslationRequest request = CreateTranslationRequest(text, speaker, job.Start, job.End, bubble, epoch) with { IsCommitted = job.Final };
+        await PublishIncomingSourceAsync(text, $"{LiveSpeakerLabel(speaker)}: {text}");
+        await QueueTranslationAsync(request, cancellation);
+        Log($"FireRed subtitle section: id={bubble}; final={job.Final}; audioMs={(job.End - job.Start).TotalMilliseconds:0}; sourceChars={text.Length}.");
+        if (job.Final) bubbles.Remove(job.Segment);
+        while (bubbles.Count > 16) bubbles.Remove(bubbles.Keys.Min());
     }
 }

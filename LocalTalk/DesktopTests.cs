@@ -52,6 +52,9 @@ internal static class DesktopTests
             checks+=NativeSpeechProvisionerTests.Run();
             checks+=FireRedSpeechTests.Run();
             checks+=RecognitionTextFilterTests.Run();
+            checks+=ChineseSubtitleFilterTests.Run();
+            checks+=IncomingChineseOnlyPreferenceTests.Run();
+            checks+=Task.Run(() => IncomingSourceFilterPipelineTests.RunAsync(Path.Combine(directory, "incoming-source-filter"))).GetAwaiter().GetResult();
             checks+=Task.Run(() => IncomingTranslationService.RunRecognitionControlOfflineChecksAsync(Path.Combine(directory, "recognition-controls"))).GetAwaiter().GetResult();
             checks+=Task.Run(() => IncomingNativeSpeechTests.RunAsync(Path.Combine(directory, "incoming-native-speech"))).GetAwaiter().GetResult();
             checks+=TranslationProfileTests.Run();

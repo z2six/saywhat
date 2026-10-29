@@ -41,6 +41,7 @@ internal sealed class AppSettings
     public string OwnMicrophoneDeviceId { get; set; } = "default";
     public bool OwnVoicePauseWhenVrchatMuted { get; set; } = true;
     public string IncomingSourceLanguage { get; set; } = "Automatic";
+    public bool IncomingChineseOnly { get; set; } = false;
     public bool OwnVoiceAdditionalLanguagesEnabled { get; set; } = false;
     public List<string> OwnVoiceAdditionalTargetLanguages { get; set; } = new();
     public string OverlayMode { get; set; } = "Sentence bubbles";
@@ -114,6 +115,7 @@ internal sealed class AppSettings
         OwnMicrophoneDeviceId = OwnMicrophoneDeviceId,
         OwnVoicePauseWhenVrchatMuted = OwnVoicePauseWhenVrchatMuted,
         IncomingSourceLanguage = IncomingSourceLanguage,
+        IncomingChineseOnly = IncomingChineseOnly,
         OwnVoiceAdditionalLanguagesEnabled = OwnVoiceAdditionalLanguagesEnabled,
         OwnVoiceAdditionalTargetLanguages = (OwnVoiceAdditionalTargetLanguages ?? new()).ToList(),
         OverlayMode = OverlayMode,
@@ -274,6 +276,20 @@ internal static partial class SettingsStore
             settings.FirstRunSetupCompleted)
             settings.FirstRunIntroductionCompleted = true;
         Normalize(settings);
+        if (document.RootElement.ValueKind == JsonValueKind.Object &&
+            !document.RootElement.TryGetProperty(nameof(AppSettings.IncomingChineseOnly), out _))
+        {
+            bool explicitChinese = document.RootElement.TryGetProperty(nameof(AppSettings.IncomingSourceLanguage), out JsonElement source)
+                && source.ValueKind == JsonValueKind.String && settings.IncomingSourceLanguage == "Chinese";
+            bool legacyChineseList = settings.IncomingSourceLanguage == "Automatic"
+                && document.RootElement.TryGetProperty(nameof(AppSettings.DetectAnySourceLanguage), out JsonElement detectAny)
+                && detectAny.ValueKind == JsonValueKind.False
+                && document.RootElement.TryGetProperty(nameof(AppSettings.SourceLanguages), out JsonElement languages)
+                && languages.ValueKind == JsonValueKind.Array && languages.GetArrayLength() == 1
+                && languages[0].ValueKind == JsonValueKind.String
+                && AppSettings.CanonicalTranslationLanguage(languages[0].GetString()) == "Chinese";
+            settings.IncomingChineseOnly = explicitChinese || legacyChineseList;
+        }
         if (document.RootElement.ValueKind == JsonValueKind.Object &&
             !document.RootElement.TryGetProperty(nameof(AppSettings.ActiveTranslationProfileId), out _))
             TranslationProfiles.MigrateExistingSettings(settings);

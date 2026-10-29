@@ -16,6 +16,7 @@ internal sealed partial class MainWindow
         AppSettings candidate = saved.Copy();
         candidate.IncomingSpeechEngine = draft.IncomingSpeechEngine;
         candidate.IncomingSourceLanguage = draft.IncomingSourceLanguage;
+        candidate.IncomingChineseOnly = draft.IncomingChineseOnly;
         candidate.IncomingNormalSpeechEngine = draft.IncomingNormalSpeechEngine;
         candidate.IncomingNormalSourceLanguage = draft.IncomingNormalSourceLanguage;
         candidate.DetectAnySourceLanguage = draft.IncomingSourceLanguage == "Automatic";
@@ -38,11 +39,14 @@ internal sealed partial class MainWindow
     internal static bool StageSubtitleSourceLanguage(AppSettings settings, string language)
     {
         if (!SubtitleSourceChoices.Contains(language)) return false;
+        bool sourceChanged = settings.IncomingSourceLanguage != language;
         // A language is a real recognition choice, not merely a translation hint.
         // Select a compatible recognizer visibly when the old one cannot use it.
         if (!IncomingRecognitionCatalog.Find(settings.IncomingSpeechEngine).SupportsSource(language))
             settings.IncomingSpeechEngine = language == "Chinese" ? "firered2-aed" : "nemotron";
         settings.IncomingSourceLanguage = language;
+        if (language != "Chinese") settings.IncomingChineseOnly = false;
+        else if (sourceChanged) settings.IncomingChineseOnly = true;
         RememberSubtitleSpeech(settings);
         return true;
     }
@@ -98,6 +102,16 @@ internal sealed partial class MainWindow
         }
         body.Children.Add(languages);
         body.Children.Add(SubtitleSpeechLabel("Choose a language when you know it. Any language uses a multilingual recognizer and may mistake short or unclear speech.", 12, ModernTheme.Muted));
+        var chineseOnly = HomeSubtitleCheck("Only show Chinese speech", _settings.IncomingChineseOnly, (_, _) =>
+        {
+            if (!CanEditSubtitleSpeech()) return;
+            _settings.IncomingChineseOnly = !_settings.IncomingChineseOnly;
+            RefreshSaveState(); Navigate(_page);
+        });
+        chineseOnly.Name = "SubtitleChineseOnlyToggle";
+        body.Children.Add(chineseOnly);
+        body.Children.Add(SubtitleSpeechLabel("Skip other languages. Short or mixed-language speech may sometimes be missed.", 12, ModernTheme.Muted));
+        body.Children.Add(SubtitleSpeechLabel("Changing only this filter does not restart models.", 12, ModernTheme.Muted));
         if (onHome) AppendHomeSubtitleTargets(body);
         body.Children.Add(SubtitleSpeechLabel("Speech model", 14));
         var models = new System.Windows.Controls.Primitives.UniformGrid { Name = "SubtitleSpeechModelChoices", Columns = 2 };
@@ -161,7 +175,8 @@ internal sealed partial class MainWindow
     }
 
     private static bool SameSubtitleSpeechSelection(AppSettings left, AppSettings right) =>
-        left.IncomingSpeechEngine == right.IncomingSpeechEngine && left.IncomingSourceLanguage == right.IncomingSourceLanguage;
+        left.IncomingSpeechEngine == right.IncomingSpeechEngine && left.IncomingSourceLanguage == right.IncomingSourceLanguage
+        && left.IncomingChineseOnly == right.IncomingChineseOnly;
 
     internal FrameworkElement CreateHomeSubtitleSpeechSummary()
     {

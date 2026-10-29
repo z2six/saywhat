@@ -219,6 +219,7 @@ internal sealed partial class SubtitleWindow : Window
         _status.Text=_lastStatus == IncomingListening.WaitingMessage(_settings)
             ? ListeningSourceWaitingUi(_settings) : Ui(_lastStatus);
         if(!_receivedSource) _source.Text=ListeningSourceWaitingUi(_settings);
+        else if (_sourceIsFilteredStatus) _source.Text = Ui(FilteredSourceUiMessage);
         ApplyAlwaysOnTop(_settings.SubtitlesAlwaysOnTop);
         _quickGuideButton.ToolTip = Ui("Quick subtitle guide");
         System.Windows.Automation.AutomationProperties.SetName(_quickGuideButton, Ui("Quick subtitle guide"));
@@ -910,6 +911,8 @@ internal sealed partial class SubtitleWindow : Window
 internal readonly record struct TranslationRequest(string Source, SpeakerAttribution Speaker, long UtteranceId, DateTimeOffset At)
 {
     public long SpeakerRecognitionEpoch { get; init; }
+    public long SourceFilterEpoch { get; init; }
+    public long SourceRevisionVersion { get; init; }
     public bool IsCommitted { get; init; } = true;
 }
 internal sealed record SpeakerRecognitionStatus(bool Enabled, bool ModelLoaded, string Message);
@@ -933,7 +936,7 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
     private readonly Func<string, bool, Task> _status;
     private readonly Func<string, Task> _source;
     private readonly Func<TranslationDisplay, Task> _translation;
-    private readonly HttpClient _http = new() { Timeout = Timeout.InfiniteTimeSpan };
+    private readonly HttpClient _http;
     private readonly object _gate = new();
     private readonly object _settingsGate = new();
     private readonly SemaphoreSlim _healthUpdates = new(1, 1);
@@ -1061,7 +1064,8 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
         Func<string, Task> source,
         Func<TranslationDisplay, Task> translation,
         AiSpeakerIdentifier? speakerIdentifier = null,
-        long initialBubbleId = 0)
+        long initialBubbleId = 0,
+        HttpMessageHandler? translationHandler = null)
     {
         _settings = settings.Copy();
         _nextUtteranceId = Math.Max(0, initialBubbleId);
@@ -1071,6 +1075,8 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
         _status = status;
         _source = source;
         _translation = translation;
+        _http = translationHandler is null ? new HttpClient() : new HttpClient(translationHandler);
+        _http.Timeout = Timeout.InfiniteTimeSpan;
         _translations = Channel.CreateBounded<TranslationRequest>(new BoundedChannelOptions(8)
         {
             FullMode = BoundedChannelFullMode.Wait, SingleReader = true, SingleWriter = false
@@ -1088,6 +1094,7 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
             next.UseAiSpeakerRecognition = _settings.UseAiSpeakerRecognition;
             _settings = next;
         }
+        ApplySourceFilterSettings(previous, settings);
         if (!IncomingListening.SameSource(previous, settings) || previous.RecognitionDelayMilliseconds != settings.RecognitionDelayMilliseconds)
         {
             _captureRefreshNeeded = true;
@@ -1929,7 +1936,7 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
             Log("Speech progress restored: changed transcript text arrived; recovery cooldown reset.");
             await ReportHealthAsync("listening", ListeningStatus(CurrentSettings()));
         }
-        if (!string.IsNullOrWhiteSpace(active)) await _source("Listening: " + active);
+        if (!string.IsNullOrWhiteSpace(active)) await PublishIncomingSourceAsync(active, "Listening: " + active);
     }
 
     private async Task SettleLoopAsync(CancellationToken cancellationToken)
@@ -1946,7 +1953,7 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
             if (request is not null && !IsSuperseded(request.Value))
             {
                 await QueueTranslationAsync(request.Value, cancellationToken);
-                await _source($"{LiveSpeakerLabel(request.Value.Speaker)}: {request.Value.Source}");
+                await PublishIncomingSourceAsync(request.Value.Source, $"{LiveSpeakerLabel(request.Value.Speaker)}: {request.Value.Source}");
             }
         }
     }
@@ -1957,36 +1964,48 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
         return await TakeSubtitleSegmentAsync(final: false, cancellationToken);
     }
 
-    private Task<TranslationRequest?> TakeSubtitleSegmentAsync(bool final, CancellationToken cancellationToken, DateTimeOffset? observedAt = null)
+    private async Task<TranslationRequest?> TakeSubtitleSegmentAsync(bool final, CancellationToken cancellationToken, DateTimeOffset? observedAt = null)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        SubtitleSegment segment;
-        long bubbleId;
-        DateTimeOffset end = observedAt ?? DateTimeOffset.UtcNow;
-        DateTimeOffset evidenceEnd, evidenceStart;
-        lock (_gate)
+        // Consume excluded segments exactly like accepted ones. Their committed
+        // source watermark must advance before trying the next sentence, including
+        // a final flush, so later Chinese cannot replay an English prefix.
+        while (true)
         {
-            AppSettings settings = CurrentSettings();
-            _subtitleSegments.StabilityMilliseconds = settings.SubtitlePreviewStableMilliseconds;
-            _subtitleSegments.SendEarlyPreviews = settings.IncomingSendEarlyPreviews;
-            TimeSpan settle = TimeSpan.FromMilliseconds(Math.Clamp(settings.IncomingSettleMilliseconds, 600, 2400));
-            bool quiet = SubtitleSegmentation.HasAudioPause(end, _speakerTracker.LastVoiceLikeAt, _lastDecodedAudioEnd, settle,
-                lastWordAudioEnd: _lastMeaningfulAudioEnd ?? _lastTextAudioEnd, lastAudibleAt: _speakerTracker.LastAudibleAt);
-            if (!_subtitleSegments.TryTakeReady(end, final,
-                settle, out segment, allowQuietCommit: quiet)) return Task.FromResult<TranslationRequest?>(null);
-            if (!_subtitleBubbleIds.TryGetValue(segment.SequenceIndex, out bubbleId))
-                _subtitleBubbleIds[segment.SequenceIndex] = bubbleId = Interlocked.Increment(ref _nextUtteranceId);
-            evidenceEnd = _lastTextAudioEnd ?? end;
-            double seconds = Math.Clamp((end - segment.StartedAt).TotalSeconds + 1, 1.5, 12);
-            evidenceStart = evidenceEnd.AddSeconds(-seconds);
-            if (evidenceStart < _audioTimelineStart) evidenceStart = _audioTimelineStart;
+            cancellationToken.ThrowIfCancellationRequested();
+            SubtitleSegment segment;
+            long bubbleId;
+            DateTimeOffset end = observedAt ?? DateTimeOffset.UtcNow;
+            DateTimeOffset evidenceEnd, evidenceStart;
+            lock (_gate)
+            {
+                AppSettings settings = CurrentSettings();
+                _subtitleSegments.StabilityMilliseconds = settings.SubtitlePreviewStableMilliseconds;
+                _subtitleSegments.SendEarlyPreviews = settings.IncomingSendEarlyPreviews;
+                TimeSpan settle = TimeSpan.FromMilliseconds(Math.Clamp(settings.IncomingSettleMilliseconds, 600, 2400));
+                bool quiet = SubtitleSegmentation.HasAudioPause(end, _speakerTracker.LastVoiceLikeAt, _lastDecodedAudioEnd, settle,
+                    lastWordAudioEnd: _lastMeaningfulAudioEnd ?? _lastTextAudioEnd, lastAudibleAt: _speakerTracker.LastAudibleAt);
+                if (!_subtitleSegments.TryTakeReady(end, final,
+                    settle, out segment, allowQuietCommit: quiet)) return null;
+                _subtitleBubbleIds.TryGetValue(segment.SequenceIndex, out bubbleId);
+                evidenceEnd = _lastTextAudioEnd ?? end;
+                double seconds = Math.Clamp((end - segment.StartedAt).TotalSeconds + 1, 1.5, 12);
+                evidenceStart = evidenceEnd.AddSeconds(-seconds);
+                if (evidenceStart < _audioTimelineStart) evidenceStart = _audioTimelineStart;
+            }
+            if (!await AdmitIncomingSourceAsync(segment.Text, bubbleId, end)) continue;
+            if (bubbleId == 0)
+            {
+                lock (_gate)
+                    if (!_subtitleBubbleIds.TryGetValue(segment.SequenceIndex, out bubbleId))
+                        _subtitleBubbleIds[segment.SequenceIndex] = bubbleId = Interlocked.Increment(ref _nextUtteranceId);
+            }
+            long recognitionEpoch = Interlocked.Read(ref _speakerRecognitionEpoch);
+            // Capture evidence before scheduling: expensive inference must never hold text release.
+            SpeakerAttribution speaker = QueueSpeakerIdentification(bubbleId, segment.Text, evidenceStart, evidenceEnd, end, recognitionEpoch);
+            Interlocked.Increment(ref _utterancesInSession);
+            Log($"Subtitle segment: id={bubbleId}; committed={segment.IsCommitted}; sourceChars={segment.Text.Length}.");
+            return CreateTranslationRequest(segment.Text, speaker, evidenceStart, end, bubbleId, recognitionEpoch) with { IsCommitted = segment.IsCommitted };
         }
-        long recognitionEpoch = Interlocked.Read(ref _speakerRecognitionEpoch);
-        // Capture evidence before scheduling: expensive inference must never hold text release.
-        SpeakerAttribution speaker = QueueSpeakerIdentification(bubbleId, segment.Text, evidenceStart, evidenceEnd, end, recognitionEpoch);
-        Interlocked.Increment(ref _utterancesInSession);
-        Log($"Subtitle segment: id={bubbleId}; committed={segment.IsCommitted}; sourceChars={segment.Text.Length}.");
-        return Task.FromResult<TranslationRequest?>(CreateTranslationRequest(segment.Text, speaker, evidenceStart, end, bubbleId, recognitionEpoch) with { IsCommitted = segment.IsCommitted });
     }
 
     private async Task<SpeakerAttribution> IdentifySpeakerAsync(DateTimeOffset start, DateTimeOffset end, CancellationToken cancellationToken)
@@ -2053,7 +2072,8 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
             foreach (long old in _latestUtteranceRevisions.Keys.Where(id => id < _nextUtteranceId - 250).ToArray())
                 _latestUtteranceRevisions.Remove(old);
             return new TranslationRequest(text, speaker, utteranceId, end)
-                { SpeakerRecognitionEpoch = attributionEpoch };
+                { SpeakerRecognitionEpoch = attributionEpoch, SourceFilterEpoch = Interlocked.Read(ref _sourceFilterEpoch),
+                    SourceRevisionVersion = SourceRevisionVersionLocked(utteranceId) };
         }
     }
 
@@ -2073,7 +2093,7 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
         while (await TakeSubtitleSegmentAsync(final: true, cancellationToken) is TranslationRequest request)
         {
             await QueueTranslationAsync(request, cancellationToken);
-            await _source($"{LiveSpeakerLabel(request.Speaker)}: {request.Source}");
+            await PublishIncomingSourceAsync(request.Source, $"{LiveSpeakerLabel(request.Speaker)}: {request.Source}");
         }
     }
 
@@ -2102,6 +2122,7 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
     {
         if (RecognitionTextFilter.IsControlOnly(request.Source)) return;
         if (!request.IsCommitted && !CurrentSettings().IncomingSendEarlyPreviews) return;
+        if (!await AdmitIncomingRequestAsync(request)) return;
         try
         {
             if (IsSuperseded(request)) return;
@@ -2115,7 +2136,9 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
             string prompt = $"The expected spoken languages are: {languages}. Translate the CURRENT transcript into concise, natural {target} for live subtitles. Preserve meaning, tone and names. Speech recognition may be imperfect; do not invent meaning to repair unrecognizable words. If it is already in the target language, reproduce it cleanly. Return ONLY the {target} translation, with no source text, labels, notes or explanations. /no_think";
             if(!string.IsNullOrWhiteSpace(settings.Glossary)) prompt += " Glossary (use only for matching source terms; do not invent missing words): " + settings.Glossary[..Math.Min(2000,settings.Glossary.Length)];
             if (!string.IsNullOrWhiteSpace(context)) prompt += " Previous speech for context only (do not translate it again): " + context;
+            if (!await AdmitIncomingRequestAsync(request)) return;
             string translated = await RequestTranslationAsync(request.Source, prompt, settings, cancellationToken);
+            if (!await AdmitIncomingRequestAsync(request)) return;
             if (NeedsTargetRetry(translated, settings.IncomingTargetLanguage))
             {
                 Log($"Wrong-language translator output rejected and retried ({settings.IncomingTargetLanguage} requested): {translated}");
@@ -2131,6 +2154,7 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
             if (NeedsTargetRetry(translated, settings.IncomingTargetLanguage))
                 throw new InvalidOperationException($"The model returned the wrong output language twice ({settings.IncomingTargetLanguage} requested). Try another translator model.");
             if (IsSuperseded(request)) return;
+            if (!await AdmitIncomingRequestAsync(request)) return;
             request = request with { Speaker = ResolveSpeaker(request.UtteranceId, request.Speaker, request.SpeakerRecognitionEpoch) };
             string pan = request.Speaker.Pan switch
             {
@@ -2146,7 +2170,7 @@ internal sealed partial class IncomingTranslationService : IDisposable, ISpeaker
                     SpeakerRecognitionEpoch = request.SpeakerRecognitionEpoch, IsManuallyAttributed = manuallyAttributed,
                     SessionVoiceKey = request.Speaker.SessionVoiceKey };
             if (!request.IsCommitted && !CurrentSettings().IncomingSendEarlyPreviews) return;
-            await PublishTranslationDisplayAsync(display);
+            if (!await PublishSourceFilteredDisplayAsync(display, request)) return;
             RememberContext(request);
             if (request.IsCommitted) await RecordPublishedTranslationAsync(request, cancellationToken);
             await ReportHealthAsync(_connected ? "listening" : "waiting",

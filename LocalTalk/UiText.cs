@@ -75,6 +75,10 @@ internal static class UiText
         Add("Visible messages", "显示消息数", "表示するメッセージ数", "표시할 메시지 수");
         Add("Couldn't show the overlay. Open Logs to read subtitles, or restart subtitles.", "无法显示悬浮字幕。请打开记录阅读字幕，或重新启动字幕。", "オーバーレイを表示できませんでした。「履歴」で字幕を読むか、字幕を再起動してください。", "오버레이를 표시하지 못했습니다. 기록에서 자막을 읽거나 자막을 다시 시작하세요.");
         Add("Show early translations", "提前显示翻译", "途中の翻訳を表示", "말하는 중에 번역 표시");
+        Add("Only show Chinese speech", "只显示中文语音", "中国語の発言だけを表示", "중국어 발언만 표시");
+        Add("Skip other languages. Short or mixed-language speech may sometimes be missed.", "跳过其他语言。简短或混合语言的语音有时可能被漏掉。", "ほかの言語を除外します。短い発言や複数の言語が混ざった発言を見逃すことがあります。", "다른 언어는 건너뜁니다. 짧거나 여러 언어가 섞인 발언은 놓칠 수 있습니다.");
+        Add("Changing only this filter does not restart models.", "只更改此筛选条件不会重启模型。", "このフィルターだけを変更してもモデルは再起動しません。", "이 필터만 변경하면 모델을 다시 시작하지 않습니다.");
+        Add("Skipping non-Chinese speech. Still listening…", "正在跳过非中文语音。仍在收听…", "中国語以外の発言を除外しています。聞き取りは続けています…", "중국어가 아닌 발언을 건너뛰고 있습니다. 계속 듣고 있습니다…");
         Add("Show a translation before the sentence is finished. It may change as more words arrive.", "在句子说完前显示翻译。随着更多内容被识别，译文可能会改变。", "文を話し終える前に翻訳を表示します。続きを聞き取ると内容が変わることがあります。", "문장을 마치기 전에 번역을 표시합니다. 말을 더 인식하면 내용이 바뀔 수 있습니다.");
         Add("Font size", "字号", "文字サイズ", "글자 크기");
         Add("Bubble width", "气泡宽度", "吹き出しの幅", "말풍선 너비");

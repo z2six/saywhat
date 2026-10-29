@@ -84,6 +84,10 @@ internal static class SubtitleSpeechUiTests
                 Check(Nodes(window).OfType<TextBlock>().Any(text => text.Text == SubtitleSpeechText.T("Subtitle speech recognition")), "the section is translated in " + language);
                 var choices = Nodes(window).OfType<Button>().Where(button => button.Name == "SubtitleSourceLanguageChoice").ToArray();
                 Check(choices.Length == 10 && choices.Any(button => Equals(button.Tag, "Chinese")) && choices.Any(button => Equals(button.Tag, "Automatic")), "source languages are directly visible");
+                var chineseOnly = Nodes(window).OfType<CheckBox>().Single(check => check.Name == "SubtitleChineseOnlyToggle");
+                Check(chineseOnly.IsEnabled && chineseOnly.Content?.ToString() == UiText.T("Only show Chinese speech") &&
+                    AutomationProperties.GetName(chineseOnly) == UiText.T("Only show Chinese speech"),
+                    "the same visible accessible filter is available in Listening: " + language);
                 var auto = choices.Single(button => Equals(button.Tag, "Automatic"));
                 auto.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 Check(settings.IncomingSpeechEngine == "nemotron" && settings.IncomingSourceLanguage == "Automatic", "the language action immediately reveals a compatible model");

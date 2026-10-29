@@ -18,3 +18,5 @@ Keep these texts unchanged with the distribution. They are notices for individua
 Build packaging also copies the FoxTrans GPL text, libfvad AUTHORS/PATENTS and self-contained .NET/ONNX package notices. The runtime archive's LLVM/OpenMP text stays with that runtime and is copied to exported recipient notices. The export manifest hashes every delivered notice so later changes are visible.
 
 Upstream NAudio's license text has a 2020 copyright line. Its pinned NuGet metadata additionally identifies Mark Heath 2026 (WinMM 2023); both are retained in the release inventory rather than rewriting upstream license text. sherpa's NuGet metadata identifies Copyright 2019–2023 Xiaomi Corporation. Neither notice collection nor SPDX labels certify all transitive native dependencies or model-weight rights; see `Release-Distribution.md`.
+
+Unicode script-data attribution for the Chinese subtitle filter: `Unicode-License-V3.txt` was retrieved from https://www.unicode.org/license.txt on 2026-10-29; SHA-256 `e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96`. The source uses Unicode Character Database 17.0.0 Han ranges.
