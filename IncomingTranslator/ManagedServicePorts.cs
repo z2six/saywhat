@@ -180,7 +180,12 @@ internal static class ManagedPortAllocator
             started = true;
             Task<string> output = ReadBoundedOwnershipOutputAsync(process.StandardOutput, MaximumOwnershipOutputCharacters, deadline.Token);
             Task<string> errors = ReadBoundedOwnershipOutputAsync(process.StandardError, 16 * 1024, deadline.Token);
-            await Task.WhenAll(output, errors, process.WaitForExitAsync(deadline.Token)).ConfigureAwait(false);
+            Task completion = Task.WhenAll(output, errors, process.WaitForExitAsync(deadline.Token));
+            // Bound the whole operation even if a pipe read cannot observe its
+            // cancellation until the retained utility is killed in finally.
+            _ = completion.ContinueWith(failed => { _ = failed.Exception; }, CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            await completion.WaitAsync(deadline.Token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
             return process.ExitCode == 0 && string.IsNullOrWhiteSpace(await errors.ConfigureAwait(false)) &&
                 ContainsOwnedListener(await output.ConfigureAwait(false), port, processId);
