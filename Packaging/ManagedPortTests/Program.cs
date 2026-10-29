@@ -45,6 +45,8 @@ internal static class Program
             PropertyInfo pid = ownedType.GetProperty("ProcessId", Instance)!;
             bool IsAlive(object process) => (bool)alive.GetValue(process)!;
             Task Stop(object process) => (Task)stop.Invoke(process, [true])!;
+            Task<bool> OwnsListener(int port, object process, CancellationToken token) =>
+                (Task<bool>)allocator.GetMethod("IsOwnedTcpListenerAsync", Static)!.Invoke(null, [port, pid.GetValue(process), token])!;
             Task Wait(object runtime, Uri endpoint, object process, TimeSpan timeout, Func<JsonElement, bool> accepted, CancellationToken token) =>
                 (Task)waitHealth.Invoke(runtime, [endpoint, process, timeout, accepted, token, true, null])!;
             using var provisioner = (IDisposable)Activator.CreateInstance(Find("LocalTalkProvisioner"), Instance, null, [directory, null], null)!;
@@ -85,7 +87,7 @@ internal static class Program
                     }
                 }
                 await Ready(http, firstReady); await Ready(idle, idleReady);
-                Check(IsAlive(http) && IsAlive(idle) && (bool)allocator.GetMethod("IsOwnedTcpListener", Static)!.Invoke(null, [port, pid.GetValue(http)])!,
+                Check(IsAlive(http) && IsAlive(idle) && await OwnsListener(port, http, deadline.Token),
                     "the fixture owns its actual loopback listener and both retained children are alive");
                 var endpoint = new Uri($"http://127.0.0.1:{port}/health");
                 bool timedOut = false;

@@ -1492,7 +1492,8 @@ internal sealed partial class RuntimeController : IAsyncDisposable, ISpeakerFeed
                 deadline.Token.ThrowIfCancellationRequested();
                 if (process is not null && !process.IsAlive)
                     throw new InvalidOperationException($"{process.Label} exited before it was ready (code {process.ExitCode}). Review Diagnostics for startup metadata.");
-                if (requireOwnedListener && (process is null || !ManagedPortAllocator.IsOwnedTcpListener(endpoint.Port, process.ProcessId)))
+                if (requireOwnedListener && (process is null ||
+                    !await ManagedPortAllocator.IsOwnedTcpListenerAsync(endpoint.Port, process.ProcessId, deadline.Token)))
                 {
                     last = "waiting for the exact owned process to bind";
                     await Task.Delay(100, deadline.Token);
@@ -1510,7 +1511,8 @@ internal sealed partial class RuntimeController : IAsyncDisposable, ISpeakerFeed
                         await using Stream stream = await response.Content.ReadAsStreamAsync(request.Token);
                         using JsonDocument json = await JsonDocument.ParseAsync(stream, cancellationToken: request.Token);
                         if (accepted(json.RootElement) && (!requireOwnedListener ||
-                            process is not null && process.IsAlive && ManagedPortAllocator.IsOwnedTcpListener(endpoint.Port, process.ProcessId))) return;
+                            process is not null && process.IsAlive &&
+                            await ManagedPortAllocator.IsOwnedTcpListenerAsync(endpoint.Port, process.ProcessId, deadline.Token) && process.IsAlive)) return;
                         last = "endpoint responded but selected model/capacity is not ready";
                     }
                 }

@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
@@ -204,36 +203,50 @@ internal static class ManagedServicePortTests
             Check(rejected, "callers cannot request an unbounded retry loop");
         }
 
-        byte[] table = ListenerTable(51000, 101, IPAddress.Loopback);
-        Check(ManagedPortAllocator.ContainsOwnedListener(table, 51000, 101), "native ownership parser accepts the exact listening loopback PID and network-order port");
-        Check(!ManagedPortAllocator.ContainsOwnedListener(table, 51000, 102) && !ManagedPortAllocator.ContainsOwnedListener(table, 51001, 101),
+        System.Diagnostics.ProcessStartInfo probe = ManagedPortAllocator.OwnershipProbeInfo();
+        Check(probe.FileName == Path.Combine(Environment.SystemDirectory, "netstat.exe") &&
+            probe.ArgumentList.SequenceEqual(new[] { "-ano", "-p", "tcp" }) && !probe.UseShellExecute && probe.CreateNoWindow &&
+            probe.WindowStyle == System.Diagnostics.ProcessWindowStyle.Hidden && probe.RedirectStandardOutput && probe.RedirectStandardError,
+            "ownership uses only the full-path Windows utility with fixed numeric TCP flags and hidden bounded pipes");
+        const string listener = "  TCP    127.0.0.1:51000    0.0.0.0:0    LISTENING    101\r\n";
+        foreach (string state in new[] { "LISTENING", "侦听", "リッスン中", "수신 대기", "ABHÖREN" })
+            Check(ManagedPortAllocator.ContainsOwnedListener("Localized header\r\n  Proto Local Foreign State PID\r\n" + listener.Replace("LISTENING", state), 51000, 101),
+                "numeric ownership proof does not depend on English or one-word localized state names");
+        Check(!ManagedPortAllocator.ContainsOwnedListener(listener, 51000, 102) && !ManagedPortAllocator.ContainsOwnedListener(listener, 51001, 101),
             "another process or another port can never satisfy owned-child readiness");
-        Check(ManagedPortAllocator.ContainsOwnedListener(ListenerTable(51000, 101, IPAddress.Any), 51000, 101) &&
-            !ManagedPortAllocator.ContainsOwnedListener(ListenerTable(51000, 101, IPAddress.Parse("192.0.2.1")), 51000, 101),
+        Check(ManagedPortAllocator.ContainsOwnedListener(listener.Replace("127.0.0.1:51000", "0.0.0.0:51000"), 51000, 101) &&
+            !ManagedPortAllocator.ContainsOwnedListener(listener.Replace("127.0.0.1:51000", "192.0.2.1:51000"), 51000, 101),
             "owned wildcard listeners cover loopback, while unrelated interface bindings are not adopted");
-        byte[] shared = new byte[52]; BinaryPrimitives.WriteUInt32LittleEndian(shared, 2);
-        ListenerTable(51000, 101, IPAddress.Loopback).AsSpan(4).CopyTo(shared.AsSpan(4));
-        ListenerTable(51000, 102, IPAddress.Any).AsSpan(4).CopyTo(shared.AsSpan(28));
-        Check(!ManagedPortAllocator.ContainsOwnedListener(shared, 51000, 101),
+        string foreign = listener.Replace("127.0.0.1:51000", "0.0.0.0:51000").Replace("101", "102");
+        Check(!ManagedPortAllocator.ContainsOwnedListener(listener + foreign, 51000, 101),
             "an owned row cannot hide a second process sharing the same loopback route");
-        ListenerTable(51000, 101, IPAddress.Loopback).AsSpan(4).CopyTo(shared.AsSpan(28));
-        ListenerTable(51000, 102, IPAddress.Any).AsSpan(4).CopyTo(shared.AsSpan(4));
-        Check(!ManagedPortAllocator.ContainsOwnedListener(shared, 51000, 101),
-            "shared-address rejection is independent of Windows table ordering");
-        table[4] = 5;
-        Check(!ManagedPortAllocator.ContainsOwnedListener(table, 51000, 101), "a TCP connection row is not a listening server");
-        foreach (byte[] malformed in new[] { Array.Empty<byte>(), new byte[3], new byte[] { 1, 0, 0, 0 }, new byte[] { 255, 255, 255, 255 } })
-            Check(!ManagedPortAllocator.ContainsOwnedListener(malformed, 51000, 101), "malformed/overflowed ownership tables fail closed");
+        Check(!ManagedPortAllocator.ContainsOwnedListener(foreign + listener, 51000, 101), "shared-address rejection is independent of snapshot ordering");
+        Check(!ManagedPortAllocator.ContainsOwnedListener(listener.Replace("0.0.0.0:0", "192.0.2.5:80"), 51000, 101) &&
+            !ManagedPortAllocator.ContainsOwnedListener(listener.Replace("0.0.0.0:0", "0.0.0.0:1"), 51000, 101),
+            "a connected TCP row is not accepted as a listening server regardless of its state text");
+        foreach (string malformed in new[] { "", "TCP", listener + "\0", "TCP 127.0.0.1:51000 0.0.0.0:0 101", "UDP 127.0.0.1:51000 0.0.0.0:0 LISTENING 101",
+            listener.Replace(":51000", ":65536"), listener.Replace(":51000", ":-1"), listener.Replace("101", "2147483648"),
+            listener.Replace("101", "+101"), listener.Replace("101", "１０１"), listener.Replace("127.0.0.1", "localhost"),
+            listener.Replace("127.0.0.1", "127.1"), listener.Replace("LISTENING", "a b c d e f"), listener.Replace("LISTENING", new string('x', 65)),
+            listener.Replace("127.0.0.1:51000", "[::1]:51000"), new string(' ', ManagedPortAllocator.MaximumOwnershipOutputCharacters + 1) })
+            Check(!ManagedPortAllocator.ContainsOwnedListener(malformed, 51000, 101), "malformed, nonnumeric or oversized ownership snapshots fail closed");
+        Check(!ManagedPortAllocator.ContainsOwnedListener(listener + "TCP invalid 0.0.0.0:0 LISTENING 102", 51000, 101),
+            "a valid first row cannot conceal an incompletely parsed TCP snapshot");
         if (OperatingSystem.IsWindows())
         {
             using ManagedPortReservation lease = ManagedPortAllocator.Reserve(true, 0, "Synthetic ownership fixture");
             int port = lease.Port; lease.ReleaseForStart();
             using var owned = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp) { ExclusiveAddressUse = true };
             owned.Bind(new IPEndPoint(IPAddress.Loopback, port)); owned.Listen(1);
-            Check(ManagedPortAllocator.IsOwnedTcpListener(port, Environment.ProcessId), "Windows ownership lookup sees only the exact socket fixture owned by this test process");
-            Check(!ManagedPortAllocator.IsOwnedTcpListener(port, int.MaxValue), "a foreign PID cannot adopt the test listener through a healthy-looking response");
+            Check(await ManagedPortAllocator.IsOwnedTcpListenerAsync(port, Environment.ProcessId), "Windows ownership lookup sees only the exact socket fixture owned by this test process");
+            Check(!await ManagedPortAllocator.IsOwnedTcpListenerAsync(port, int.MaxValue), "a foreign PID cannot adopt the test listener through a healthy-looking response");
             owned.Dispose();
-            Check(!ManagedPortAllocator.IsOwnedTcpListener(port, Environment.ProcessId), "closing the test fixture removes its readiness ownership proof");
+            Check(!await ManagedPortAllocator.IsOwnedTcpListenerAsync(port, Environment.ProcessId), "closing the test fixture removes its readiness ownership proof");
+            using var ownershipCancelled = new CancellationTokenSource(); ownershipCancelled.Cancel();
+            bool cancelledProof = false;
+            try { await ManagedPortAllocator.IsOwnedTcpListenerAsync(port, Environment.ProcessId, ownershipCancelled.Token); }
+            catch (OperationCanceledException) { cancelledProof = true; }
+            Check(cancelledProof, "a cancelled ownership check cannot start a utility or produce readiness proof");
         }
         return checks;
     }
@@ -247,14 +260,4 @@ internal static class ManagedServicePortTests
         catch { socket.Dispose(); throw; }
     }
 
-    private static byte[] ListenerTable(ushort port, uint processId, IPAddress address)
-    {
-        byte[] bytes = new byte[28];
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes, 1);
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(4), 2);
-        address.GetAddressBytes().CopyTo(bytes, 8);
-        BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(12), port);
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(24), processId);
-        return bytes;
-    }
 }

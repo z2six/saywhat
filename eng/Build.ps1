@@ -180,8 +180,12 @@ try {
             [Environment]::SetEnvironmentVariable('TEMP', $testTemp, 'Process')
             [Environment]::SetEnvironmentVariable('TMP', $testTemp, 'Process')
             Write-Host 'Running isolated dashboard and capture-host checks. No AI models, audio devices or live OSC are used.'
-            Invoke-OwnedTest (Join-Path $appOutput 'SayWhat.exe') @('--ui-self-test', $dashboardReport)
             $resultFile = Join-Path $dashboardReport 'results.log'
+            try { Invoke-OwnedTest (Join-Path $appOutput 'SayWhat.exe') @('--ui-self-test', $dashboardReport) }
+            catch {
+                if (Test-Path -LiteralPath $resultFile -PathType Leaf) { Get-Content -LiteralPath $resultFile -Tail 80 }
+                throw
+            }
             if (-not (Test-Path -LiteralPath $resultFile -PathType Leaf) -or
                 -not ((Get-Content -LiteralPath $resultFile -Raw) -match '^PASS ')) {
                 throw ('Dashboard checks did not produce a passing report. See ' + $dashboardReport)

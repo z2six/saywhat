@@ -543,7 +543,7 @@ internal static partial class SettingsStore
     internal static void WriteOwnVoiceConfig(AppSettings settings, string speechEndpoint, string? translatorEndpoint = null)
     {
         speechEndpoint = SessionEndpoints.Validate(speechEndpoint);
-        translatorEndpoint = SessionEndpoints.Validate(translatorEndpoint ?? SessionEndpoints.OwnTranslation(settings));
+        translatorEndpoint = SessionEndpoints.Validate(translatorEndpoint ?? SessionEndpoints.OwnTranslation(settings), allowHttps: true);
         lock (SettingsGate)
         {
             _ownRuntimeSpeechEndpoint = speechEndpoint;
@@ -561,7 +561,10 @@ internal static partial class SettingsStore
     private static void UpdateOwnVoiceConfig(AppSettings settings, string path)
     {
         string speechEndpoint = _ownRuntimeSpeechEndpoint ?? SessionEndpoints.OwnSpeech(settings);
-        string translatorEndpoint = _ownRuntimeTranslationEndpoint ?? SessionEndpoints.OwnTranslation(settings);
+        string translatorEndpoint = _ownRuntimeTranslationEndpoint ??
+            (!string.IsNullOrWhiteSpace(settings.OwnTranslationEndpoint) || !settings.UseManagedTranslator
+                ? SessionEndpoints.OwnTranslation(settings)
+                : $"http://127.0.0.1:{(settings.AutomaticManagedPorts ? 1235 : settings.OwnTranslationPort)}/v1");
         if (!File.Exists(path) && AppPaths.IsPackagedApplication)
         {
             var template = new JsonObject {

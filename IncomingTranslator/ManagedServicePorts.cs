@@ -1,8 +1,8 @@
-using System.Buffers.Binary;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.InteropServices;
 using System.Globalization;
+using System.Text;
 
 namespace IncomingTranslator;
 
@@ -160,66 +160,119 @@ internal static class ManagedPortAllocator
         }
     }
 
-    // A healthy HTTP response is insufficient proof after the reserved socket
-    // has been handed off. Read the Windows ownership table, never connect to an
-    // arbitrary endpoint, and accept only the exact native child PID. WSL's
-    // Windows forwarding PID is different; its servers need owner-token proof.
-    internal static bool IsOwnedTcpListener(int port, int processId)
+    internal const int MaximumOwnershipOutputCharacters = 1024 * 1024;
+
+    // The signed Windows utility supplies ownership metadata without custom
+    // native-memory access. Fixed numeric TCP arguments perform no connection
+    // probe. Its snapshot is kept only for this check and never written to logs.
+    internal static async Task<bool> IsOwnedTcpListenerAsync(int port, int processId, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         if (port is < MinimumFixedPort or > MaximumPort || processId <= 0 || !OperatingSystem.IsWindows()) return false;
-        int length = 0;
-        const uint insufficientBuffer = 122;
-        uint result = GetExtendedTcpTable(IntPtr.Zero, ref length, false, 2, 3, 0);
-        if (result != insufficientBuffer || length < 4 || length > 16 * 1024 * 1024) return false;
-        for (int attempt = 0; attempt < 3; attempt++)
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
+        deadline.CancelAfter(TimeSpan.FromSeconds(2));
+        using var process = new Process { StartInfo = OwnershipProbeInfo() };
+        bool started = false;
+        try
         {
-            int capacity = length;
-            IntPtr buffer = Marshal.AllocHGlobal(capacity);
-            try
-            {
-                result = GetExtendedTcpTable(buffer, ref length, false, 2, 3, 0);
-                if (result == insufficientBuffer)
-                {
-                    if (length < 4 || length > 16 * 1024 * 1024) return false;
-                    continue;
-                }
-                if (result != 0 || length < 4 || length > capacity) return false;
-                byte[] snapshot = new byte[length];
-                Marshal.Copy(buffer, snapshot, 0, snapshot.Length);
-                return ContainsOwnedListener(snapshot, port, processId);
-            }
-            finally { Marshal.FreeHGlobal(buffer); }
+            token.ThrowIfCancellationRequested();
+            if (!process.Start()) return false;
+            started = true;
+            Task<string> output = ReadBoundedOwnershipOutputAsync(process.StandardOutput, MaximumOwnershipOutputCharacters, deadline.Token);
+            Task<string> errors = ReadBoundedOwnershipOutputAsync(process.StandardError, 16 * 1024, deadline.Token);
+            await Task.WhenAll(output, errors, process.WaitForExitAsync(deadline.Token)).ConfigureAwait(false);
+            token.ThrowIfCancellationRequested();
+            return process.ExitCode == 0 && string.IsNullOrWhiteSpace(await errors.ConfigureAwait(false)) &&
+                ContainsOwnedListener(await output.ConfigureAwait(false), port, processId);
         }
-        return false;
+        catch (OperationCanceledException) when (!token.IsCancellationRequested) { return false; }
+        catch (Exception error) when (error is IOException or InvalidOperationException or System.ComponentModel.Win32Exception or UnauthorizedAccessException)
+        { return false; }
+        finally
+        {
+            if (started)
+            {
+                // This is the exact utility Process we started, not a PID or
+                // process-name search; no model/application process is affected.
+                try
+                {
+                    if (!process.HasExited) process.Kill(entireProcessTree: false);
+                    using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+                    await process.WaitForExitAsync(cleanup.Token).ConfigureAwait(false);
+                }
+                catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception or OperationCanceledException) { }
+            }
+        }
     }
 
-    internal static bool ContainsOwnedListener(ReadOnlySpan<byte> table, int port, int processId)
+    internal static ProcessStartInfo OwnershipProbeInfo()
     {
-        if (table.Length < 4 || port is < MinimumFixedPort or > MaximumPort || processId <= 0) return false;
-        uint rows = BinaryPrimitives.ReadUInt32LittleEndian(table);
-        const int rowSize = 24;
-        if (rows > (table.Length - 4) / rowSize) return false;
-        bool owned = false;
-        for (int index = 0; index < rows; index++)
+        var info = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "netstat.exe"))
         {
-            ReadOnlySpan<byte> row = table.Slice(4 + index * rowSize, rowSize);
-            uint state = BinaryPrimitives.ReadUInt32LittleEndian(row);
-            uint address = BinaryPrimitives.ReadUInt32LittleEndian(row[4..]);
-            int localPort = BinaryPrimitives.ReadUInt16BigEndian(row[8..]);
-            uint owner = BinaryPrimitives.ReadUInt32LittleEndian(row[20..]);
-            // IP bytes are 127.0.0.1 (little-endian uint 0x0100007f) or wildcard.
-            if (state == 2 && (address is 0 or 0x0100007f) && localPort == port)
-            {
-                // A child using SO_REUSEADDR must not count as exclusive proof
-                // if another PID can also receive this same loopback address.
-                if (owner != processId) return false;
-                owned = true;
-            }
+            UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden,
+            RedirectStandardOutput = true, RedirectStandardError = true
+        };
+        foreach (string argument in new[] { "-ano", "-p", "tcp" }) info.ArgumentList.Add(argument);
+        return info;
+    }
+
+    private static async Task<string> ReadBoundedOwnershipOutputAsync(StreamReader reader, int limit, CancellationToken token)
+    {
+        var text = new StringBuilder(Math.Min(limit, 4096));
+        char[] buffer = new char[2048];
+        int read;
+        while ((read = await reader.ReadAsync(buffer.AsMemory(), token).ConfigureAwait(false)) > 0)
+        {
+            if (text.Length > limit - read) throw new InvalidDataException("Windows connection metadata exceeded its safe size.");
+            text.Append(buffer, 0, read);
+        }
+        return text.ToString();
+    }
+
+    // This parser is exclusively for `netstat -ano -p tcp` (never -q). In that
+    // output a TCP peer of 0.0.0.0:0 denotes a listener, so localized state labels
+    // need not be interpreted. Headers and non-TCP rows supply no proof.
+    internal static bool ContainsOwnedListener(string? snapshot, int port, int processId)
+    {
+        if (string.IsNullOrEmpty(snapshot) || snapshot.Length > MaximumOwnershipOutputCharacters || snapshot.IndexOf('\0') >= 0 ||
+            port is < MinimumFixedPort or > MaximumPort || processId <= 0) return false;
+        bool owned = false;
+        using var reader = new StringReader(snapshot);
+        while (reader.ReadLine() is string line)
+        {
+            if (line.Length > 1024) return false;
+            string[] fields = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            if (fields.Length == 0 || !fields[0].Equals("TCP", StringComparison.OrdinalIgnoreCase)) continue;
+            if (fields.Length is < 5 or > 8 || !TryNumeric(fields[^1], int.MaxValue, out int owner)) return false;
+            int stateLength = fields.Skip(3).Take(fields.Length - 4).Sum(value => value.Length);
+            if (stateLength is < 1 or > 64) return false;
+            if (!TryIpv4Endpoint(fields[1], out string local, out int localPort) ||
+                !TryIpv4Endpoint(fields[2], out string peer, out int peerPort)) return false;
+            if (localPort != port || local is not ("127.0.0.1" or "0.0.0.0") || peer != "0.0.0.0" || peerPort != 0) continue;
+            // SO_REUSEADDR must not let an owned row hide another reachable PID.
+            if (owner != processId) return false;
+            owned = true;
         }
         return owned;
     }
 
-    [DllImport("iphlpapi.dll", SetLastError = false)]
-    private static extern uint GetExtendedTcpTable(IntPtr table, ref int length,
-        [MarshalAs(UnmanagedType.Bool)] bool order, int addressFamily, int tableClass, uint reserved);
+    private static bool TryIpv4Endpoint(string text, out string address, out int port)
+    {
+        address = ""; port = 0;
+        int colon = text.IndexOf(':');
+        if (colon <= 0 || colon != text.LastIndexOf(':') ||
+            !TryNumeric(text[(colon + 1)..], MaximumPort, out port)) return false;
+        string host = text[..colon];
+        if (!IPAddress.TryParse(host, out IPAddress? parsed) || parsed.AddressFamily != AddressFamily.InterNetwork ||
+            parsed.ToString() != host) return false;
+        address = host;
+        return true;
+    }
+
+    private static bool TryNumeric(string text, int maximum, out int value)
+    {
+        value = 0;
+        return text.Length is > 0 and <= 10 && text.All(character => character is >= '0' and <= '9') &&
+            int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out value) && value <= maximum;
+    }
 }

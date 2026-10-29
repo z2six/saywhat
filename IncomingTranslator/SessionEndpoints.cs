@@ -14,7 +14,7 @@ internal static class SessionEndpoints
     private static string Speech(string resolved, int configuredPort) =>
         Validate(string.IsNullOrWhiteSpace(resolved) ? $"http://127.0.0.1:{configuredPort}" : resolved).TrimEnd('/');
     private static string Translation(string resolved, string configured) =>
-        Validate(string.IsNullOrWhiteSpace(resolved) ? configured : resolved).TrimEnd('/');
+        Validate(string.IsNullOrWhiteSpace(resolved) ? configured : resolved, allowHttps: true).TrimEnd('/');
 
     internal static Uri SpeechUri(AppSettings settings, string path, bool socket = false)
     {
@@ -23,9 +23,9 @@ internal static class SessionEndpoints
         return uri.Uri;
     }
 
-    internal static string Validate(string endpoint)
+    internal static string Validate(string endpoint, bool allowHttps = false)
     {
-        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out Uri? uri) || uri.Scheme != "http" ||
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out Uri? uri) || !(uri.Scheme == "http" || allowHttps && uri.Scheme == "https") ||
             uri.Port is < 1 or > 65535 || uri.UserInfo.Length != 0 || uri.Query.Length != 0 || uri.Fragment.Length != 0 ||
             !(uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
               IPAddress.TryParse(uri.Host, out IPAddress? ip) && IPAddress.IsLoopback(ip)))

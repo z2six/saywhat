@@ -26,6 +26,8 @@ internal static class SessionEndpointTests
         Check(SessionEndpoints.SpeechUri(session, "/v1/audio/transcriptions/realtime", true).Port == 49162, "native reconnect uses the selected session port");
         Check(SessionEndpoints.IncomingTranslation(session) == "http://127.0.0.1:49164/v1", "subtitle requests follow their session translator");
         Check(SessionEndpoints.OwnTranslation(preferences) == preferences.OwnTranslatorBaseUrl, "external preference retains its chosen connection");
+        AppSettings externalTls = preferences.Copy(); externalTls.UseManagedTranslator = false; externalTls.OwnTranslatorBaseUrl = "https://localhost:7777/v1";
+        Check(SessionEndpoints.OwnTranslation(externalTls) == externalTls.OwnTranslatorBaseUrl, "configured local TLS translators remain supported");
         var refreshed = preferences.Copy(); refreshed.IncomingTargetLanguage = "Korean";
         AppSettings preserved = SessionEndpoints.PreserveRuntime(session, refreshed);
         Check(preserved.IncomingSpeechEndpoint == session.IncomingSpeechEndpoint && preserved.IncomingTranslationEndpoint == session.IncomingTranslationEndpoint && preserved.IncomingTargetLanguage == "Korean", "generic live settings retain current connections");
@@ -43,6 +45,11 @@ internal static class SessionEndpointTests
         {
             foreach (string path in configPaths)
                 File.WriteAllText(path, "{\"audio\":{},\"pipeline\":{\"speech\":{},\"translation\":{},\"realtime\":{}},\"outputs\":[{\"type\":\"vrchat-osc\",\"address\":\"127.0.0.1:9010\"}]}");
+            var unusedExternal = preferences.Copy(); unusedExternal.OwnTranslatorBaseUrl = "unused external URL draft";
+            SettingsStore.Save(unusedExternal);
+            Check(SettingsStore.Load().OwnTranslatorBaseUrl == unusedExternal.OwnTranslatorBaseUrl &&
+                JsonNode.Parse(File.ReadAllText(configPaths[0]))!["pipeline"]!["translation"]!["baseUrl"]!.GetValue<string>() == "http://127.0.0.1:1235/v1",
+                "inactive external URL choices cannot block managed configuration saves");
             SettingsStore.WriteOwnVoiceConfig(session, session.OwnSpeechEndpoint, session.OwnTranslationEndpoint);
             SettingsStore.Save(refreshed);
             foreach (string path in configPaths)
