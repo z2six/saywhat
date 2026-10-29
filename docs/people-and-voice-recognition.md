@@ -68,6 +68,40 @@ Matching is deliberately conservative:
 
 The threshold is a similarity score, **not a probability of being correct**. The People familiarity labels report saved clear examples/readiness, not a measured percentage accuracy. A model can still confuse songs, similar voices, changed microphones, short utterances or overlapping speech.
 
+## Models and processing cost
+
+Person recognition identifies a voice; speech-to-text recognizes its words. These
+are separate models. **People → More voice options → Voice recognition model**
+contains both identity choices and their download action:
+
+| Identity model | Download size | Execution |
+| --- | --- | --- |
+| CAM++ Mandarin (fast), the default | 28,281,138 bytes (28.3 MB) | CPU, two inference threads |
+| ERes2Net Mandarin (larger), the base variant | 39,593,761 bytes (39.6 MB) | CPU, two inference threads |
+
+Sizes are from the [official sherpa-onnx release assets](https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-recongition-models), checked 29 October 2026. They are download sizes, not measured resident memory. The configured ERes2Net is the base model, not the upstream large or V2 variant. A larger download does not prove better matching for a particular VRChat voice.
+
+The extractor receives mono 16 kHz audio trimmed to at most six seconds. Identity
+jobs run on one background worker, with two threads available inside the native
+inference. The separate queue holds at most eight jobs and drops its oldest job
+when full; this drops identity work, not the subtitle. The initial translation
+does not wait for an embedding. A later name can update the bubble. CPU time and
+RAM still compete with the game, and shared identity/feedback bookkeeping can
+affect later-message throughput. There is no measured per-clip CPU/RAM budget or
+validated low-end real-time hardware minimum. The identity extractor performs
+no GPU inference; this does not apply to the separate speech or translation
+models, which depend on their selected runtime.
+
+Turn **Recognize saved people by their voices** off on Home, or use the optional
+voice recognition section in Settings. It blocks queued identity work and unloads
+the extractor after any in-progress native call finishes, while keeping saved
+people and examples. Transcription and translation continue. **Just one person**
+can assign a selected name without running identity matching at all.
+
+Confirmed examples belong to the exact model that produced them. Changing the
+identity model keeps previous examples, but the new model needs its own confirmed
+examples; embeddings from different models are not compared.
+
 ## Identification, diarization and separation
 
 These names describe different tasks:
@@ -78,7 +112,7 @@ These names describe different tasks:
 | Diarization | “Who spoke when; were several voices active?” | Usually labels/timestamps, not separate waveforms |
 | Speech separation/extraction | “Estimate an individual voice from this mixture.” | Yes, subject to artifacts/errors |
 
-**Quick/Normal** transcribe mixed VRChat playback through Voxtral. They do not independently recover each simultaneously overlapping voice. Saved names or a larger fingerprint model do not change that. Left/right position is not treated as a person's permanent identity.
+**Quick/Normal** transcribe mixed playback through the selected Nemotron, FireRed or Voxtral recognizer. They do not independently recover each simultaneously overlapping voice. Saved names or a larger fingerprint model do not change that. Left/right position is not treated as a person's permanent identity.
 
 Optional **Groups** uses VibeVoice streaming recognition to return text with temporary voice labels, then translates each route into its own bubbles. It can help recover more than one person's words from a chunk, but does not output isolated recordings. Its labels are session-scoped: “voice 0” is not permanently the same person after a recognition reset.
 

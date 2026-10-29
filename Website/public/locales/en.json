@@ -182,5 +182,6 @@
   "demo.panelTitle": "Translate into VRChat chat",
   "demo.native": "Uses your spoken language",
   "demo.larger": "Larger",
-  "benefits.sourceGuide": "Technical guide"
+  "benefits.sourceGuide": "Technical guide",
+  "speakers.resources": "Optional person identification uses a separate, small CPU model: CAM++ or the larger ERes2Net option. It identifies voices, rather than recognizing words or translating. It does not use GPU inference, though CPU and memory use can still affect game performance."
 }

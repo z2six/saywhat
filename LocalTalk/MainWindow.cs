@@ -617,7 +617,7 @@ internal sealed partial class MainWindow : Window
         page.Children.Add(ModernTheme.Card(guided));
         page.Children.Add(CreateListeningSettingsCard());
         page.Children.Add(ModernTheme.Card(ThemesSection()));
-        var recognition = Section("Voice recognition · optional", "An extra AI model can recognize who is speaking. Translations work with this turned off.");
+        var recognition = Section("Voice recognition · optional", "A small CPU model matches voices to saved people. Speech-to-text and translation use separate models and work without person recognition.");
         recognition.Name = "SpeakerRecognitionSettingsSection";
         _speakerRecognitionSettingsSection = recognition;
         var recognitionToggle = ModernTheme.Button(_settings.UseAiSpeakerRecognition ? "Turn off recognition" : "Enable recognition",
@@ -625,6 +625,7 @@ internal sealed partial class MainWindow : Window
         recognitionToggle.IsEnabled = !_settings.IncomingSinglePerson; recognition.Children.Add(recognitionToggle);
         if (_settings.IncomingSinglePerson) recognition.Children.Add(ModernTheme.Label("Not needed for one person", 13, ModernTheme.Muted));
         recognition.Children.Add(ModernTheme.Label("Off releases the recognition model. Translation keeps working, and your saved people are kept.", 13, ModernTheme.Muted));
+        recognition.Children.Add(ModernTheme.Label("CPU time and memory are shared with your game. Turning person recognition off may improve performance.", 12, ModernTheme.Muted));
         page.Children.Add(ModernTheme.Card(recognition));
         var closing = Section("When I close this window", "You can stop translation, or keep it running in the notification area beside the clock.");
         var choices = new[] {
@@ -962,7 +963,7 @@ internal sealed partial class MainWindow : Window
         {
             if (!_preview && !_savedPeopleLoaded && !_savedPeopleLoading) _ = RefreshSavedPeopleAsync();
             page.Children.Add(SavedPeopleSection());
-            var learning = Section("Voice recognition · optional", "An extra AI model can recognize who is speaking. Translations work with this turned off.");
+            var learning = Section("Voice recognition · optional", "A small CPU model matches voices to saved people. Speech-to-text and translation use separate models and work without person recognition.");
             _speakerRecognitionState = ModernTheme.Label(SpeakerRecognitionStateText(), 16, _settings.UseAiSpeakerRecognition ? ModernTheme.Good : ModernTheme.Muted);
             learning.Children.Add(_speakerRecognitionState);
             var recognitionActions=new WrapPanel();
@@ -971,6 +972,7 @@ internal sealed partial class MainWindow : Window
             recognitionToggle.IsEnabled = !_settings.IncomingSinglePerson; recognitionActions.Children.Add(recognitionToggle);
             recognitionActions.Children.Add(ModernTheme.Button("More voice options", (_, _) => Navigate("Speaker options")));learning.Children.Add(recognitionActions);
             learning.Children.Add(ModernTheme.Label("Off releases the recognition model. Translation keeps working, and your saved people are kept.", 13, ModernTheme.Muted));
+            learning.Children.Add(ModernTheme.Label("CPU time and memory are shared with your game. Turning person recognition off may improve performance.", 12, ModernTheme.Muted));
             var recognitionNotes=new StackPanel();recognitionNotes.Children.Add(ModernTheme.Label(_settings.UseAiSpeakerRecognition
                 ? "If several people talk at once, the app may not know who spoke. Choose Music / recording or Unidentified voice when a message should not teach a voice."
                 : "Sentences are shown without guessing who spoke. You can still assign a name by hand, but the app won't learn voice examples while recognition is off.", 13, ModernTheme.Muted));
@@ -986,6 +988,7 @@ internal sealed partial class MainWindow : Window
         SpeakerModelChoice selected = AppPaths.SpeakerModels.FirstOrDefault(choice => string.Equals(choice.Path, _settings.SpeakerModelPath, StringComparison.OrdinalIgnoreCase)) ?? AppPaths.SpeakerModels[0];
         var choice = Select(AppPaths.SpeakerModels, selected, value => _settings.SpeakerModelPath = value.Path);
         identity.Children.Add(Field("Voice recognition model", choice));
+        identity.Children.Add(ModernTheme.Label("These models identify people, not words. They use CPU time and RAM, not GPU memory, and may affect game performance.", 12, ModernTheme.Muted));
         identity.Children.Add(ModernTheme.Label(File.Exists(_settings.SpeakerModelPath) ? "Selected model file is available" : "Selected model file is missing — download it or import one", 12, ModernTheme.Muted));
         var buttons = new WrapPanel();
         buttons.Children.Add(ModernTheme.Button("Download voice recognition model", async (_, _) => await DownloadFingerprintAsync((SpeakerModelChoice)choice.SelectedItem)));

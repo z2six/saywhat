@@ -182,5 +182,6 @@
   "demo.panelTitle": "Traducir al chat de VRChat",
   "demo.native": "Usa el idioma que hablas",
   "demo.larger": "Más grande",
-  "benefits.sourceGuide": "Guía técnica"
+  "benefits.sourceGuide": "Guía técnica",
+  "speakers.resources": "La identificación opcional de personas usa un modelo pequeño de CPU aparte: CAM++ o la opción más grande ERes2Net. Identifica voces; no transcribe ni traduce. No usa inferencia en la GPU, aunque el uso de CPU y memoria puede afectar al rendimiento del juego."
 }

@@ -182,5 +182,6 @@
   "demo.panelTitle": "翻译为 VRChat 聊天消息",
   "demo.native": "根据你说的语言识别",
   "demo.larger": "更大",
-  "benefits.sourceGuide": "技术文档"
+  "benefits.sourceGuide": "技术文档",
+  "speakers.resources": "可选的人物识别使用独立的小型 CPU 模型：CAM++，或较大的 ERes2Net。它用于辨认声音，不负责语音转文字或翻译。它不使用 GPU 推理，但 CPU 和内存占用仍可能影响游戏表现。"
 }

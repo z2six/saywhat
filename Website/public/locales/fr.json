@@ -182,5 +182,6 @@
   "demo.panelTitle": "Traduire dans le chat VRChat",
   "demo.native": "Tient compte de votre langue",
   "demo.larger": "Plus grand",
-  "benefits.sourceGuide": "Guide technique"
+  "benefits.sourceGuide": "Guide technique",
+  "speakers.resources": "L’identification facultative des personnes utilise un petit modèle CPU distinct : CAM++ ou ERes2Net, plus volumineux. Il identifie les voix, sans transcrire ni traduire. Il ne fait pas d’inférence sur le GPU, mais son utilisation du CPU et de la mémoire peut affecter les performances du jeu."
 }

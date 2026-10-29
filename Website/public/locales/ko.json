@@ -182,5 +182,6 @@
   "demo.panelTitle": "VRChat 채팅으로 번역",
   "demo.native": "내가 말하는 언어를 사용",
   "demo.larger": "더 큰 모델",
-  "benefits.sourceGuide": "기술 안내"
+  "benefits.sourceGuide": "기술 안내",
+  "speakers.resources": "선택 기능인 인물 식별은 별도의 작은 CPU 모델인 CAM++ 또는 더 큰 ERes2Net을 사용합니다. 목소리로 사람을 구별하며, 음성 인식이나 번역을 담당하지 않습니다. GPU 추론은 사용하지 않지만 CPU와 메모리 사용은 게임 성능에 영향을 줄 수 있습니다."
 }

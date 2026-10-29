@@ -894,7 +894,9 @@ internal static class UiText
         Add("Name speakers and correct mistaken matches.", "为说话人命名并纠正错误匹配。", "話者に名前を付け、間違った判定を訂正できます。", "화자에게 이름을 붙이고 잘못된 매칭을 수정하세요.");
         Add("Adjust voice matching and manage recognition models.", "调整声音匹配并管理识别模型。", "声の照合を調整し、認識モデルを管理します。", "음성 매칭을 조정하고 인식 모델을 관리합니다.");
         Add("Speaker recognition · optional", "说话人识别 · 可选", "話者認識 · 任意", "화자 인식 · 선택 사항");
-        Add("An extra AI model can recognize who is speaking. Translations work with this turned off.", "额外的 AI 模型可识别谁在说话。关闭此功能仍可正常翻译。", "追加の AI モデルで誰が話しているかを認識します。オフでも翻訳は使えます。", "추가 AI 모델이 누가 말하는지 인식합니다. 꺼도 번역은 사용할 수 있습니다.");
+        Add("A small CPU model matches voices to saved people. Speech-to-text and translation use separate models and work without person recognition.", "一个小型 CPU 模型会将声音与已保存的人物匹配。语音转文字和翻译使用其他模型，关闭人物识别也能正常工作。", "小さな CPU モデルで声を保存した人と照合します。文字起こしや翻訳には別のモデルを使い、人の識別をオフにしても利用できます。", "작은 CPU 모델이 목소리를 저장된 사람과 대조합니다. 음성을 글로 바꾸고 번역하는 기능은 별도의 모델을 사용하므로 사람 구별을 꺼도 작동합니다.");
+        Add("CPU time and memory are shared with your game. Turning person recognition off may improve performance.", "此功能与游戏共用 CPU 资源和内存。关闭人物识别可能改善游戏性能。", "ゲームと CPU やメモリを共有します。人の識別をオフにすると、動作が改善する場合があります。", "게임과 CPU 자원 및 메모리를 공유합니다. 사람 구별을 끄면 성능이 나아질 수 있습니다.");
+        Add("These models identify people, not words. They use CPU time and RAM, not GPU memory, and may affect game performance.", "这些模型用于识别说话的人，不用于听写语音内容。它们使用 CPU 资源和内存，不占用显存，但可能影响游戏性能。", "これらのモデルは言葉ではなく人を識別します。GPU メモリは使わず CPU や RAM を使うため、ゲームの動作に影響する場合があります。", "이 모델은 단어가 아니라 사람을 구별합니다. GPU 메모리 대신 CPU 자원과 RAM을 사용하므로 게임 성능에 영향을 줄 수 있습니다.");
         Add("Turn off recognition", "关闭识别", "認識をオフにする", "인식 끄기");
         Add("Enable recognition", "启用识别", "認識を有効にする", "인식 켜기");
         Add("More voice options", "更多声音选项", "声の詳細設定", "음성 추가 옵션");

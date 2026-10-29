@@ -303,7 +303,7 @@ internal sealed partial class MainWindow
         });
         recognition.Name = "HomeSubtitlePersonRecognitionToggle"; recognition.IsEnabled = CanEditSubtitleSpeech() && !_settings.IncomingSinglePerson && !quick;
         body.Children.Add(recognition);
-        body.Children.Add(SubtitleSpeechLabel("Voice recognition is optional. Voice examples and names stay on this PC.", 12, ModernTheme.Muted));
+        body.Children.Add(SubtitleSpeechLabel("Optional person matching uses a small CPU model, separate from speech-to-text and translation. It shares CPU time and memory with your game. Names and voice examples stay on this PC.", 12, ModernTheme.Muted));
         var profiles = new WrapPanel { Name = "HomeSubtitleProfileChoices" };
         foreach (string id in new[] { TranslationProfiles.NormalId, TranslationProfiles.GroupsId })
         {

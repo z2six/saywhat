@@ -3,6 +3,14 @@
 Installers, full notes and matching source archives are on
 [GitHub Releases](https://github.com/z2six/saywhat/releases).
 
+## 0.2.9
+
+- Clarified that optional person recognition uses a separate small CPU model,
+  while speech recognition and translation are independent workloads.
+- Explained shared CPU/memory costs without promising no effect on games.
+- Straightened the website header previews and added the same model explanation
+  in every website language.
+
 ## 0.2.8
 
 - Added Only show Chinese speech on Home and Listening, filtering clearly

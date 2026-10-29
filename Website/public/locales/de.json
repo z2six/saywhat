@@ -182,5 +182,6 @@
   "demo.panelTitle": "Für den VRChat-Chat übersetzen",
   "demo.native": "Berücksichtigt deine Sprache",
   "demo.larger": "Größer",
-  "benefits.sourceGuide": "Technische Dokumentation"
+  "benefits.sourceGuide": "Technische Dokumentation",
+  "speakers.resources": "Die optionale Personenerkennung nutzt ein separates kleines CPU-Modell: CAM++ oder die größere ERes2Net-Option. Es erkennt Stimmen, statt Sprache zu verschriftlichen oder zu übersetzen. Die Inferenz läuft nicht auf der GPU, doch CPU- und Arbeitsspeichernutzung können die Spielleistung beeinflussen."
 }

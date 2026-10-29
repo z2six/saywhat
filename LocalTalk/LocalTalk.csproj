@@ -9,7 +9,7 @@
     <AssemblyName>SayWhat</AssemblyName>
     <StartupObject>IncomingTranslator.LocalTalkEntry</StartupObject>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <Version>0.2.8</Version>
+    <Version>0.2.9</Version>
     <ApplicationIcon>Assets/SayWhat.ico</ApplicationIcon>
     <Product>SayWhat?</Product>
     <Title>SayWhat?</Title>
