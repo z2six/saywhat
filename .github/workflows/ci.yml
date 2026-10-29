@@ -45,6 +45,8 @@ jobs:
         run: node eng/Check-PublicSource.mjs --self-test
       - name: Audit the indexed public source
         run: node eng/Check-PublicSource.mjs
+      - name: Preserve reviewed license bytes
+        run: ./Packaging/Test-ReleaseLicenses.ps1
       - name: Build native library, app and host; run offline checks
         run: ./eng/Build.ps1 -Configuration Release -RunTests
 

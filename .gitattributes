@@ -24,7 +24,7 @@
 FoxTransSource/.gitattributes -whitespace
 FoxTransSource/native/vendor/** -whitespace
 Packaging/Languages/*.isl -whitespace
-Packaging/licenses/** -whitespace
+Packaging/licenses/** -text -whitespace
 Packaging/scripts/*.patch -whitespace
 
 # Keep the reviewed upstream license byte-for-byte, including its line endings.
