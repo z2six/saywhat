@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: App help and troubleshooting
+    url: https://github.com/z2six/saywhat/blob/main/SUPPORT.md
+    about: Start here for installation, OSC, model and performance questions.
+  - name: Security reports
+    url: https://github.com/z2six/saywhat/security/advisories/new
+    about: Report vulnerabilities privately; do not post sensitive details in a public issue.

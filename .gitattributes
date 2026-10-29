@@ -1,0 +1,28 @@
+* text=auto
+*.cs text eol=lf
+*.csproj text eol=lf
+*.props text eol=lf
+*.targets text eol=lf
+*.ps1 text eol=lf
+*.sh text eol=lf
+*.patch text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.jsonc text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.svg text eol=lf
+*.bat text eol=crlf
+*.png binary
+*.ico binary
+
+# Preserve third-party source, license text and patch-context whitespace.
+FoxTransSource/.gitattributes -whitespace
+FoxTransSource/native/vendor/** -whitespace
+Packaging/Languages/*.isl -whitespace
+Packaging/licenses/** -whitespace
+Packaging/scripts/*.patch -whitespace

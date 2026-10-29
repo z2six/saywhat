@@ -1,0 +1,20 @@
+name: Feature request
+description: Suggest an improvement to SayWhat?.
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What are you trying to do?
+      description: Describe the user-visible outcome or problem first.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested change
+      description: Include alternatives or tradeoffs if you have considered them.
+  - type: textarea
+    id: context
+    attributes:
+      label: Relevant context
+      description: Languages, model or hardware requirements, or examples without private conversations.

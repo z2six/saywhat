@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../IncomingTranslator/AppBrand.cs" Link="AppBrand.cs" />
+    <Compile Include="../../LocalTalk/Provisioning.cs" Link="Provisioning.cs" />
+    <Compile Include="../../FoxTransSource/FoxTrans/Providers/TranslationModelPrompts.cs" Link="TranslationModelPrompts.cs" />
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+</Project>

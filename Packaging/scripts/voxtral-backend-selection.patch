@@ -1,0 +1,38 @@
+diff --git a/server/engine.cpp b/server/engine.cpp
+--- a/server/engine.cpp
++++ b/server/engine.cpp
+@@ -1,6 +1,7 @@
+ #include "engine.h"
+ 
+ #include <algorithm>
++#include <cstdlib>
+ #include <utility>
+ #include <vector>
+ 
+@@ -143,7 +144,16 @@ Engine::Engine(const std::string & model_path, Logger & logger)
+     : logger_(logger)
+ {
+     voxtral_model_params model_parameters = voxtral_model_default_params();
+-    model_parameters.backend = VOXTRAL_BACKEND_VULKAN;
++    const char * requested = std::getenv("VOXTRAL_SERVER_BACKEND");
++    const std::string backend = requested ? requested : "vulkan";
++    if (backend == "cuda") model_parameters.backend = VOXTRAL_BACKEND_CUDA;
++    else if (backend == "cpu") model_parameters.backend = VOXTRAL_BACKEND_CPU;
++    else if (backend == "vulkan") model_parameters.backend = VOXTRAL_BACKEND_VULKAN;
++    else throw EngineError(VOXTRAL_STATUS_INVALID_ARGUMENT,
++        "VOXTRAL_SERVER_BACKEND must be cuda, vulkan, or cpu");
++    // LocalTalk extension to the pinned upstream Vulkan-only server selector.
++    // No model backend, weights, or realtime protocol is replaced.
++    // CUDA is a locally maintained build path, not an upstream support claim.
+     model_parameters.log_level = VOXTRAL_LOG_INFO;
+ 
+     voxtral_model * model = nullptr;
+@@ -156,7 +166,7 @@ Engine::Engine(const std::string & model_path, Logger & logger)
+         throw EngineError(status, "model load failed: " + safe_status_message(status));
+     }
+     model_.reset(model);
+-    logger_.info("model_loaded", {{"backend", "vulkan"}});
++    logger_.info("model_loaded", {{"backend", backend}});
+ 
+     voxtral_context_config context_config = voxtral_context_default_config();
+     voxtral_context * context = nullptr;

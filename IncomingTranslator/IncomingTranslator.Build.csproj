@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>VRChatIncomingTranslator</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <Compile Include="GlobalUsings.Fixed.cs" />
+    <Compile Include="../FoxTransSource/FoxTrans/Providers/TranslationModelPrompts.cs" Link="Core/TranslationModelPrompts.cs" />
+    <Compile Include="../FoxTransSource/FoxTrans/Providers/TranslationModelCapabilities.cs" Link="Core/TranslationModelCapabilities.cs" />
+    <Compile Include="AppSettings.cs" />
+    <Compile Include="TranslationProfiles.cs" />
+    <Compile Include="IncomingPipelineProfiles.cs" />
+    <Compile Include="IncomingSpeakerReviews.cs" />
+    <Compile Include="IncomingGroupPipeline.cs" />
+    <Compile Include="GroupSpeechClient.cs" />
+    <Compile Include="SubtitleProfiles.cs" />
+    <Compile Include="AppearanceTheme.cs" />
+    <Compile Include="ThemeBackground.cs" />
+    <Compile Include="AppBrand.cs" />
+    <Compile Include="AudioRouting.cs" />
+    <Compile Include="ProcessLoopbackCapture.cs" />
+    <Compile Include="LocalModelManager.cs" />
+    <Compile Include="AiSpeakerIdentifier.cs" />
+    <Compile Include="SpeakerFeedback.cs" />
+    <Compile Include="PersonAvatar.cs" />
+    <Compile Include="PersonAvatarSeed.cs" />
+    <Compile Include="GeneratedPersonAvatar.cs" />
+    <Compile Include="SmokeTests.cs" />
+    <Compile Include="Program.Fixed.cs" />
+    <Compile Include="SubtitleWindowPlacement.cs" />
+    <Compile Include="SubtitleQuickGuide.cs" />
+    <Compile Include="SpeakerTracking.cs" />
+    <Compile Include="SubtitleSegmentation.cs" />
+    <Compile Include="IncomingContinuousAudio.cs" />
+    <Compile Include="IncomingContinuousAudioTests.cs" />
+    <PackageReference Include="NAudio" Version="2.3.0" />
+    <PackageReference Include="org.k2fsa.sherpa.onnx" Version="1.13.8" />
+  </ItemGroup>
+</Project>

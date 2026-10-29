@@ -1,0 +1,15 @@
+// FoxTrans provider reference only. SayWhat? prepares its selected local services.
+{
+  "$schema": "../foxtrans.schema.json",
+  "version": 1,
+  "audio": { "device": "default" },
+  "pipeline": {
+    "speech": { "type": "voxtral-fox", "baseUrl": "http://127.0.0.1:8080", "delayMs": 240 },
+    "translation": {
+      "type": "openai-chat", "baseUrl": "http://127.0.0.1:1234/v1",
+      "model": "local-translator", "prompt": "Translate into English. Reply only with the translation."
+    },
+    "realtime": { "preset": "responsive" }
+  },
+  "outputs": [{ "type": "vrchat-osc" }]
+}

@@ -1,62 +1,73 @@
+<img src="Website/public/assets/saywhat-icon-256.png" width="72" alt="SayWhat? app icon">
+
 # SayWhat?
 
-Translate your voice into VRChat chat on Windows. Choose the language you speak, choose what your friends should read, and press Start. Other people’s voice translations remain available as a separate, optional subtitle window.
+**Free, open-source voice translation for VRChat on Windows.** Translate your microphone into VRChat chat messages. An optional subtitle window translates the voices you hear from VRChat or another chosen application.
 
-**[Download SayWhat?](https://saywhat.pages.dev/#download)** · [Website](https://saywhat.pages.dev/) · [Release notes](https://github.com/z2six/saywhat/releases) · [Help](SUPPORT.md)
+**[Download the installer](https://saywhat.pages.dev/#download)** · [Website](https://saywhat.pages.dev/) · [Releases](https://github.com/z2six/saywhat/releases) · [Get help](SUPPORT.md)
 
-Want to understand what runs on your PC or tune a specific setting? Read the [technical documentation](docs/README.md): [architecture](docs/architecture.md), [settings reference](docs/settings-reference.md), [models](docs/models-and-runtimes.md), [voice recognition](docs/people-and-voice-recognition.md), and [performance troubleshooting](docs/performance-and-troubleshooting.md).
+There are no subscriptions or paid features. Speech recognition, translation and optional familiar-voice matching run locally on your PC. Downloads and update checks need an internet connection.
 
 ## Get started
 
-1. Download and run the Windows installer.
-2. Open SayWhat? and choose your spoken language and one to four translation languages. Keep the recommended models or choose another card, review the downloads, then prepare translation.
+1. Install SayWhat? and follow its setup screens.
+2. Choose the language you speak and the language or languages your friends should read. Prepare the recommended models, or choose different ones.
 3. Enable **OSC → Enabled** in VRChat’s Action Menu.
 4. On Home, choose **Start translating my voice**.
 
-No separate LM Studio or FoxTrans installation is needed. The default own-voice recognizer runs directly on Windows; WSL is not required for that path. Additional speech modes can need Windows components, permission or a restart. Setup explains those changes before preparation. It does not start listening automatically.
+No separate LM Studio or FoxTrans installation is needed. The default speech recognizer runs directly on Windows. Optional Voxtral and Groups modes use additional local tools; setup explains their requirements before preparing them. Nothing starts listening merely because you open the app.
 
-Your spoken language, output languages, recognizer, translator and microphone are visible on **Home**. Click to change them without searching through Settings. Model cards explain the choices and offer downloads when needed. Theme selection is optional, and setup can be repeated from **Settings → Run setup again**.
+SayWhat? targets **Windows 11 x64**. The recommended translation runtime needs compatible GPU acceleration, and downloaded models require additional disk space. This is an **unsigned preview**; hardware compatibility and fresh-PC installation are still being tested. See the [requirements](https://saywhat.pages.dev/#requirements) and [installation guide](docs/install-and-updates.md).
 
-## What it does
+## Features
 
-- Translates your voice into one to four languages. Additional outputs share the same short VRChat message and add processing time; long messages may be shortened.
-- Lets you choose a continuous recognizer and a separate translation model. Native Nemotron can use your chosen spoken language; existing Voxtral setups retain automatic speech-language detection.
-- Offers a 1.2-second starting pause and optional early messages so friends can read while you keep speaking. Both are easy to change on Home.
-- Optionally shows translated voices from VRChat or another chosen application in a movable subtitle window. Prepare and start subtitles separately when you want them; they are not needed for your microphone translation.
-- Saves names and photos in **People**, with translation counts and clear voice examples. People without a photo get locally generated artwork based on their first confirmed voice example. Choose a picture file or paste an image to override it. Smaller pictures appear beside subtitles.
-- Optionally suggests familiar people as **Maybe [name]** beside subtitles. Confirm with ✓, reject with ✕, or choose a different person. Clear reviewed examples improve later matching; automatic guesses never teach themselves. People shows confirmed and rejected review counts.
-- Offers an optional **Groups** speech model that returns separate attributed text for multiple voices. It can help with overlapping conversation, but does not produce isolated recordings or guarantee that every voice is recovered.
-- Pauses new microphone capture when your VRChat mic is muted.
-- Offers local translation models, themes, four app interface languages and in-app updates.
+- **Your voice → VRChat chat:** choose up to four output languages, a finishing pause and optional early messages. Outputs share VRChat’s 144-character message limit.
+- **Other voices → Subtitles:** choose the application to hear, the spoken language, the subtitle language and a separate speech recognizer. FireRedASR2 offers Chinese/English Fast and Accurate options; Nemotron offers multilingual recognition. [Model choices](docs/models-and-runtimes.md).
+- **Saved people:** add names and pictures, review familiar-voice suggestions and correct them. Only reviewed, suitable voice examples improve matching; automatic guesses do not train themselves.
+- **Adjustable controls:** change models and languages, use built-in or custom profiles, choose themes, toggle the subtitle window’s always-on-top setting and inspect problems and logs.
 
-Need guidance? Open **Help** in the sidebar, or **?** in the subtitle window. **Settings → Run setup again** lets you repeat setup without removing downloaded files or saved people.
+Subtitles are prepared and started separately from your microphone translator. Normal and Quick use your selected subtitle recognizer; Groups uses the optional VibeVoice path. Identifying a familiar voice does **not** isolate every person’s audio or guarantee that all overlapping words are recovered. [How people and Groups work](docs/people-and-voice-recognition.md).
 
-## Translation profiles
-
-Choose a profile near the top of **Settings**, then **Apply profile**:
-
-- **Quick:** shorter subtitle waits and familiar-voice matching off. A lower-load starting point for one-to-one conversation.
-- **Normal:** the existing realtime speech path with optional familiar-voice matching.
-- **Groups:** optional VibeVoice streaming recognition for multiple attributed voices. Adds buffering and memory use; review and approve its extra downloads first.
-
-These presets keep your chosen translator, languages and appearance. The subtitle window switches between Normal and Groups; Quick is selected in Settings. **Save current settings as…** creates a custom profile, including model and language choices, without copying model files or saved people. [Profile details and limits](docs/settings-reference.md#translation-profiles).
-
-## Before installing
-
-SayWhat? currently requires **Windows 11 x64**, supported GPU acceleration and several gigabytes of free disk space. It is not a standalone Quest or iPad app. See the [system requirements](https://saywhat.pages.dev/#requirements).
-
-This is an **unsigned preview**. Fresh-PC installation, hardware compatibility and long-session performance are still being tested. If antivirus flags a download, keep protection enabled and [report it](SUPPORT.md).
+By default, microphone capture pauses when your VRChat mic is muted. **Pause when my VRChat mic is muted** on Home changes that behavior. Your timing and early-message controls are also on Home.
 
 ## Privacy
 
-Speech recognition and translation run on your PC. Saved names, photos and voice examples remain on your device. Downloads and update checks need an internet connection; they do not upload microphone recordings or your saved people. Logs may contain conversation text, so review them before sharing.
+Audio processing stays on your device. Saved people, pictures and voice representations are stored locally. The app does not upload them for recognition or translation. Detailed logs can contain conversation text, so review them before sharing. [Storage and privacy](docs/privacy-and-storage.md).
 
-The website has no analytics or tracking cookies. Its language picker remembers only your language preference. [Privacy details](https://saywhat.pages.dev/#privacy).
+## Browse the source
 
-## Source and licenses
+This repository contains the application, capture host, native capture source, installer scripts and website. Start with the [codebase guide](docs/codebase-guide.md) for the main entry points and a conceptual explanation of the pipelines, then read the [architecture](docs/architecture.md) or [settings reference](docs/settings-reference.md).
 
-This repository is the public download and support page. The application’s matching source and license notices are provided with each [release](https://github.com/z2six/saywhat/releases): use **SayWhat-Corresponding-Source.zip** from the same release as your installer, not GitHub’s automatic “Source code” archives.
+| Directory | Purpose |
+| --- | --- |
+| [LocalTalk](LocalTalk/) | SayWhat?’s WPF application, setup, model preparation, runtime ownership and UI checks. The directory retains its earlier internal name. |
+| [IncomingTranslator](IncomingTranslator/) | Subtitle capture, recognition routing, translation, people matching and shared settings. |
+| [FoxTransLocalHost](FoxTransLocalHost/) | The microphone translation host and its isolated protocol tests. |
+| [FoxTransSource](FoxTransSource/) | Included FoxTrans core and native capture source, with upstream attribution. |
+| [Packaging](Packaging/) | Installer, update/data lifecycle, provisioning scripts and license notices. |
+| [Website](Website/) | Static download site, localization and website checks. |
+| [eng](eng/) | Developer build and public-source audit commands. |
 
-SayWhat?’s original contributions use [GPL-3.0-only](LICENSE). FoxTrans and other components retain their respective notices; models have separate terms. Recipients can inspect, modify and redistribute the application under the applicable licenses.
+The [documentation index](docs/README.md) covers recognition versus translation, model choices, queue and recovery behavior, saved people, settings, installation and updates.
+
+## Build and contribute
+
+For the main Windows build, install the **.NET 8 and 9 SDKs**, **CMake 3.21+** and **Visual Studio 2022 Desktop development with C++**, including a Windows SDK. **Node.js 22+** is needed for the website checks.
+
+```powershell
+git clone https://github.com/z2six/saywhat.git
+cd saywhat
+powershell -NoProfile -ExecutionPolicy Bypass -File .\eng\Build.ps1 -RunTests
+```
+
+The script builds the native capture library from the included C source, builds the app and host, and runs isolated checks. It does not install SayWhat?, load AI models, capture audio or send live OSC messages. NuGet restore can download build dependencies. The runnable development app is written to `artifacts/app/SayWhat.exe`; `-Publish` produces self-contained Windows output.
+
+Read [development and build instructions](docs/development.md) before building installers or changing runtime behavior, and [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Bug reports and feature requests belong in [Issues](https://github.com/z2six/saywhat/issues).
+
+## License and releases
+
+SayWhat?’s original code and modifications are licensed under [GPL-3.0-only](LICENSE). FoxTrans and other included components retain their own applicable licenses and notices. Model weights have separate terms and are downloaded separately; they are not committed here. See [source provenance](SOURCE-PROVENANCE.md) and [third-party notices](Packaging/THIRD-PARTY-NOTICES.md).
+
+The Code tab contains current development source. For the exact source matching an existing installer, use **SayWhat-Corresponding-Source.zip** from that same [release](https://github.com/z2six/saywhat/releases). Older GitHub-generated “Source code” archives predate this repository’s source import and may contain only the earlier documentation site.
 
 Independent project. Not affiliated with VRChat, Inc.

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#211e1a">
+  <title data-i18n="notFound.title">Page not found — SayWhat?</title>
+  <link rel="icon" href="/assets/saywhat-icon-256.png" type="image/png">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/i18n.js" defer></script>
+</head>
+<body class="dark-intro">
+  <a class="skip-link" href="#main" data-i18n="nav.skip">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="brand" href="/" data-i18n-aria-label="nav.home" aria-label="SayWhat? home"><img src="/assets/saywhat-icon-256.png" alt="" width="42" height="42"><span lang="en">SayWhat?</span></a>
+    <label class="language-picker" for="website-language"><span data-i18n="nav.language">Website language</span><select id="website-language" name="language" aria-describedby="language-status"><option value="en" lang="en">English</option><option value="zh-CN" lang="zh-CN">简体中文</option><option value="ja" lang="ja">日本語</option><option value="ko" lang="ko">한국어</option><option value="es" lang="es">Español</option><option value="fr" lang="fr">Français</option><option value="de" lang="de">Deutsch</option><option value="pt-BR" lang="pt-BR">Português (Brasil)</option></select></label>
+    <p class="language-status" id="language-status" role="status" aria-live="polite" hidden></p>
+  </header>
+  <main id="main" class="not-found wrap">
+    <p class="eyebrow">404</p>
+    <h1 data-i18n="notFound.heading">Page not found.</h1>
+    <p data-i18n="notFound.description">This address does not point to a page on the SayWhat? website.</p>
+    <a class="button primary" href="/"><span data-i18n="notFound.home">Go to the homepage</span> <span aria-hidden="true">↗</span></a>
+  </main>
+</body>
+</html>

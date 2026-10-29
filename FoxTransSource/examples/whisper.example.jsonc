@@ -1,0 +1,18 @@
+// FoxTrans provider reference only, not SayWhat?'s chosen realtime pipeline.
+{
+  "$schema": "../foxtrans.schema.json",
+  "version": 1,
+  "audio": { "device": "default" },
+  "pipeline": {
+    "vad": { "type": "webrtc", "preset": "natural-speech" },
+    "speech": {
+      "type": "openai-transcription", "baseUrl": "http://127.0.0.1:8000/v1",
+      "model": "local-transcription-model", "requestFormat": "multipart"
+    },
+    "translation": {
+      "type": "openai-chat", "baseUrl": "http://127.0.0.1:1234/v1",
+      "model": "local-translator", "prompt": "Translate into English. Reply only with the translation."
+    }
+  },
+  "outputs": [{ "type": "vrchat-osc" }]
+}

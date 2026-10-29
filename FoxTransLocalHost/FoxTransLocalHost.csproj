@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>FoxTrans.LocalHost</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>preview</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="MultiLanguageTests.cs" />
+    <Compile Include="SpecializedTranslationTests.cs" />
+    <Compile Include="NativeSpeechTests.cs" />
+    <Compile Include="../FoxTransSource/FoxTrans/**/*.cs" Exclude="../FoxTransSource/FoxTrans/obj/**/*.cs;../FoxTransSource/FoxTrans/bin/**/*.cs" />
+    <EmbeddedResource Include="../FoxTransSource/foxtrans.schema.json" LogicalName="FoxTrans.foxtrans.schema.json" />
+    <Content Include="Native/FoxTrans.Native.dll" Link="FoxTrans.Native.dll" TargetPath="FoxTrans.Native.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../FoxTransSource/LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="README.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

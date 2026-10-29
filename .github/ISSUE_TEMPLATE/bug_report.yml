@@ -1,0 +1,51 @@
+name: Bug report
+description: Report an app, installer or translation-pipeline problem.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check Help and Troubleshooting first. Do not attach recordings, raw conversation logs, saved voice profiles, credentials or other people's information. Use a short synthetic example or redact details before sharing.
+  - type: input
+    id: version
+    attributes:
+      label: SayWhat? version
+      placeholder: e.g. 0.2.3
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected feature
+      options:
+        - My voice to VRChat chat
+        - Live subtitles
+        - People / voice matching
+        - Setup / models
+        - Installer / update / uninstall
+        - Interface / other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include only the minimum steps needed, using non-private example speech if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: setup
+    attributes:
+      label: Relevant setup
+      description: Windows version, recognizer/translator, spoken and target languages, selected profile, and GPU if relevant. Omit personal file paths.
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Redacted error or diagnostic summary
+      description: Prefer the app's error code and stage. Review any text or screenshot for private content before attaching it.

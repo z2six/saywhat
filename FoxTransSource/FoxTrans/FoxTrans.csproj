@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>FoxTrans.Core</AssemblyName>
+    <PackageId>FoxTrans.Core</PackageId>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\foxtrans.schema.json"
+                      Link="foxtrans.schema.json"
+                      LogicalName="FoxTrans.foxtrans.schema.json" />
+  </ItemGroup>
+
+</Project>

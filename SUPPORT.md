@@ -1,37 +1,42 @@
 # Help with SayWhat?
 
-Open **Help** in SayWhat?’s sidebar for setup and troubleshooting advice, or read the [website FAQ](https://saywhat.pages.dev/#help). To report a bug, [open an issue](https://github.com/z2six/saywhat/issues).
+Open **Help** in the app’s sidebar for setup and troubleshooting, or use the [website FAQ](https://saywhat.pages.dev/#help). Report bugs and request features through [GitHub Issues](https://github.com/z2six/saywhat/issues).
 
-For your first voice-to-chat message, choose **I speak**, select the translation language(s) on Home, then choose **Start translating my voice**. Enable **OSC → Enabled** in VRChat’s Action Menu and unmute your VRChat microphone. Speech and translation model cards are directly on Home. Subtitles are optional and are prepared/started separately; they are not required for your own voice.
+## Get a first translation working
 
-Please include:
+For your own voice, choose **I speak** and the output language or languages on Home, prepare the selected models, then choose **Start translating my voice**. Enable **OSC → Enabled** in VRChat’s Action Menu. With **Pause when my VRChat mic is muted** enabled, unmute in VRChat before speaking.
+
+For other people’s voices, prepare and start **live subtitles** separately. **Speech model & language** on Home lets you select what they speak and which model recognizes it. For Chinese → English, choose Chinese with FireRedASR2 Fast or Accurate, and keep the subtitle language set to English. For automatic detection or other supported languages, choose a multilingual recognizer such as Nemotron. [Model and language details](docs/models-and-runtimes.md).
+
+You do not need subtitles running to translate your own microphone.
+
+## Report a problem
+
+Include:
 
 - Your SayWhat? version and Windows version.
-- Whether the problem affects your voice, subtitles, setup, or something else.
-- What you expected and what happened instead.
-- The selected speech recognizer and translator, spoken/output languages and any visible error message, if relevant.
+- Which feature is affected: microphone translation, subtitles, setup, updates or another part of the app.
+- What you expected, what happened and steps that reproduce the issue.
+- The chosen speech recognizer, translator, spoken/output languages and profile, when relevant.
+- The visible error or diagnostics summary. For speed problems, describe approximately how long it takes and whether it eventually catches up.
 
-Open **Settings → Problems & logs → Open troubleshooting** (also available under **Advanced → Diagnostics**). **Recent issues** shows where a failure occurred. Use **Copy diagnostics** for a summary without conversation text, names, file paths or raw exceptions. Detailed logs and screenshots may contain private conversations, saved names or file paths. Review those before posting; never share passwords, tokens or recordings you do not have permission to share.
+Open **Settings → Problems & logs → Open troubleshooting**, also available under **Advanced → Diagnostics**. **Recent issues** shows the stage where a failure occurred. Use **Copy diagnostics** first; it leaves out conversation text, names, file paths and raw exceptions.
 
-For a detailed explanation rather than a quick fix, use the [technical documentation](docs/README.md). In particular:
+Detailed logs and screenshots may contain private conversations, saved names, photos or paths. Review them before posting. Never share passwords, API tokens, people-profile files or recordings you do not have permission to share.
 
-- [Latency, missed messages and reconnecting speech](docs/performance-and-troubleshooting.md)
+For an antivirus detection, leave protection enabled and report the release version, detection name and downloaded file’s checksum if available. Do not disable protection to make an installer run.
+
+## Common questions
+
+- [Slow translations, missed messages and reconnecting speech](docs/performance-and-troubleshooting.md)
 - [What each setting changes](docs/settings-reference.md)
 - [Models, acceleration and shared versus separate translators](docs/models-and-runtimes.md)
 - [Saved people, corrections and overlapping voices](docs/people-and-voice-recognition.md)
 - [Data locations and privacy](docs/privacy-and-storage.md)
-- [Installation, updates and shutdown](docs/install-and-updates.md)
+- [Installation, updates, shutdown and uninstalling](docs/install-and-updates.md)
 
-If a download is flagged by antivirus, leave protection enabled. Include the release version and detection name rather than changing security settings.
+The app checks for updates on launch unless you turn that off in Settings. An accepted update downloads and verifies the installer, preserves your settings and reopens with translation stopped. Windows may still request permission. If an update cannot finish, include its visible error when reporting it. You can also download the installer from the [website](https://saywhat.pages.dev/#download).
 
-## Updates and uninstalling
+## Questions about the code
 
-SayWhat? checks for updates when it opens unless you turn this off in Settings. Choose **Update now** to download and verify the installer, update with visible progress and reopen the app with translation stopped. Settings, people and models are kept. Windows may still ask for permission; safety errors remain visible. If automatic reopening is unavailable, open SayWhat? from Start. You can also download the latest installer from the [website](https://saywhat.pages.dev/#download).
-
-## People and subtitles
-
-Open **People** to add a name, choose a picture file or paste an image, crop a picture, or view saved voice examples and translation counts. Counts begin with the version that introduced them; they are not reconstructed from old conversations. Voice familiarity describes saved clear examples, not a measured accuracy percentage.
-
-Under a subtitle, choose **Select a person** to name the person who spoke. Clear examples can improve future recognition when **Voice recognition** is on. Turn it off in Settings if you only want translation or manual names. Songs, overlapping voices and unclear speech can still cause incorrect matches. The subtitle window's **?** button explains this briefly.
-
-To uninstall, use Windows **Settings → Apps → Installed apps**, or run the installer and choose its uninstall option. Review the data choices before removing saved settings or models.
+The [documentation index](docs/README.md), [codebase guide](docs/codebase-guide.md) and [architecture](docs/architecture.md) explain the components and their design. For changes to the code or documentation, read [CONTRIBUTING.md](CONTRIBUTING.md). Security concerns should follow [SECURITY.md](SECURITY.md).

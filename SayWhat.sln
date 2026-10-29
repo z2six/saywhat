@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SayWhat", "LocalTalk\LocalTalk.csproj", "{10DB6030-FB63-42B6-93AC-518B6E9FAC51}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Capture host", "FoxTransLocalHost\FoxTransLocalHost.csproj", "{D88DFBBC-016E-4A50-9D60-6856CFABED69}"
+EndProject
+Global
+    GlobalSection(SolutionConfigurationPlatforms) = preSolution
+        Debug|Any CPU = Debug|Any CPU
+        Release|Any CPU = Release|Any CPU
+    EndGlobalSection
+    GlobalSection(ProjectConfigurationPlatforms) = postSolution
+        {10DB6030-FB63-42B6-93AC-518B6E9FAC51}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {10DB6030-FB63-42B6-93AC-518B6E9FAC51}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {10DB6030-FB63-42B6-93AC-518B6E9FAC51}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {10DB6030-FB63-42B6-93AC-518B6E9FAC51}.Release|Any CPU.Build.0 = Release|Any CPU
+        {D88DFBBC-016E-4A50-9D60-6856CFABED69}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {D88DFBBC-016E-4A50-9D60-6856CFABED69}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {D88DFBBC-016E-4A50-9D60-6856CFABED69}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {D88DFBBC-016E-4A50-9D60-6856CFABED69}.Release|Any CPU.Build.0 = Release|Any CPU
+    EndGlobalSection
+EndGlobal

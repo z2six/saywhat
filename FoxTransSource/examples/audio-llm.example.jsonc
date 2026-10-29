@@ -1,0 +1,16 @@
+// FoxTrans provider reference only. SayWhat? generates its own runtime settings.
+// Replace the placeholder model with a model served by your local audio endpoint.
+{
+  "$schema": "../foxtrans.schema.json",
+  "version": 1,
+  "audio": { "device": "default" },
+  "pipeline": {
+    "vad": { "type": "webrtc", "preset": "natural-speech" },
+    "speech": {
+      "type": "openai-chat-audio", "baseUrl": "http://127.0.0.1:1234/v1",
+      "model": "local-audio-model",
+      "prompt": "Translate this audio to English. Reply only with the translated text."
+    }
+  },
+  "outputs": [{ "type": "vrchat-osc" }]
+}

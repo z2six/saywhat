@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>SayWhat</AssemblyName>
+    <StartupObject>IncomingTranslator.LocalTalkEntry</StartupObject>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <Version>0.2.3</Version>
+    <ApplicationIcon>Assets/SayWhat.ico</ApplicationIcon>
+    <Product>SayWhat?</Product>
+    <Title>SayWhat?</Title>
+    <AssemblyTitle>SayWhat?</AssemblyTitle>
+    <Description>Local speech translation companion for VRChat</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+    <Using Include="System.IO" />
+    <Compile Include="../IncomingTranslator/GlobalUsings.Fixed.cs" Link="Core/GlobalUsings.cs" />
+    <Compile Include="../FoxTransSource/FoxTrans/Providers/TranslationModelPrompts.cs" Link="Core/TranslationModelPrompts.cs" />
+    <Compile Include="../FoxTransSource/FoxTrans/Providers/TranslationModelCapabilities.cs" Link="Core/TranslationModelCapabilities.cs" />
+    <Compile Include="../IncomingTranslator/AppSettings.cs" Link="Core/AppSettings.cs" />
+    <Compile Include="../IncomingTranslator/TranslationProfiles.cs" Link="Core/TranslationProfiles.cs" />
+    <Compile Include="../IncomingTranslator/IncomingPipelineProfiles.cs" Link="Core/IncomingPipelineProfiles.cs" />
+    <Compile Include="../IncomingTranslator/IncomingRecognitionCatalog.cs" Link="Core/IncomingRecognitionCatalog.cs" />
+    <Compile Include="../IncomingTranslator/IncomingNativeSpeech.cs" Link="Core/IncomingNativeSpeech.cs" />
+    <Compile Include="../IncomingTranslator/IncomingSpeakerReviews.cs" Link="Core/IncomingSpeakerReviews.cs" />
+    <Compile Include="../IncomingTranslator/IncomingGroupPipeline.cs" Link="Core/IncomingGroupPipeline.cs" />
+    <Compile Include="../IncomingTranslator/GroupSpeechClient.cs" Link="Core/GroupSpeechClient.cs" />
+    <Compile Include="../IncomingTranslator/IncomingGroupSoundLabelTests.cs" Link="Tests/IncomingGroupSoundLabelTests.cs" />
+    <Compile Include="../IncomingTranslator/SubtitleProfiles.cs" Link="Core/SubtitleProfiles.cs" />
+    <Compile Include="../IncomingTranslator/AppearanceTheme.cs" Link="Core/AppearanceTheme.cs" />
+    <Compile Include="../IncomingTranslator/ThemeBackground.cs" Link="Core/ThemeBackground.cs" />
+    <Compile Include="../IncomingTranslator/AppBrand.cs" Link="Core/AppBrand.cs" />
+    <Compile Include="../IncomingTranslator/AudioRouting.cs" Link="Core/AudioRouting.cs" />
+    <Compile Include="../IncomingTranslator/IncomingListening.cs" Link="Core/IncomingListening.cs" />
+    <Compile Include="../IncomingTranslator/IncomingListeningPipeline.cs" Link="Core/IncomingListeningPipeline.cs" />
+    <Compile Include="../IncomingTranslator/IncomingListeningTests.cs" Link="Tests/IncomingListeningTests.cs" />
+    <Compile Include="../IncomingTranslator/ProcessLoopbackCapture.cs" Link="Core/ProcessLoopbackCapture.cs" />
+    <Compile Include="../IncomingTranslator/LocalModelManager.cs" Link="Core/LocalModelManager.cs" />
+    <Compile Include="../IncomingTranslator/AiSpeakerIdentifier.cs" Link="Core/AiSpeakerIdentifier.cs" />
+    <Compile Include="../IncomingTranslator/SpeakerFeedback.cs" Link="Core/SpeakerFeedback.cs" />
+    <Compile Include="../IncomingTranslator/PersonAvatar.cs" Link="Core/PersonAvatar.cs" />
+    <Compile Include="../IncomingTranslator/PersonAvatarSeed.cs" Link="Core/PersonAvatarSeed.cs" />
+    <Compile Include="../IncomingTranslator/GeneratedPersonAvatar.cs" Link="Core/GeneratedPersonAvatar.cs" />
+    <Compile Include="../IncomingTranslator/PersonAvatarTests.cs" Link="Tests/PersonAvatarTests.cs" />
+    <Compile Include="../IncomingTranslator/SmokeTests.cs" Link="Core/SmokeTests.cs" />
+    <Compile Include="../IncomingTranslator/Program.Fixed.cs" Link="Core/IncomingTranslation.cs" />
+    <Compile Include="../IncomingTranslator/SubtitleWindowPlacement.cs" Link="Core/SubtitleWindowPlacement.cs" />
+    <Compile Include="../IncomingTranslator/SubtitleQuickGuide.cs" Link="Core/SubtitleQuickGuide.cs" />
+    <Compile Include="../IncomingTranslator/SubtitleSegmentation.cs" Link="Core/SubtitleSegmentation.cs" />
+    <Compile Include="../IncomingTranslator/IncomingContinuousAudio.cs" Link="Core/IncomingContinuousAudio.cs" />
+    <Compile Include="../IncomingTranslator/IncomingContinuousAudioTests.cs" Link="Tests/IncomingContinuousAudioTests.cs" />
+    <Compile Include="../IncomingTranslator/SpeakerTracking.cs" Link="Core/SpeakerTracking.cs" />
+    <Compile Include="*.cs" />
+    <Resource Include="Assets/SayWhat.ico" />
+    <Resource Include="Assets/saywhat-icon-256.png" />
+    <Resource Include="Assets/saywhat-mark.png" />
+    <Resource Include="Assets/saywhat-lockup.png" />
+    <PackageReference Include="NAudio" Version="2.3.0" />
+    <PackageReference Include="org.k2fsa.sherpa.onnx" Version="1.13.8" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.28.0" />
+    <Content Include="../Packaging/scripts/*" Exclude="../Packaging/scripts/test-hidden-desktop-entries.sh" Link="provisioning/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../Packaging/vibevoice/*.py;../Packaging/vibevoice/*.sh;../Packaging/vibevoice/README.md" Exclude="../Packaging/vibevoice/test_*.py" Link="provisioning/vibevoice/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

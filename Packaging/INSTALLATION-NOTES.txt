@@ -1,0 +1,135 @@
+SayWhat? preview installation
+
+SayWhat? is an unofficial VRChat companion, not made or endorsed by VRChat or
+the projects providing its translation components.
+
+The installer uses SayWhat? styling and offers English, Simplified
+Chinese, Japanese and Korean. English is initially selected. The selected language
+is the fresh app's display-language default, not a translation target. Existing
+saved display preferences are kept on ordinary launches. You can change display
+language in the app. The software license screen keeps the English original.
+
+The finish-page Open SayWhat? choice is optional and checked by default. It opens the
+dashboard with translation stopped. Silent setup does not launch the app.
+Updates and removal can safely ask a compatible open app to quit, even from the
+tray. If it cannot finish closing, quit from the tray and retry. Setup never
+force-kills the app's tools or unloads an unrelated application's models.
+
+Setup still shows measured progress when available; elapsed time is not a
+countdown. First speech installation can take a while and reuses valid downloads.
+No model, voice capture or translation starts during the update itself.
+
+GET STARTED
+
+Setup defaults to installing Just me. You can choose All users instead; Windows
+will ask for administrator permission for shared app files. Each Windows user
+keeps separate settings and models. Optional data changes can affect only the
+verified initiating account, including all-users installation. Other accounts
+keep their data. Unknown identity or alternate-account elevation without the
+original token disables cleanup; start setup normally from your own account.
+
+For a registered copy, setup shows the installed version and path, and offers
+Update or Repair, or Uninstall. Uninstall removes the registered app without
+installing a replacement. A copy in the other installation scope must be managed
+or removed first. Unregistered app files are reported but not silently taken over.
+Installing an older version requires a separate confirmation.
+
+Your data is kept by default. Verified-account installation/removal offers three
+separate unchecked choices: reset preferences, remove saved speakers and log
+history, and delete downloaded model files in the app cache. Review the summary
+and final confirmation. Imported files outside the app cache and Windows speech
+support are kept. Deleted cached files must be downloaded again.
+Silent setup/removal keeps data. Cancellation before removal changes nothing.
+If app removal or optional cleanup cannot be verified, the app reports a failure;
+it does not claim all data was cleared or the app removal was rolled back.
+
+Install the app and open SayWhat from Start. The first-time setup asks for your
+spoken language, translation languages and models. Review the download notice, then let the app prepare
+its tools. You do not need a separate FoxTrans, .NET or LM Studio/Bionic install,
+or a separate manual setup guide for the recommended workflow.
+
+The recommended translator is the smaller Hy-MT2 1.8B model for gaming. A larger
+Hy-MT2 7B option is available alongside it on Home and in setup. TranslateGemma
+and the English/Japanese-only Liquid translator are optional alternatives with
+their own terms. Existing saved model choices are kept.
+Model weights are not included in this installer: setup downloads selected
+files after consent and verifies pinned checksums.
+
+Windows may ask for administrator approval or a restart. After restarting,
+reopen SayWhat? and choose Continue setup; your choices and completed steps
+are kept. Neither installation nor finishing setup starts voice capture or
+translation. Use Start on Home when you are ready.
+
+New installations use Nemotron streaming recognition directly on Windows with
+Vulkan GPU support. Its tools and speech model download during setup; no WSL,
+LM Studio or second application is required for the default own-voice workflow.
+The previous Voxtral recognizer remains selectable and existing installations
+keep it. That optional path still uses the app's managed WSL2 Ubuntu tools and
+may require administrator approval, a restart, and additional downloads. The
+optional incoming-voice and Groups tools are prepared separately when selected.
+
+Missing Microsoft Visual C++ x64 support is downloaded directly from Microsoft
+after consent, checked by hash and Microsoft signature, and installed with
+administrator approval. No automatic reboot occurs. An optional unchecked
+installer task is also available. The Microsoft package is not redistributed
+inside SayWhat?, and its own terms apply.
+
+USE AND CLOSE
+
+The compact dashboard keeps everyday controls together. Detailed audio, model
+and troubleshooting options remain under Advanced.
+
+Start your voice translation on Home. Spoken language, output languages, models,
+microphone, finishing pause and early translated messages can be changed there.
+Timing and early-message changes apply live; language and microphone changes
+finish the already captured sentence before changing capture. Model changes may
+need file preparation and a brief processing restart, with progress shown.
+Up to four output languages share VRChat's short message limit and need more
+translation work, so one is the quickest default.
+
+Subtitles for other voices are a separate, optional feature on Home. Close subtitles when
+you no longer need them; your own voice translation can continue.
+Use Always on top beside Settings in the subtitles window to pin or unpin it.
+The choice is remembered for the next time you open subtitles.
+
+On Speakers, choose Enable recognition or Turn off recognition independently of
+translation. The voice model loads when suitable clear speech arrives.
+Turning it off releases only that model, while translations continue. With recognition
+off, the app does not guess who is speaking from their voice or position.
+Saved names and voice fingerprints are kept; delete a saved person on Speakers
+when you want to remove their confirmed examples.
+
+The first time you press X, choose Quit and stop translation or Keep running in
+the tray. You can remember the choice and change it in Settings. Tray mode hides
+the main window while translation keeps running; reopen or quit from the icon
+beside the clock. Quit stops only SayWhat?'s own services and releases their
+model memory. It does not close VRChat or unload another app's models.
+
+PRIVACY AND PREVIEW LIMITS
+
+Speech and translation are processed on your PC. Speech, saved names and voice
+fingerprints are not uploaded. Internet access is used for setup downloads, not
+cloud translation. Models, preferences, saved people and logs live under
+%LOCALAPPDATA%\SayWhat and are kept by default when uninstalling. If you used the former
+LocalTalk app, its existing data folder is reused without copying the models.
+An existing SayWhat folder takes priority; the two folders are not merged.
+
+The app is called SayWhat?, but Windows files and shortcuts are named SayWhat.
+Upgrading keeps the previous installation directory and replaces old app
+shortcuts. User preferences, model downloads and speech registrations remain
+unless you explicitly select eligible private-data cleanup categories. Windows speech
+support and imported models outside the app cache are never removed by these choices.
+
+Speaker learning saves local voice fingerprints, not audio files or transcript
+text. Delete a saved person in Speakers to remove their confirmed examples.
+Music, detected overlap and unsuitable examples do not teach a person. Recognition can
+still be wrong, and live separation of simultaneous speakers is not enabled.
+Logs may include spoken or translated text; review them before sharing.
+
+This preview is unsigned and Windows may show a reputation/security warning.
+The complete first-run workflow has not been verified on a fresh PC. Real
+permission/restart/resume, GPU compatibility and longer live VRChat sessions
+still need testing before a wider release. Recovery safeguards reduce known
+stalls but do not guarantee accuracy, speed or uninterrupted translation.
+
+Source and third-party license notices are included with the app.

@@ -1,0 +1,458 @@
+diff --git a/server/engine.cpp b/server/engine.cpp
+index 953e332..271ba59 100644
+--- a/server/engine.cpp
++++ b/server/engine.cpp
+@@ -94,6 +95,14 @@ voxtral_status EngineStream::cancel() {
+     return voxtral_stream_cancel(stream_.get());
+ }
+ 
++voxtral_status EngineStream::reset_for_continuation() {
++    // Reset is documented from CANCELLED, not ACTIVE. The cancellation event
++    // is internal and is cleared by reset; the WebSocket remains continuous.
++    const voxtral_status status = voxtral_stream_cancel(stream_.get());
++    if (status != VOXTRAL_STATUS_OK) return status;
++    return voxtral_stream_reset(stream_.get());
++}
++
+ voxtral_stream_state EngineStream::state() const {
+     return voxtral_stream_get_state(stream_.get());
+ }
+diff --git a/server/engine.h b/server/engine.h
+index 1306f5f..feef6cc 100644
+--- a/server/engine.h
++++ b/server/engine.h
+@@ -56,6 +56,7 @@ public:
+     voxtral_status poll(voxtral_event & event);
+     voxtral_status finish();
+     voxtral_status cancel();
++    voxtral_status reset_for_continuation();
+     voxtral_stream_state state() const;
+     voxtral_stream_metrics metrics() const;
+     std::string final_text() const;
+diff --git a/server/realtime-session.cpp b/server/realtime-session.cpp
+index 0d55724..ec003a1 100644
+--- a/server/realtime-session.cpp
++++ b/server/realtime-session.cpp
+@@ -4,6 +4,7 @@
+ 
+ #include <algorithm>
+ #include <chrono>
++#include <cctype>
+ #include <cmath>
+ #include <cstdlib>
+ #include <exception>
+@@ -21,6 +22,60 @@ namespace {
+ 
+ constexpr std::chrono::seconds kConfigurationTimeout{5};
+ 
++// Count visible letters/digits/ideographs, not UTF-8 bytes. Partial snapshots
++// already end at a complete UTF-8 boundary, so split token pieces cannot inflate
++// the recovery-success threshold. Common Unicode punctuation is excluded.
++std::uint64_t meaningful_visible_characters(std::string_view text) {
++    std::uint64_t count = 0;
++    for (std::size_t i = 0; i < text.size();) {
++        const unsigned char lead = static_cast<unsigned char>(text[i++]);
++        if (lead < 0x80) {
++            if (std::isalnum(lead) != 0) ++count;
++            continue;
++        }
++        std::uint32_t codepoint = 0;
++        unsigned continuation = 0;
++        if ((lead & 0xE0) == 0xC0) { codepoint = lead & 0x1F; continuation = 1; }
++        else if ((lead & 0xF0) == 0xE0) { codepoint = lead & 0x0F; continuation = 2; }
++        else if ((lead & 0xF8) == 0xF0) { codepoint = lead & 0x07; continuation = 3; }
++        else continue;
++        bool valid = i + continuation <= text.size();
++        for (unsigned j = 0; valid && j < continuation; ++j) {
++            const unsigned char byte = static_cast<unsigned char>(text[i++]);
++            valid = (byte & 0xC0) == 0x80;
++            codepoint = (codepoint << 6) | (byte & 0x3F);
++        }
++        if (!valid) continue;
++        if (codepoint == 0xA0 || (codepoint >= 0x2000 && codepoint <= 0x206F) ||
++            (codepoint >= 0x3000 && codepoint <= 0x303F) ||
++            (codepoint >= 0xFF01 && codepoint <= 0xFF0F) ||
++            (codepoint >= 0xFF1A && codepoint <= 0xFF20) ||
++            (codepoint >= 0xFF3B && codepoint <= 0xFF40) ||
++            (codepoint >= 0xFF5B && codepoint <= 0xFF65)) continue;
++        ++count;
++    }
++    return count;
++}
++
++std::string recovery_warning_json(const char * code, unsigned attempts,
++    std::uint64_t tokens, std::uint64_t characters, std::uint64_t replayed_ms = 0,
++    std::uint64_t audio_offset_ms = 0) {
++    boost::json::object warning;
++    warning["type"] = "session.warning";
++    warning["code"] = code;
++    warning["message"] = std::string_view(code) == "decoder_blank_recovered"
++        ? "The decoder was refreshed after receiving speech without useful text."
++        : "Useful transcript progress resumed after decoder recovery.";
++    warning["backlog_ms"] = 0;
++    warning["failed_recovery_attempts"] = attempts;
++    warning["meaningful_lexical_tokens"] = tokens;
++    warning["meaningful_visible_chars"] = characters;
++    warning["recovery_limit"] = 2;
++    warning["replayed_ms"] = replayed_ms;
++    warning["audio_offset_ms"] = audio_offset_ms;
++    return boost::json::serialize(warning);
++}
++
+ std::size_t realtime_capacity_samples(const ServerConfig & config) {
+     constexpr std::uint64_t samples_per_ms = 16;
+     const std::uint64_t samples =
+@@ -411,6 +466,24 @@ void RealtimeSession::inference_worker(std::shared_ptr<GpuLease>) {
+                 }
+                 return;
+             }
++            if (terminal.eos_seen &&
++                !recover_decoder_eos(*stream, terminal)) {
++                return;
++            }
++            if (should_recover_blank_rut()) {
++                const std::uint64_t accepted = stream->metrics().audio_samples_accepted;
++                const std::uint64_t four_seconds_back = accepted > 64000u
++                    ? accepted - 64000u : 0;
++                terminal.eos_audio_end_ms = std::max(
++                    last_lexical_audio_sample_, four_seconds_back) / 16u;
++                app_.logger().info("realtime_blank_rut_detected", {
++                    {"session_id", session_id_},
++                    {"pad_run_tokens", pad_run_tokens_},
++                    {"input_peak_rms", diag_peak_rms_},
++                    {"consecutive_recoveries", consecutive_blank_recoveries_},
++                });
++                if (!recover_decoder_eos(*stream, terminal, "blank_pad")) return;
++            }
+             if (!observe_lag(*stream)) {
+                 handle_worker_cancellation(*stream);
+                 return;
+@@ -448,8 +521,9 @@ void RealtimeSession::inference_worker(std::shared_ptr<GpuLease>) {
+                 "public stream omitted terminal events");
+         }
+ 
+-        const std::string final_text = stream->final_text();
+-        const voxtral_stream_metrics metrics = stream->metrics();
++        const std::string final_text = transcript_prefix_ + stream->final_text();
++        voxtral_stream_metrics metrics = stream->metrics();
++        metrics.audio_duration_ms += audio_epoch_samples_ / 16u;
+         const double elapsed_ms =
+             std::chrono::duration<double, std::milli>(
+                 std::chrono::steady_clock::now() - started).count();
+@@ -517,6 +591,30 @@ bool RealtimeSession::feed_audio(
+             samples.data() + offset,
+             samples.size() - offset,
+             &consumed);
++        // Keep only a bounded tail. On EOS the frontend can already have
++        // accepted later audio because of the transcription delay; replay that
++        // untranscribed tail after reset instead of dropping the next words.
++        for (std::size_t i = 0; i < consumed; ++i) {
++            recent_pcm_.push_back(samples[offset + i]);
++        }
++        constexpr std::size_t kRecentPcmSamples = 4u * 16000u;
++        while (recent_pcm_.size() > kRecentPcmSamples) recent_pcm_.pop_front();
++        if (consumed != 0) {
++            double energy = 0;
++            for (std::size_t i = 0; i < consumed; ++i) {
++                const double value = samples[offset + i] / 32768.0;
++                energy += value * value;
++            }
++            const double rms = std::sqrt(energy / consumed);
++            recent_activity_.push_back({epoch_samples_fed_, epoch_samples_fed_ + consumed, rms});
++            epoch_samples_fed_ += consumed;
++            while (!recent_activity_.empty() &&
++                   recent_activity_.front().end + kRecentPcmSamples < epoch_samples_fed_)
++                recent_activity_.pop_front();
++            diag_peak_rms_ = std::max(diag_peak_rms_, rms);
++            quiet_samples_ = rms < 0.0012 ? quiet_samples_ + consumed : 0;
++            if (quiet_samples_ >= 16000u) quiet_observed_ = true;
++        }
+         offset += consumed;
+         if (!drain_events(stream, terminal)) {
+             return false;
+@@ -581,15 +679,49 @@ bool RealtimeSession::drain_events(
+         if (status != VOXTRAL_STATUS_OK) {
+             throw EngineError(status, stream.last_error());
+         }
++        const std::uint64_t segment_audio_end_ms = event.audio_end_ms;
++        event.sequence = ++event_sequence_;
++        event.audio_start_ms += audio_epoch_samples_ / 16u;
++        event.audio_end_ms += audio_epoch_samples_ / 16u;
+         switch (event.type) {
+             case VOXTRAL_EVENT_TOKEN:
+                 ++terminal.token_count;
++                last_decoder_audio_sample_ = segment_audio_end_ms * 16u;
++                if (event.token_id == VOXTRAL_TOKEN_STREAMING_PAD) {
++                    ++pad_run_tokens_;
++                    ++diag_pad_tokens_;
++                } else if (event.token_id != VOXTRAL_TOKEN_BOS &&
++                           event.token_id != VOXTRAL_TOKEN_EOS &&
++                           std::any_of(event.text, event.text + event.text_length,
++                               [](unsigned char c) { return c >= 0x80 || std::isalnum(c) != 0; })) {
++                    last_lexical_audio_sample_ = last_decoder_audio_sample_;
++                    pad_run_tokens_ = 0;
++                    ++diag_lexical_tokens_;
++                    ++meaningful_lexical_tokens_since_recovery_;
++                    // Only quiet observed AFTER the latest real lexical output
++                    // may arm the next recovery; old epoch silence is not enough.
++                    quiet_observed_ = false;
++                    quiet_samples_ = 0;
++                    if (!observe_recovery_progress()) return false;
++                }
++                if (event.token_id == VOXTRAL_TOKEN_EOS) {
++                    terminal.eos_seen = true;
++                    terminal.eos_audio_end_ms = segment_audio_end_ms;
++                    // This EOS ends an internal decoder epoch, not the public
++                    // realtime WebSocket. Do not expose a terminal token that
++                    // would make a client prematurely end its logical sentence.
++                    break;
++                }
+                 if (realtime_config_.token_events &&
+                     !enqueue_token_from_worker(event)) {
+                     return false;
+                 }
+                 break;
+             case VOXTRAL_EVENT_PARTIAL_TEXT:
++                segment_partial_.assign(event.text, event.text_length);
++                meaningful_visible_chars_since_recovery_ =
++                    meaningful_visible_characters(segment_partial_);
++                if (!observe_recovery_progress()) return false;
+                 if (realtime_config_.partial_events &&
+                     !enqueue_partial_from_worker(event)) {
+                     return false;
+@@ -620,13 +752,118 @@ bool RealtimeSession::drain_events(
+     }
+ }
+ 
++bool RealtimeSession::observe_recovery_progress() {
++    if (consecutive_blank_recoveries_ == 0 ||
++        (meaningful_lexical_tokens_since_recovery_ < 3u &&
++         meaningful_visible_chars_since_recovery_ < 8u)) return true;
++    consecutive_blank_recoveries_ = 0;
++    app_.logger().info("realtime_decoder_progress_restored", {
++        {"session_id", session_id_},
++        {"failed_recovery_attempts", 0},
++        {"meaningful_lexical_tokens", meaningful_lexical_tokens_since_recovery_},
++        {"meaningful_visible_chars", meaningful_visible_chars_since_recovery_},
++    });
++    return enqueue_mandatory_from_worker(recovery_warning_json(
++        "decoder_progress_restored", consecutive_blank_recoveries_,
++        meaningful_lexical_tokens_since_recovery_,
++        meaningful_visible_chars_since_recovery_));
++}
++
++bool RealtimeSession::recover_decoder_eos(
++    EngineStream & stream, TerminalEvents & terminal, const char * reason)
++{
++    if (cancellation_->requested()) return false;
++    const voxtral_stream_metrics before = stream.metrics();
++    const std::uint64_t accepted = before.audio_samples_accepted;
++    const std::uint64_t boundary = std::min(
++        accepted, terminal.eos_audio_end_ms * 16u);
++    const std::size_t replay_count = static_cast<std::size_t>(std::min(
++        accepted - boundary, static_cast<std::uint64_t>(recent_pcm_.size())));
++    std::vector<std::int16_t> tail;
++    tail.reserve(replay_count);
++    tail.insert(tail.end(), recent_pcm_.end() - replay_count, recent_pcm_.end());
++
++    if (!segment_partial_.empty()) {
++        transcript_prefix_ += segment_partial_;
++        if (transcript_prefix_.back() != ' ') transcript_prefix_ += ' ';
++    }
++    audio_epoch_samples_ += accepted - replay_count;
++    const voxtral_status status = stream.reset_for_continuation();
++    if (status != VOXTRAL_STATUS_OK)
++        throw EngineError(status, stream.last_error());
++    recent_pcm_.clear();
++    recent_activity_.clear();
++    epoch_samples_fed_ = 0;
++    last_decoder_audio_sample_ = 0;
++    last_lexical_audio_sample_ = 0;
++    quiet_samples_ = 0;
++    quiet_observed_ = false;
++    pad_run_tokens_ = 0;
++    meaningful_lexical_tokens_since_recovery_ = 0;
++    meaningful_visible_chars_since_recovery_ = 0;
++    last_decoder_recovery_at_ = std::chrono::steady_clock::now();
++    if (std::string_view(reason) == "blank_pad") ++consecutive_blank_recoveries_;
++    segment_partial_.clear();
++    terminal.eos_seen = false;
++    terminal.eos_audio_end_ms = 0;
++    ++eos_recoveries_;
++    app_.logger().info(std::string_view(reason) == "eos"
++        ? "realtime_decoder_eos_recovered" : "realtime_decoder_blank_recovered", {
++        {"session_id", session_id_},
++        {"reason", reason},
++        {"recoveries", eos_recoveries_},
++        {"failed_recovery_attempts", consecutive_blank_recoveries_},
++        {"audio_offset_ms", audio_epoch_samples_ / 16u},
++        {"replayed_ms", replay_count / 16u},
++    });
++    // No model load, lease release, or WebSocket handshake is needed.
++    if (std::string_view(reason) == "blank_pad" &&
++        !enqueue_mandatory_from_worker(recovery_warning_json(
++            "decoder_blank_recovered", consecutive_blank_recoveries_,
++            meaningful_lexical_tokens_since_recovery_,
++            meaningful_visible_chars_since_recovery_, replay_count / 16u,
++            audio_epoch_samples_ / 16u))) return false;
++    return tail.empty() || feed_audio(stream, tail, terminal);
++}
++
++bool RealtimeSession::should_recover_blank_rut() const {
++    if (pad_run_tokens_ < 25u || consecutive_blank_recoveries_ >= 2u ||
++        last_decoder_audio_sample_ < last_lexical_audio_sample_ + 48000u ||
++        (!quiet_observed_ && !segment_partial_.empty()) ||
++        std::chrono::steady_clock::now() - last_decoder_recovery_at_ <
++            std::chrono::seconds(15)) return false;
++    const std::uint64_t cutoff = last_decoder_audio_sample_ > 48000u
++        ? last_decoder_audio_sample_ - 48000u : 0;
++    const std::uint64_t current_cutoff = last_decoder_audio_sample_ > 8000u
++        ? last_decoder_audio_sample_ - 8000u : 0;
++    std::uint64_t active_samples = 0;
++    std::uint64_t current_active_samples = 0;
++    for (const AudioActivity & region : recent_activity_) {
++        if (region.rms < 0.0035 || region.start >= last_decoder_audio_sample_ ||
++            region.end <= cutoff) continue;
++        active_samples += std::min(region.end, last_decoder_audio_sample_) -
++            std::max(region.start, cutoff);
++        if (region.end > current_cutoff) {
++            current_active_samples += std::min(region.end, last_decoder_audio_sample_) -
++                std::max(region.start, current_cutoff);
++        }
++    }
++    // At least 400ms of non-silent audio must have reached the decoder, with
++    // 160ms in its latest 500ms. A just-completed phrase followed by quiet must
++    // not cause a reset simply because speech remains in the three-second tail.
++    // Noise
++    // cannot cause an endless refresh cycle: cooldown and a two-attempt cap
++    // apply until actual lexical output demonstrates progress.
++    return active_samples >= 6400u && current_active_samples >= 2560u;
++}
++
+ bool RealtimeSession::observe_lag(EngineStream & stream) {
+     const voxtral_stream_metrics metrics = stream.metrics();
+     const std::uint64_t received =
+         received_samples_.load(std::memory_order_acquire);
+     const std::uint64_t unaccepted =
+-        received > metrics.audio_samples_accepted
+-            ? received - metrics.audio_samples_accepted
++        received > audio_epoch_samples_ + metrics.audio_samples_accepted
++            ? received - audio_epoch_samples_ - metrics.audio_samples_accepted
+             : 0;
+     const double input_backlog_ms =
+         static_cast<double>(unaccepted) * 1000.0 / 16000.0;
+@@ -635,6 +872,25 @@ bool RealtimeSession::observe_lag(EngineStream & stream) {
+     const auto now = std::chrono::steady_clock::now();
+ 
+     log_realtime_diag(metrics);
++    if (now - last_source_diag_at_ >= std::chrono::seconds(10)) {
++        last_source_diag_at_ = now;
++        app_.logger().info("realtime_source_progress", {
++            {"session_id", session_id_},
++            {"accepted_ms", (audio_epoch_samples_ + metrics.audio_samples_accepted) / 16u},
++            {"decoded_ms", (audio_epoch_samples_ + last_decoder_audio_sample_) / 16u},
++            {"input_peak_rms", diag_peak_rms_},
++            {"pad_tokens", diag_pad_tokens_},
++            {"lexical_tokens", diag_lexical_tokens_},
++            {"pad_run_tokens", pad_run_tokens_},
++            {"blank_recoveries_without_progress", consecutive_blank_recoveries_},
++            {"failed_recovery_attempts", consecutive_blank_recoveries_},
++            {"meaningful_lexical_tokens", meaningful_lexical_tokens_since_recovery_},
++            {"meaningful_visible_chars", meaningful_visible_chars_since_recovery_},
++        });
++        diag_peak_rms_ = 0.0;
++        diag_pad_tokens_ = 0;
++        diag_lexical_tokens_ = 0;
++    }
+ 
+     if (backlog_ms >= app_.config().realtime_hard_lag_ms) {
+         cancellation_->request(CancelReason::Capacity);
+@@ -795,11 +1051,16 @@ bool RealtimeSession::enqueue_partial_from_worker(const voxtral_event & event) {
+     // before serialization, delivery is throttled, and only the newest partial
+     // is retained, so a slow reader can never stall inference behind superseded
+     // partial updates. The JSON is built lazily only when the text changes.
+-    const std::string_view text(event.text, event.text_length);
++    const std::string text = transcript_prefix_ +
++        std::string(event.text, event.text_length);
+     const OutboundQueue::PartialOutcome outcome = outbound_queue_.offer_partial(
+         text,
+         std::chrono::steady_clock::now(),
+-        [&event] { return partial_event_json(event); });
++        [&event, &text] {
++            boost::json::value payload = boost::json::parse(partial_event_json(event));
++            payload.as_object()["text"] = text;
++            return boost::json::serialize(payload);
++        });
+     lock.unlock();
+     if (outcome == OutboundQueue::PartialOutcome::Enqueued ||
+         outcome == OutboundQueue::PartialOutcome::Coalesced) {
+@@ -835,7 +1096,8 @@ void RealtimeSession::log_realtime_diag(
+ 
+     const std::uint64_t received =
+         received_samples_.load(std::memory_order_acquire);
+-    const std::uint64_t accepted = metrics.audio_samples_accepted;
++    const std::uint64_t accepted =
++        audio_epoch_samples_ + metrics.audio_samples_accepted;
+     const double input_backlog_ms =
+         static_cast<double>(received > accepted ? received - accepted : 0) *
+         1000.0 / 16000.0;
+diff --git a/server/realtime-session.h b/server/realtime-session.h
+index c35a71b..b58e422 100644
+--- a/server/realtime-session.h
++++ b/server/realtime-session.h
+@@ -48,6 +48,8 @@ private:
+         std::uint64_t completed_sequence = 0;
+         bool final_seen = false;
+         bool completed_seen = false;
++        bool eos_seen = false;
++        std::uint64_t eos_audio_end_ms = 0;
+         std::uint64_t token_count = 0;
+     };
+ 
+@@ -77,6 +79,10 @@ private:
+         EngineStream & stream,
+         TerminalEvents & terminal);
+     bool observe_lag(EngineStream & stream);
++    bool recover_decoder_eos(EngineStream & stream, TerminalEvents & terminal,
++                             const char * reason = "eos");
++    bool should_recover_blank_rut() const;
++    bool observe_recovery_progress();
+     void handle_worker_cancellation(EngineStream & stream);
+     void worker_failure(
+         std::string_view code,
+@@ -149,6 +155,35 @@ private:
+     double max_write_duration_ms_ = 0.0;
+     std::chrono::steady_clock::time_point last_diag_at_{};
+     bool diag_started_ = false;
++
++    // Worker-only continuation state. Preserve the public cumulative text and
++    // timeline while resetting a decoder that emitted terminal EOS on silence.
++    std::string transcript_prefix_;
++    std::string segment_partial_;
++    std::deque<std::int16_t> recent_pcm_;
++    std::uint64_t audio_epoch_samples_ = 0;
++    std::uint64_t event_sequence_ = 0;
++    std::uint64_t eos_recoveries_ = 0;
++    struct AudioActivity {
++        std::uint64_t start;
++        std::uint64_t end;
++        double rms;
++    };
++    std::deque<AudioActivity> recent_activity_;
++    std::uint64_t epoch_samples_fed_ = 0;
++    std::uint64_t last_decoder_audio_sample_ = 0;
++    std::uint64_t last_lexical_audio_sample_ = 0;
++    std::uint64_t quiet_samples_ = 0;
++    std::uint64_t pad_run_tokens_ = 0;
++    std::uint64_t diag_pad_tokens_ = 0;
++    std::uint64_t diag_lexical_tokens_ = 0;
++    unsigned consecutive_blank_recoveries_ = 0;
++    std::uint64_t meaningful_lexical_tokens_since_recovery_ = 0;
++    std::uint64_t meaningful_visible_chars_since_recovery_ = 0;
++    bool quiet_observed_ = false;
++    double diag_peak_rms_ = 0.0;
++    std::chrono::steady_clock::time_point last_decoder_recovery_at_{};
++    std::chrono::steady_clock::time_point last_source_diag_at_{};
+ };
+ 
+ } // namespace voxtral::server
