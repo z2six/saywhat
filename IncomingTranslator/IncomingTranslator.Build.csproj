@@ -36,6 +36,9 @@
     <Compile Include="SmokeTests.cs" />
     <Compile Include="Program.Fixed.cs" />
     <Compile Include="SubtitleWindowPlacement.cs" />
+    <Compile Include="SubtitleWindow.Compact.cs" />
+    <Compile Include="SubtitleTextSurface.cs" />
+    <Compile Include="SubtitleActionSurface.cs" />
     <Compile Include="SubtitleQuickGuide.cs" />
     <Compile Include="SpeakerTracking.cs" />
     <Compile Include="SubtitleSegmentation.cs" />

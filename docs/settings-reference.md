@@ -106,18 +106,19 @@ No setting here separates audio waveforms. Reset unnamed voices preserves manual
 
 | Setting / key | Default | Behavior |
 | --- | --- | --- |
-| Layout / `OverlayMode` | `Sentence bubbles` | The compact overlay shows the latest three messages. Retained `Per-speaker history` groups the Transcript by attribution and shows up to three recent voices in the compact surface; legacy `History` maps to this mode. `Latest sentence` shows one compact message. Transcript retention stays bounded to 200 messages in every layout. |
+| Layout / `OverlayMode` | `Sentence bubbles` | Retained `Per-speaker history` groups the Transcript by attribution; legacy `History` maps to this mode. Compact display always uses the newest `SubtitlesVisibleMessages` sentences regardless of legacy layout. Transcript retention stays bounded to 200 messages in every layout. |
 | Visible history lines / `HistoryLinesPerSpeaker` | `12` | Retained legacy preference, clamped to 3–40. It no longer controls compact display or Transcript retention, and never changes recognition context. |
 | `VisibleSpeakerRows` | `8` | Retained legacy preference, clamped to 2–12. It no longer controls Transcript retention and is not a saved-People limit. |
 | Always on top / `SubtitlesAlwaysOnTop` | `true` | The toolbar pin button saves this immediately for the compact toolbar and subtitle surface. Transcript and the dashboard are not forced always on top. |
+| Visible messages / `SubtitlesVisibleMessages` | `3` | 1–10 recent compact messages, newest at the top, in every legacy layout. An old `Latest sentence` installation with no saved count initially migrates to `1`; an explicit count always wins. Changing this does not shorten retained Transcript history or alter recognition context. |
 | Font size / `SubtitlesFontSize` | `16` | 12–30 device-independent pixels for translated text in the compact overlay and Transcript. Original text uses a smaller size. |
 | Bubble width / `SubtitlesBubbleWidth` | `420` | 240–900 device-independent pixels for the compact subtitle surface. |
 | Background / `SubtitlesBackgroundOpacity` | `0.65` | 0–1 opacity for compact bubble backplates. Text remains opaque. |
 | Original text / `SubtitlesShowOriginalText` | `true` | Show recognized source words above translations in the compact overlay and Transcript. Hiding them does not change recognition or translation. |
 
-The compact subtitle body is click-through. **Logs** opens the separate interactive **Transcript** window, with selectable text, copying, name review and a **Follow latest** toggle. Closing Transcript hides that reading window; closing the compact subtitle toolbar stops incoming translation. A first-time help offer and **?** open the quick guide in Transcript without changing capture behavior.
+Compact message text is click-through; each message's name header keeps **Select a person** and applicable ✓ / ✕ review controls interactive. **Logs** opens the separate **Transcript** window, newest-first, with selectable text, copying, name review and a **Follow latest** toggle that follows the top. Closing Transcript hides that reading window; closing the compact subtitle toolbar stops incoming translation. A first-time help offer and **?** open the quick guide in Transcript without changing capture behavior.
 
-Appearance controls apply without restarting services. Their scoped save patches only the four appearance values, preserving microphone configuration and unrelated model/language preferences. Ordinary dashboard saves and built-in profile selections merge the newest saved live-window appearance rather than reverting it or treating it as an unsaved dashboard draft. Explicitly applying a custom profile can restore that profile's appearance. Invalid or nonfinite font/width/opacity values fall back to defaults, and finite out-of-range values clamp to the bounds above. [Subtitle controls](subtitles.md).
+Appearance controls apply without restarting services. Their scoped save patches only the five appearance values, preserving microphone configuration and unrelated model/language preferences. Ordinary dashboard saves and built-in profile selections merge the newest saved live-window appearance rather than reverting it or treating it as an unsaved dashboard draft. Explicitly applying a custom profile can restore that profile's appearance. Nonfinite font/width/opacity values fall back to defaults; finite out-of-range values and the visible-message count clamp to the bounds above. [Subtitle controls](subtitles.md).
 
 ## App appearance, closing and updates
 

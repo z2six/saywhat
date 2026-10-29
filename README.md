@@ -26,7 +26,7 @@ Windows 10 compatibility is a **preview and has not been verified on a real Wind
 - **Your voice → VRChat chat:** choose up to four output languages, a finishing pause and optional early messages. Outputs share VRChat’s 144-character message limit.
 - **Other voices → Subtitles:** choose the application to hear, the spoken language, the subtitle language and a separate speech recognizer. FireRedASR2 offers Chinese/English Fast and Accurate options; Nemotron offers multilingual recognition. [Model choices](docs/models-and-runtimes.md).
 - **Saved people:** add names and pictures, review familiar-voice suggestions and correct them. Only reviewed, suitable voice examples improve matching; automatic guesses do not train themselves.
-- **Adjustable controls:** change models and languages, use built-in or custom profiles and choose themes. Subtitles have a compact click-through overlay, appearance controls and a separate selectable transcript for copying and name review. [Subtitle controls](docs/subtitles.md).
+- **Adjustable controls:** change models and languages, use built-in or custom profiles and choose themes. Compact subtitles show newest messages first, with an adjustable visible count and clickable name controls; message text lets clicks pass through. A separate transcript supports selection and copying. [Subtitle controls](docs/subtitles.md).
 
 Subtitles are prepared and started separately from your microphone translator. Normal and Quick use your selected subtitle recognizer; Groups uses the optional VibeVoice path. Identifying a familiar voice does **not** isolate every person’s audio or guarantee that all overlapping words are recovered. [How people and Groups work](docs/people-and-voice-recognition.md).
 

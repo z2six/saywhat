@@ -76,6 +76,7 @@ internal sealed class AppSettings
     public bool SubtitleGuidePromptSeen { get; set; } = false;
     public string CloseButtonBehavior { get; set; } = "Ask";
     public bool SubtitlesAlwaysOnTop { get; set; } = true;
+    public int SubtitlesVisibleMessages { get; set; } = 3;
     public double SubtitlesFontSize { get; set; } = 16;
     public double SubtitlesBubbleWidth { get; set; } = 420;
     public double SubtitlesBackgroundOpacity { get; set; } = .65;
@@ -147,6 +148,7 @@ internal sealed class AppSettings
         SubtitleGuidePromptSeen = SubtitleGuidePromptSeen,
         CloseButtonBehavior = CloseButtonBehavior,
         SubtitlesAlwaysOnTop = SubtitlesAlwaysOnTop,
+        SubtitlesVisibleMessages = SubtitlesVisibleMessages,
         SubtitlesFontSize = SubtitlesFontSize,
         SubtitlesBubbleWidth = SubtitlesBubbleWidth,
         SubtitlesBackgroundOpacity = SubtitlesBackgroundOpacity,
@@ -258,6 +260,12 @@ internal static partial class SettingsStore
             !document.RootElement.TryGetProperty(nameof(AppSettings.OwnVoiceSendEarlyPreviews), out _) &&
             settings.OwnVoiceEndPauseMilliseconds == 2400)
             settings.OwnVoiceEndPauseMilliseconds = AppSettings.DefaultSentencePauseMilliseconds;
+        // Retain the old one-message layout only until the user chooses a count.
+        // Afterwards the explicit count owns compact display in every legacy layout.
+        if (document.RootElement.ValueKind == JsonValueKind.Object &&
+            !document.RootElement.TryGetProperty(nameof(AppSettings.SubtitlesVisibleMessages), out _) &&
+            settings.OverlayMode == "Latest sentence")
+            settings.SubtitlesVisibleMessages = 1;
         // A completed setup is reliable evidence of an existing installation.
         // Do not interrupt those users with the new first-run introduction.
         // Explicit false remains false so a deliberate reset can show it again.
@@ -335,6 +343,7 @@ internal static partial class SettingsStore
         NormalizeSubtitleAppearance(appearance);
         SavePreferences(new Dictionary<string, JsonNode>
         {
+            [nameof(AppSettings.SubtitlesVisibleMessages)] = JsonValue.Create(appearance.SubtitlesVisibleMessages)!,
             [nameof(AppSettings.SubtitlesFontSize)] = JsonValue.Create(appearance.SubtitlesFontSize)!,
             [nameof(AppSettings.SubtitlesBubbleWidth)] = JsonValue.Create(appearance.SubtitlesBubbleWidth)!,
             [nameof(AppSettings.SubtitlesBackgroundOpacity)] = JsonValue.Create(appearance.SubtitlesBackgroundOpacity)!,
@@ -344,6 +353,8 @@ internal static partial class SettingsStore
 
     private static void PreserveSubtitleAppearance(AppSettings settings, JsonObject document)
     {
+        if (document[nameof(AppSettings.SubtitlesVisibleMessages)] is JsonValue messages && messages.TryGetValue<int>(out int visibleMessages))
+            settings.SubtitlesVisibleMessages = visibleMessages;
         if (document[nameof(AppSettings.SubtitlesFontSize)] is JsonValue font && font.TryGetValue<double>(out double fontSize))
             settings.SubtitlesFontSize = fontSize;
         if (document[nameof(AppSettings.SubtitlesBubbleWidth)] is JsonValue width && width.TryGetValue<double>(out double bubbleWidth))
@@ -356,6 +367,7 @@ internal static partial class SettingsStore
 
     internal static void NormalizeSubtitleAppearance(AppSettings settings)
     {
+        settings.SubtitlesVisibleMessages = Math.Clamp(settings.SubtitlesVisibleMessages, 1, 10);
         settings.SubtitlesFontSize = double.IsFinite(settings.SubtitlesFontSize) ? Math.Clamp(settings.SubtitlesFontSize, 12, 30) : 16;
         settings.SubtitlesBubbleWidth = double.IsFinite(settings.SubtitlesBubbleWidth) ? Math.Clamp(settings.SubtitlesBubbleWidth, 240, 900) : 420;
         settings.SubtitlesBackgroundOpacity = double.IsFinite(settings.SubtitlesBackgroundOpacity) ? Math.Clamp(settings.SubtitlesBackgroundOpacity, 0, 1) : .65;
@@ -363,6 +375,7 @@ internal static partial class SettingsStore
 
     internal static void CopySubtitleAppearance(AppSettings source, AppSettings target)
     {
+        target.SubtitlesVisibleMessages = source.SubtitlesVisibleMessages;
         target.SubtitlesFontSize = source.SubtitlesFontSize;
         target.SubtitlesBubbleWidth = source.SubtitlesBubbleWidth;
         target.SubtitlesBackgroundOpacity = source.SubtitlesBackgroundOpacity;

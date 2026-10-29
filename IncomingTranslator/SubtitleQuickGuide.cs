@@ -34,13 +34,13 @@ internal sealed class SubtitleQuickGuide : Border
         "See how to read translations and help the app recognize people.",
         "Show guide", "Not now",
         "Read recent subtitles",
-        "By default, the overlay shows the latest three messages. Its bubbles let clicks pass through; drag or use controls from the toolbar.",
+        "New messages appear at the top. The default is three; change Visible messages in Appearance. Message text lets clicks pass through, while name controls stay clickable.",
         "Original text is what speech recognition heard; the translation appears below. Either step can make mistakes.",
         "Open the transcript",
-        "Choose Logs for up to 200 recent messages in Transcript. Select text, use Copy all, or turn Follow latest on to keep up.",
-        "Use Select a person and the ✓ / ✕ buttons in Transcript to correct or review names.",
+        "Choose Logs for up to 200 recent messages in Transcript, newest first. Select text, use Copy all, or keep Follow latest on to stay at the top.",
+        "Use Select a person and the ✓ / ✕ buttons beside a message to correct or review names, in the overlay or Transcript.",
         "Adjust the overlay",
-        "Open Appearance on the toolbar to change Font size, Bubble width, Background and Original text. Changes save immediately.",
+        "Open Appearance on the toolbar to change Visible messages, Font size, Bubble width, Background and Original text. Changes save immediately.",
         "The background starts at 65% opacity; text stays solid. Always on top controls whether the overlay stays in front.",
         "Choose what to listen to",
         "On Home, choose the subtitle listening source: VRChat or another application. Only what that application plays is translated; your microphone settings stay separate.",
@@ -178,13 +178,13 @@ internal sealed class SubtitleQuickGuide : Border
             else
             {
                 AddCopy("Read recent subtitles", heading: true);
-                AddCopy("By default, the overlay shows the latest three messages. Its bubbles let clicks pass through; drag or use controls from the toolbar.");
+                AddCopy("New messages appear at the top. The default is three; change Visible messages in Appearance. Message text lets clicks pass through, while name controls stay clickable.");
                 AddCopy("Original text is what speech recognition heard; the translation appears below. Either step can make mistakes.");
                 AddCopy("Open the transcript", heading: true);
-                AddCopy("Choose Logs for up to 200 recent messages in Transcript. Select text, use Copy all, or turn Follow latest on to keep up.");
-                AddCopy("Use Select a person and the ✓ / ✕ buttons in Transcript to correct or review names.");
+                AddCopy("Choose Logs for up to 200 recent messages in Transcript, newest first. Select text, use Copy all, or keep Follow latest on to stay at the top.");
+                AddCopy("Use Select a person and the ✓ / ✕ buttons beside a message to correct or review names, in the overlay or Transcript.");
                 AddCopy("Adjust the overlay", heading: true);
-                AddCopy("Open Appearance on the toolbar to change Font size, Bubble width, Background and Original text. Changes save immediately.");
+                AddCopy("Open Appearance on the toolbar to change Visible messages, Font size, Bubble width, Background and Original text. Changes save immediately.");
                 AddCopy("The background starts at 65% opacity; text stays solid. Always on top controls whether the overlay stays in front.");
                 AddCopy("Choose what to listen to", heading: true);
                 AddCopy("On Home, choose the subtitle listening source: VRChat or another application. Only what that application plays is translated; your microphone settings stay separate.");

@@ -9,7 +9,7 @@
     <AssemblyName>SayWhat</AssemblyName>
     <StartupObject>IncomingTranslator.LocalTalkEntry</StartupObject>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <Version>0.2.6</Version>
+    <Version>0.2.7</Version>
     <ApplicationIcon>Assets/SayWhat.ico</ApplicationIcon>
     <Product>SayWhat?</Product>
     <Title>SayWhat?</Title>
@@ -55,6 +55,7 @@
     <Compile Include="../IncomingTranslator/SubtitleWindowPlacement.cs" Link="Core/SubtitleWindowPlacement.cs" />
     <Compile Include="../IncomingTranslator/SubtitleWindow.Compact.cs" Link="Core/SubtitleWindow.Compact.cs" />
     <Compile Include="../IncomingTranslator/SubtitleTextSurface.cs" Link="Core/SubtitleTextSurface.cs" />
+    <Compile Include="../IncomingTranslator/SubtitleActionSurface.cs" Link="Core/SubtitleActionSurface.cs" />
     <Compile Include="../IncomingTranslator/SubtitleQuickGuide.cs" Link="Core/SubtitleQuickGuide.cs" />
     <Compile Include="../IncomingTranslator/SubtitleSegmentation.cs" Link="Core/SubtitleSegmentation.cs" />
     <Compile Include="../IncomingTranslator/IncomingContinuousAudio.cs" Link="Core/IncomingContinuousAudio.cs" />

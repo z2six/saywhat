@@ -92,7 +92,9 @@ internal static class DesktopTests
             checks+=SubtitleAppearancePreferenceTests.Run();
             checks+=EarlyTranslationPreferenceTests.Run();
             checks+=SubtitleTextSurfaceTests.Run();
+            checks+=SubtitleActionSurfaceTests.Run();
             checks+=CompactSubtitleUiTests.Run(directory);
+            checks+=CompactPersonCorrectionTests.Run(Path.Combine(directory, "compact-person-correction"));
             checks+=SubtitleWindowControlsTests.Run();
             checks+=SubtitleProfileUiTests.Run();
             checks+=SubtitleQuickGuideTests.Run(directory, window);

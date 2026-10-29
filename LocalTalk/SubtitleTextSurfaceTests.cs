@@ -75,12 +75,12 @@ internal static class SubtitleTextSurfaceTests
         var owner = new Window { ShowActivated = false, ShowInTaskbar = false };
         var rows = new StackPanel();
         TextBlock latest = null!;
-        foreach (string caption in new[] { "Oldest sentence", "Previous sentence", "Newest sentence" })
+        foreach (string caption in new[] { "Newest sentence", "Previous sentence", "Oldest sentence" })
         {
             var text = new TextBlock { Text = string.Join(Environment.NewLine, Enumerable.Repeat(caption, 5)),
                 FontSize = 30, LineHeight = 40, TextWrapping = TextWrapping.Wrap, Foreground = Brushes.White };
             rows.Children.Add(new Border { Child = text, Padding = new Thickness(10), Background = Brushes.Black });
-            latest = text;
+            if (caption == "Newest sentence") latest = text;
         }
         var surface = new SubtitleTextSurface(owner, rows) { Width = 420, MaxHeight = 440 };
         var viewport = (Border)surface.Content;
@@ -93,12 +93,12 @@ internal static class SubtitleTextSurfaceTests
                 viewport.Arrange(new Rect(0, 0, 420, height)); viewport.UpdateLayout();
                 Rect latestBounds = latest.TransformToAncestor(viewport).TransformBounds(new Rect(new Point(), latest.RenderSize));
                 Point offset = rows.TranslatePoint(new Point(), viewport);
-                Check(rows.ActualHeight > height && offset.Y < 0 && Math.Abs(offset.Y + rows.ActualHeight - height) < .5,
-                    "a taller bubble stack moves upward and retains its bottom at viewport height " + height);
-                Check(latestBounds.Bottom <= height + .5 && latestBounds.Bottom >= height - 11 &&
+                Check(rows.ActualHeight > height && Math.Abs(offset.Y) < .5,
+                    "a taller newest-first bubble stack retains its top at viewport height " + height);
+                Check(latestBounds.Top >= 0 && latestBounds.Top <= 11 &&
                     latestBounds.IntersectsWith(new Rect(0, 0, 420, height)),
-                    "the newest text remains visible instead of the oldest text at viewport height " + height);
-                if (height >= 240) Check(latestBounds.Top >= 0,
+                    "the newest text remains visible at the top instead of exposing older text first at viewport height " + height);
+                if (height >= 240) Check(latestBounds.Bottom <= height + .5,
                     "the complete newest large-font sentence fits when there is enough room for it");
             }
             viewport.MaxHeight = 1000;

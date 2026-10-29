@@ -23,7 +23,7 @@ internal static class SubtitleAppearancePreferenceTests
         {
             void CheckDefaults(AppSettings settings, string context)
             {
-                Check(settings.SubtitlesFontSize == 16 && settings.SubtitlesBubbleWidth == 420 &&
+                Check(settings.SubtitlesVisibleMessages == 3 && settings.SubtitlesFontSize == 16 && settings.SubtitlesBubbleWidth == 420 &&
                     settings.SubtitlesBackgroundOpacity == .65 && settings.SubtitlesShowOriginalText,
                     context + " uses readable first-run defaults");
             }
@@ -33,6 +33,18 @@ internal static class SubtitleAppearancePreferenceTests
             CheckDefaults(SettingsStore.ReadSettings("""{"SubtitlesAlwaysOnTop":false,"OwnVoiceTargetLanguage":"Chinese"}"""), "legacy settings");
             Check(!SettingsStore.ReadSettings("""{"SubtitlesAlwaysOnTop":false}""").SubtitlesAlwaysOnTop,
                 "migrating appearance does not change the pin preference");
+            Check(SettingsStore.ReadSettings("""{"OverlayMode":"Latest sentence"}""").SubtitlesVisibleMessages == 1,
+                "an old one-message layout migrates to one only when no explicit visible count exists");
+            Check(SettingsStore.ReadSettings("""{"OverlayMode":"Latest sentence","SubtitlesVisibleMessages":5}""").SubtitlesVisibleMessages == 5,
+                "an explicit count overrides a legacy one-message layout");
+            Check(SettingsStore.ReadSettings("""{"OverlayMode":"Per-speaker history"}""").SubtitlesVisibleMessages == 3,
+                "other legacy layouts use the three-message factory count");
+            foreach ((int value, int expected) in new[] { (int.MinValue, 1), (0, 1), (1, 1), (5, 5), (10, 10), (11, 10), (int.MaxValue, 10) })
+            {
+                var visible = new AppSettings { SubtitlesVisibleMessages = value };
+                SettingsStore.NormalizeSubtitleAppearance(visible);
+                Check(visible.SubtitlesVisibleMessages == expected, "visible message count is bounded to one through ten");
+            }
 
             foreach ((double font, double width, double opacity, double expectedFont, double expectedWidth, double expectedOpacity) in new[]
             {
@@ -54,8 +66,8 @@ internal static class SubtitleAppearancePreferenceTests
                     "normalization clamps numeric values and preserves the original-text choice");
             }
 
-            AppSettings readClamped = SettingsStore.ReadSettings("""{"SubtitlesFontSize":2,"SubtitlesBubbleWidth":2000,"SubtitlesBackgroundOpacity":-2,"SubtitlesShowOriginalText":false}""");
-            Check(readClamped.SubtitlesFontSize == 12 && readClamped.SubtitlesBubbleWidth == 900 &&
+            AppSettings readClamped = SettingsStore.ReadSettings("""{"SubtitlesVisibleMessages":15,"SubtitlesFontSize":2,"SubtitlesBubbleWidth":2000,"SubtitlesBackgroundOpacity":-2,"SubtitlesShowOriginalText":false}""");
+            Check(readClamped.SubtitlesVisibleMessages == 10 && readClamped.SubtitlesFontSize == 12 && readClamped.SubtitlesBubbleWidth == 900 &&
                 readClamped.SubtitlesBackgroundOpacity == 0 && !readClamped.SubtitlesShowOriginalText,
                 "out-of-range saved appearance is normalized while loading");
 
@@ -73,11 +85,12 @@ internal static class SubtitleAppearancePreferenceTests
             File.WriteAllText(AppPaths.SettingsPath, before.ToJsonString());
 
             AppSettings overlay = baseline.Copy();
+            overlay.SubtitlesVisibleMessages = 5;
             overlay.SubtitlesFontSize = 24;
             overlay.SubtitlesBubbleWidth = 650;
             overlay.SubtitlesBackgroundOpacity = .8;
             overlay.SubtitlesShowOriginalText = false;
-            // Deliberately stale unrelated values: this save may touch only the four appearance keys.
+            // Deliberately stale unrelated values: this save may touch only the five appearance keys.
             overlay.SubtitlesAlwaysOnTop = true;
             overlay.OwnVoiceTargetLanguage = "Japanese";
             overlay.IncomingTargetLanguage = "Korean";
@@ -89,6 +102,7 @@ internal static class SubtitleAppearancePreferenceTests
 
             var appearanceKeys = new HashSet<string>(StringComparer.Ordinal)
             {
+                nameof(AppSettings.SubtitlesVisibleMessages),
                 nameof(AppSettings.SubtitlesFontSize), nameof(AppSettings.SubtitlesBubbleWidth),
                 nameof(AppSettings.SubtitlesBackgroundOpacity), nameof(AppSettings.SubtitlesShowOriginalText)
             };
@@ -99,11 +113,11 @@ internal static class SubtitleAppearancePreferenceTests
                     Check(JsonNode.DeepEquals(preference.Value, after[preference.Key]), "scoped save preserves " + preference.Key);
 
             AppSettings loaded = SettingsStore.Load();
-            Check(loaded.SubtitlesFontSize == 24 && loaded.SubtitlesBubbleWidth == 650 &&
+            Check(loaded.SubtitlesVisibleMessages == 5 && loaded.SubtitlesFontSize == 24 && loaded.SubtitlesBubbleWidth == 650 &&
                 loaded.SubtitlesBackgroundOpacity == .8 && !loaded.SubtitlesShowOriginalText,
-                "all four appearance values persist across loading");
+                "all five appearance values persist across loading");
             AppSettings copy = loaded.Copy();
-            Check(copy.SubtitlesFontSize == 24 && copy.SubtitlesBubbleWidth == 650 &&
+            Check(copy.SubtitlesVisibleMessages == 5 && copy.SubtitlesFontSize == 24 && copy.SubtitlesBubbleWidth == 650 &&
                 copy.SubtitlesBackgroundOpacity == .8 && !copy.SubtitlesShowOriginalText,
                 "settings copies retain all appearance values");
             Check(!loaded.SubtitlesAlwaysOnTop, "appearance saving preserves the independently saved pin preference");
@@ -113,20 +127,21 @@ internal static class SubtitleAppearancePreferenceTests
             AppSettings staleDashboard = baseline.Copy();
             SettingsStore.Save(staleDashboard);
             AppSettings preserved = SettingsStore.Load();
-            Check(preserved.SubtitlesFontSize == 24 && preserved.SubtitlesBubbleWidth == 650 &&
+            Check(preserved.SubtitlesVisibleMessages == 5 && preserved.SubtitlesFontSize == 24 && preserved.SubtitlesBubbleWidth == 650 &&
                 preserved.SubtitlesBackgroundOpacity == .8 && !preserved.SubtitlesShowOriginalText,
                 "a stale dashboard save cannot undo live subtitle appearance");
-            Check(staleDashboard.SubtitlesFontSize == 24 && staleDashboard.SubtitlesBubbleWidth == 650,
+            Check(staleDashboard.SubtitlesVisibleMessages == 5 && staleDashboard.SubtitlesFontSize == 24 && staleDashboard.SubtitlesBubbleWidth == 650,
                 "the saved dashboard snapshot reflects the preserved appearance");
 
+            overlay.SubtitlesVisibleMessages = 99;
             overlay.SubtitlesFontSize = double.NaN;
             overlay.SubtitlesBubbleWidth = 10;
             overlay.SubtitlesBackgroundOpacity = 5;
             SettingsStore.SaveSubtitleAppearancePreference(overlay);
             loaded = SettingsStore.Load();
-            Check(loaded.SubtitlesFontSize == 16 && loaded.SubtitlesBubbleWidth == 240 && loaded.SubtitlesBackgroundOpacity == 1,
+            Check(loaded.SubtitlesVisibleMessages == 10 && loaded.SubtitlesFontSize == 16 && loaded.SubtitlesBubbleWidth == 240 && loaded.SubtitlesBackgroundOpacity == 1,
                 "scoped saves normalize a detached copy before serialization");
-            Check(double.IsNaN(overlay.SubtitlesFontSize) && overlay.SubtitlesBubbleWidth == 10 && overlay.SubtitlesBackgroundOpacity == 5,
+            Check(overlay.SubtitlesVisibleMessages == 99 && double.IsNaN(overlay.SubtitlesFontSize) && overlay.SubtitlesBubbleWidth == 10 && overlay.SubtitlesBackgroundOpacity == 5,
                 "normalizing a scoped save does not mutate its caller");
 
             string settingsBeforeFailure = File.ReadAllText(AppPaths.SettingsPath);
@@ -138,6 +153,24 @@ internal static class SubtitleAppearancePreferenceTests
                 "an atomic-save failure leaves the previous appearance intact");
             Check(!Directory.EnumerateFiles(AppPaths.Root, "vrchat-translation-settings.json.tmp-*").Any(),
                 "failed scoped saves leave no temporary files");
+            var raceAppearance = baseline.Copy();
+            raceAppearance.SubtitlesVisibleMessages = 9; raceAppearance.SubtitlesFontSize = 22;
+            raceAppearance.SubtitlesBubbleWidth = 520; raceAppearance.SubtitlesBackgroundOpacity = .55;
+            raceAppearance.SubtitlesShowOriginalText = true;
+            JsonObject raceDocument = JsonNode.Parse(File.ReadAllText(AppPaths.SettingsPath))!.AsObject();
+            raceDocument["FutureRacePreference"] = "keep";
+            File.WriteAllText(AppPaths.SettingsPath, raceDocument.ToJsonString());
+            Task.WhenAll(
+                Task.Run(() => SettingsStore.SaveSubtitleAppearancePreference(raceAppearance)),
+                Task.Run(() => SettingsStore.SaveSubtitlePinPreference(true)),
+                Task.Run(() => SettingsStore.SaveUiLanguagePreference("ko"))).GetAwaiter().GetResult();
+            AppSettings raced = SettingsStore.Load();
+            Check(raced.SubtitlesVisibleMessages == 9 && raced.SubtitlesFontSize == 22 && raced.SubtitlesBubbleWidth == 520 &&
+                raced.SubtitlesBackgroundOpacity == .55 && raced.SubtitlesShowOriginalText && raced.SubtitlesAlwaysOnTop && raced.UiLanguage == "ko",
+                "concurrent scoped saves retain all five appearance fields plus unrelated live pin and language choices");
+            Check(JsonNode.Parse(File.ReadAllText(AppPaths.SettingsPath))!["FutureRacePreference"]!.GetValue<string>() == "keep" &&
+                File.ReadAllText(AppPaths.FastConfigPath) == microphoneBefore && File.ReadAllText(AppPaths.FoxTransConfigPath) == sentenceBefore,
+                "racing targeted saves preserve unknown data and never rewrite microphone configuration");
             CheckProfileOwnership(Check);
         }
         finally
@@ -151,6 +184,7 @@ internal static class SubtitleAppearancePreferenceTests
     {
         var original = new AppSettings
         {
+            SubtitlesVisibleMessages = 2,
             SubtitlesFontSize = 18, SubtitlesBubbleWidth = 500,
             SubtitlesBackgroundOpacity = .45, SubtitlesShowOriginalText = false,
             UiThemeId = "paper", SubtitlesAlwaysOnTop = false, Glossary = "Saved profile fixture"
@@ -160,11 +194,12 @@ internal static class SubtitleAppearancePreferenceTests
         SettingsStore.SaveTranslationProfileSelection(savedProfile);
         AppSettings dashboard = savedProfile.Copy(), appliedBaseline = savedProfile.Copy();
         AppSettings overlay = savedProfile.Copy();
+        overlay.SubtitlesVisibleMessages = 7;
         overlay.SubtitlesFontSize = 26; overlay.SubtitlesBubbleWidth = 700;
         overlay.SubtitlesBackgroundOpacity = .25; overlay.SubtitlesShowOriginalText = true;
         SettingsStore.SaveSubtitleAppearancePreference(overlay);
         AppSettings latest = SettingsStore.Load();
-        bool HasLiveAppearance(AppSettings settings) => settings.SubtitlesFontSize == 26 && settings.SubtitlesBubbleWidth == 700 &&
+        bool HasLiveAppearance(AppSettings settings) => settings.SubtitlesVisibleMessages == 7 && settings.SubtitlesFontSize == 26 && settings.SubtitlesBubbleWidth == 700 &&
             settings.SubtitlesBackgroundOpacity == .25 && settings.SubtitlesShowOriginalText;
 
         AppSettings rebased = SettingsSaveState.Rebase(dashboard, appliedBaseline, latest);
@@ -179,7 +214,7 @@ internal static class SubtitleAppearancePreferenceTests
         SettingsStore.CopySubtitleAppearance(latest, appliedBaseline);
         check(HasLiveAppearance(dashboard) && HasLiveAppearance(appliedBaseline) &&
             !SettingsSaveState.HasChanges(dashboard, appliedBaseline) && TranslationProfiles.ConfigurationEquals(dashboard, latest),
-            "profile-selection rebasing merges the four live values into both snapshots without a false unsaved prompt");
+            "profile-selection rebasing merges the five live values into both snapshots without a false unsaved prompt");
 
         var scope = new AppSettings
         {
@@ -190,7 +225,7 @@ internal static class SubtitleAppearancePreferenceTests
         check(HasLiveAppearance(scope) && scope.UiThemeId == "coral-night" && scope.SubtitlesAlwaysOnTop &&
             scope.Glossary == "Keep pending text" && scope.OwnVoiceTargetLanguage == "Korean" &&
             scope.OwnVoiceSendEarlyPreviews && scope.IncomingSendEarlyPreviews,
-            "the four-value copy does not rebase theme, pin, translation or delivery preferences");
+            "the five-value copy does not rebase theme, pin, translation or delivery preferences");
 
         foreach (string id in new[] { TranslationProfiles.QuickId, TranslationProfiles.NormalId, TranslationProfiles.GroupsId })
         {
@@ -212,12 +247,12 @@ internal static class SubtitleAppearancePreferenceTests
             "profile rebasing does not erase a real draft that still needs a replacement prompt");
 
         AppSettings explicitCustom = TranslationProfiles.Select(dashboard, customId);
-        check(explicitCustom.SubtitlesFontSize == 18 && explicitCustom.SubtitlesBubbleWidth == 500 &&
+        check(explicitCustom.SubtitlesVisibleMessages == 2 && explicitCustom.SubtitlesFontSize == 18 && explicitCustom.SubtitlesBubbleWidth == 500 &&
             explicitCustom.SubtitlesBackgroundOpacity == .45 && !explicitCustom.SubtitlesShowOriginalText,
             "an explicitly chosen custom profile can restore its own saved appearance after rebasing");
         SettingsStore.SaveTranslationProfileSelection(explicitCustom);
         AppSettings restored = SettingsStore.Load();
-        check(restored.SubtitlesFontSize == 18 && restored.SubtitlesBubbleWidth == 500 &&
+        check(restored.SubtitlesVisibleMessages == 2 && restored.SubtitlesFontSize == 18 && restored.SubtitlesBubbleWidth == 500 &&
             restored.SubtitlesBackgroundOpacity == .45 && !restored.SubtitlesShowOriginalText &&
             restored.CustomTranslationProfiles.Single().Id == customId,
             "explicit custom appearance persists without losing the profile library");

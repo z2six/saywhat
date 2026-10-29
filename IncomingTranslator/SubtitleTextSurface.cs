@@ -31,10 +31,9 @@ internal sealed class SubtitleTextSurface : Window
         if (owner.Dispatcher != Dispatcher || content.Dispatcher != Dispatcher)
             throw new ArgumentException("The subtitle display and toolbar must use the same UI thread.");
         _toolbarOwner = owner; _textContent = content;
-        // The viewport can be shorter than the three retained bubbles. WPF
-        // arranges oversized bottom-aligned content upward, so clipping removes
-        // older text rather than hiding the newest sentence at the bottom.
-        content.VerticalAlignment = VerticalAlignment.Bottom;
+        // Newest sentences are first. Keep the top of the stack visible when
+        // monitor space clips its older rows, without making the text scrollable.
+        content.VerticalAlignment = VerticalAlignment.Top;
         AllowsTransparency = true; WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
         Background = Brushes.Transparent; ShowInTaskbar = false; ShowActivated = false;
         SizeToContent = SizeToContent.Height; WindowStartupLocation = WindowStartupLocation.Manual;

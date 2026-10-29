@@ -12,6 +12,11 @@ internal sealed partial class SubtitleWindow
     private readonly StackPanel _compactRows = new();
     private readonly TextBlock _compactStatus = new();
     private SubtitleTextSurface? _textSurface;
+    private SubtitleActionSurface? _actionSurface;
+    private readonly List<SubtitleActionAnchor> _compactActions = new();
+    private bool _compactActionsDirty;
+    private int _compactSelectionDepth;
+    private readonly HashSet<long> _personPickerMessages = new();
     private Window? _transcriptWindow;
     private FrameworkElement _transcriptRoot = null!;
     private readonly Dictionary<long, TranscriptEntryView> _transcriptEntries = new();
@@ -25,6 +30,7 @@ internal sealed partial class SubtitleWindow
     internal FrameworkElement TranscriptRoot => _transcriptRoot;
     internal FrameworkElement CompactPreview => _compactRows;
     internal int CompactBubbleCount => _compactRows.Children.OfType<Border>().Count();
+    internal IReadOnlyList<SubtitleActionAnchor> CompactActions => _compactActions;
 
     private FrameworkElement CreateCompactToolbar()
     {
@@ -71,7 +77,7 @@ internal sealed partial class SubtitleWindow
         var follow = new CheckBox { Name = "TranscriptFollowLatest", IsChecked = true, Foreground = OverlayText,
             VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
         _refreshCompactCopy.Add(() => follow.Content = Ui("Follow latest")); follow.Content = Ui("Follow latest");
-        follow.Checked += (_, _) => { _followLatest = true; _speakerScroll.ScrollToEnd(); };
+        follow.Checked += (_, _) => { _followLatest = true; _speakerScroll.ScrollToTop(); };
         follow.Unchecked += (_, _) => _followLatest = false; actions.Children.Add(follow);
         top.Children.Add(actions); top.Children.Add(_status); top.Children.Add(CreateSubtitleProfileBar());
         _source.Margin = new Thickness(0, 5, 0, 8);
@@ -96,7 +102,7 @@ internal sealed partial class SubtitleWindow
                 Topmost = false, ShowInTaskbar = true, WindowStartupLocation = WindowStartupLocation.CenterScreen };
             _transcriptWindow.Resources.MergedDictionaries.Add(Resources);
             _transcriptWindow.SizeChanged += (_, _) => _quickGuide.MaxHeight = Math.Clamp(_transcriptWindow.ActualHeight * .45, 120, 320);
-            _transcriptWindow.Activated += (_, _) => _textSurface?.Hide();
+            _transcriptWindow.Activated += (_, _) => { _actionSurface?.Hide(); _textSurface?.Hide(); };
             _transcriptWindow.Deactivated += (_, _) => ShowPassiveSurface();
             _transcriptWindow.PreviewKeyDown += (_, args) =>
             { if (args.Key == Key.Escape && _quickGuide.Mode != SubtitleQuickGuideMode.Hidden) { _quickGuide.Dismiss(); args.Handled = true; } };
@@ -106,7 +112,7 @@ internal sealed partial class SubtitleWindow
         if (_transcriptWindow.WindowState == WindowState.Minimized) _transcriptWindow.WindowState = WindowState.Normal;
         if (maximize) _transcriptWindow.WindowState = WindowState.Maximized;
         _transcriptWindow.Activate(); RefreshOutgoingState();
-        if (_followLatest) _speakerScroll.ScrollToEnd();
+        if (_followLatest) _speakerScroll.ScrollToTop();
     }
 
     private void ToggleAppearancePopup()
@@ -134,6 +140,7 @@ internal sealed partial class SubtitleWindow
             slider.ValueChanged += (_, _) => { RefreshCaption(); apply(slider.Value); QueueAppearanceSave(); };
             body.Children.Add(caption); body.Children.Add(slider);
         }
+        SliderControl("Visible messages", "SubtitleCountSlider", _settings.SubtitlesVisibleMessages, 1, 10, 1, v => _settings.SubtitlesVisibleMessages = (int)v);
         SliderControl("Font size", "SubtitleFontSlider", _settings.SubtitlesFontSize, 12, 30, 1, v => _settings.SubtitlesFontSize = v);
         SliderControl("Bubble width", "SubtitleWidthSlider", _settings.SubtitlesBubbleWidth, 240, 900, 20, v => _settings.SubtitlesBubbleWidth = v);
         SliderControl("Background opacity", "SubtitleOpacitySlider", _settings.SubtitlesBackgroundOpacity * 100, 0, 100, 5, v => _settings.SubtitlesBackgroundOpacity = v / 100);
@@ -173,6 +180,7 @@ internal sealed partial class SubtitleWindow
         catch (Exception error)
         {
             LogOverlayError("Save subtitle appearance", error);
+            _settings.SubtitlesVisibleMessages = previous.SubtitlesVisibleMessages;
             _settings.SubtitlesFontSize = previous.SubtitlesFontSize; _settings.SubtitlesBubbleWidth = previous.SubtitlesBubbleWidth;
             _settings.SubtitlesBackgroundOpacity = previous.SubtitlesBackgroundOpacity; _settings.SubtitlesShowOriginalText = previous.SubtitlesShowOriginalText;
             RefreshCompactSurface(); RefreshTranscriptTypography();
@@ -184,18 +192,27 @@ internal sealed partial class SubtitleWindow
     {
         if (_surfaceFailed || _shutdown.IsCancellationRequested) return;
         if (!IsLoaded || !IsVisible || WindowState == WindowState.Minimized || _transcriptWindow?.IsActive == true)
-        { _textSurface?.Hide(); return; }
+        { _actionSurface?.Hide(); _textSurface?.Hide(); return; }
         try
         {
-            _textSurface ??= new SubtitleTextSurface(this, _compactRows) { MaxHeight = 440 };
+            _textSurface ??= new SubtitleTextSurface(this, _compactRows);
             _textSurface.Topmost = Topmost;
             _textSurface.PlaceRelativeToOwner(_settings.SubtitlesBubbleWidth);
             if (!_textSurface.IsVisible) _textSurface.Show();
             _textSurface.PlaceRelativeToOwner(_settings.SubtitlesBubbleWidth);
+            _actionSurface ??= new SubtitleActionSurface(this, _textSurface);
+            _actionSurface.Topmost = Topmost;
+            if (_compactActionsDirty) { _actionSurface.SetActions(_compactActions); _compactActionsDirty = false; }
+            _actionSurface.SyncToTextSurface();
+            if (_actionSurface.HasVisibleActions && !_actionSurface.IsVisible) _actionSurface.Show();
+            else if (!_actionSurface.HasVisibleActions) _actionSurface.Hide();
+            _actionSurface.SyncToTextSurface();
         }
         catch (Exception error)
         {
             _surfaceFailed = true; LogOverlayError("Open passive subtitle surface", error);
+            try { _actionSurface?.Close(); } catch (Exception cleanup) { LogOverlayError("Close failed subtitle actions", cleanup); }
+            _actionSurface = null;
             try { _textSurface?.Close(); } catch (Exception cleanup) { LogOverlayError("Close failed subtitle surface", cleanup); }
             _textSurface = null;
             _subtitleHeading.Foreground = AppearanceTheme.Error;
@@ -206,21 +223,40 @@ internal sealed partial class SubtitleWindow
 
     private void RefreshCompactSurface()
     {
+        // Keep the clicked message and its search anchor still until the person
+        // picker closes. Capture, translation and retained history continue.
+        if (_compactSelectionDepth > 0) return;
         _compactRows.Children.Clear();
-        IEnumerable<TranslationDisplay> recent = _displayHistory.OrderBy(item => item.At);
-        if (_settings.OverlayMode is not ("Sentence bubbles" or "Latest sentence"))
-            recent = recent.GroupBy(DisplayGroupKey).Select(group => group.Last()).OrderBy(item => item.At);
-        foreach (TranslationDisplay item in recent.TakeLast(_settings.OverlayMode == "Latest sentence" ? 1 : 3))
+        _compactActions.Clear(); _compactActionsDirty = true;
+        IEnumerable<TranslationDisplay> recent = _displayHistory.OrderByDescending(item => item.At).ThenByDescending(item => item.UtteranceId);
+        foreach (TranslationDisplay item in recent.Take(Math.Clamp(_settings.SubtitlesVisibleMessages, 1, 10)))
         {
             var panel = new StackPanel();
-            var heading = new DockPanel { Margin = new Thickness(0, 0, 0, 3) };
+            var heading = new Grid { Margin = new Thickness(0, 0, 0, 3), MinHeight = 26 };
+            heading.ColumnDefinitions.Add(new ColumnDefinition());
+            heading.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var identity = new DockPanel { Margin = new Thickness(0, 0, 5, 0) };
             if (item.PersonId is not null && _people.TryGetValue(item.PersonId, out SpeakerPerson? person))
             {
                 var avatar = PersonAvatar.Create(person, 18, OverlayStroke, OverlayText); avatar.Margin = new Thickness(0, 0, 5, 0);
-                DockPanel.SetDock(avatar, Dock.Left); heading.Children.Add(avatar);
+                DockPanel.SetDock(avatar, Dock.Left); identity.Children.Add(avatar);
             }
-            heading.Children.Add(new TextBlock { Text = DisplayPersonLabel(item), Foreground = OverlayMuted, FontSize = 10,
-                TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center }); panel.Children.Add(heading);
+            identity.Children.Add(new TextBlock { Text = DisplayPersonLabel(item), Foreground = OverlayMuted, FontSize = 10,
+                TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
+            heading.Children.Add(identity);
+            var actions = new DockPanel { LastChildFill = false, Tag = item.UtteranceId };
+            actions.Resources.MergedDictionaries.Add(Resources);
+            AddCorrectionButton(actions, item); AddSuggestionReviewButtons(actions, item);
+            if (actions.Children.Count > 0)
+            {
+                actions.Measure(new Size(Math.Max(1, _settings.SubtitlesBubbleWidth - 20), double.PositiveInfinity));
+                var actionAnchor = new Border { Name = "CompactPersonActionsAnchor", Tag = item.UtteranceId,
+                    Width = Math.Min(actions.DesiredSize.Width, Math.Max(1, _settings.SubtitlesBubbleWidth - 20)),
+                    Height = Math.Max(26, actions.DesiredSize.Height) };
+                Grid.SetColumn(actionAnchor, 1); heading.Children.Add(actionAnchor);
+                _compactActions.Add(new SubtitleActionAnchor(actionAnchor, actions));
+            }
+            panel.Children.Add(heading);
             if (_settings.SubtitlesShowOriginalText && !string.IsNullOrWhiteSpace(item.Source))
                 panel.Children.Add(new TextBlock { Name = "CompactOriginalText", Text = item.Source, FontFamily = ConversationFont,
                     FontSize = Math.Max(10, _settings.SubtitlesFontSize * .75), Foreground = OverlayMuted,
@@ -230,7 +266,7 @@ internal sealed partial class SubtitleWindow
                 Foreground = OverlayText, FontSize = _settings.SubtitlesFontSize, LineHeight = _settings.SubtitlesFontSize * 1.35,
                 TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, MaxHeight = _settings.SubtitlesFontSize * 5.4 });
             var color = AppearanceTheme.Surface.Color; color.A = (byte)Math.Round(255 * _settings.SubtitlesBackgroundOpacity);
-            _compactRows.Children.Add(new Border { Name = "CompactSubtitleBubble", Background = new SolidColorBrush(color),
+            _compactRows.Children.Add(new Border { Name = "CompactSubtitleBubble", Tag = item.UtteranceId, Background = new SolidColorBrush(color),
                 CornerRadius = new CornerRadius(8), Padding = new Thickness(10, 7, 10, 8), Margin = new Thickness(0, 0, 0, 5),
                 IsHitTestVisible = false, Child = panel });
         }
@@ -247,7 +283,7 @@ internal sealed partial class SubtitleWindow
     private void RenderTranscript()
     {
         bool grouping = _settings.OverlayMode is not ("Sentence bubbles" or "Latest sentence");
-        TranslationDisplay[] ordered = _displayHistory.OrderBy(item => item.At).ToArray();
+        TranslationDisplay[] ordered = _displayHistory.OrderByDescending(item => item.At).ThenByDescending(item => item.UtteranceId).ToArray();
         foreach (long obsolete in _transcriptEntries.Keys.Except(ordered.Select(item => item.UtteranceId)).ToArray())
         { if (_transcriptEntries[obsolete].Root.Parent is Panel parent) parent.Children.Remove(_transcriptEntries[obsolete].Root); _transcriptEntries.Remove(obsolete); }
         foreach (TranslationDisplay item in ordered)
@@ -265,14 +301,21 @@ internal sealed partial class SubtitleWindow
         }
         if (grouping)
         {
+            int groupIndex = 0;
             foreach (var group in ordered.GroupBy(DisplayGroupKey))
             {
                 var outer = _speakerRows.Children.OfType<StackPanel>().FirstOrDefault(p => Equals(p.Tag, group.Key));
-                if (outer is null) { outer = new StackPanel { Tag = group.Key }; _speakerRows.Children.Add(outer); }
+                if (outer is null) outer = new StackPanel { Tag = group.Key };
+                if (groupIndex >= _speakerRows.Children.Count || !ReferenceEquals(_speakerRows.Children[groupIndex], outer))
+                { _speakerRows.Children.Remove(outer); _speakerRows.Children.Insert(groupIndex, outer); }
+                groupIndex++;
+                int entryIndex = 0;
                 foreach (var item in group)
                 {
                     Border entry = _transcriptEntries[item.UtteranceId].Root;
-                    if (!ReferenceEquals(entry.Parent, outer)) { if (entry.Parent is Panel old) old.Children.Remove(entry); outer.Children.Add(entry); }
+                    if (entryIndex >= outer.Children.Count || !ReferenceEquals(outer.Children[entryIndex], entry))
+                    { if (entry.Parent is Panel old) old.Children.Remove(entry); outer.Children.Insert(entryIndex, entry); }
+                    entryIndex++;
                 }
             }
             foreach (var empty in _speakerRows.Children.OfType<StackPanel>().Where(p => p.Children.Count == 0).ToArray()) _speakerRows.Children.Remove(empty);
@@ -287,7 +330,7 @@ internal sealed partial class SubtitleWindow
         RefreshTranscriptTypography();
         if (_followLatest && !_speakerRows.IsKeyboardFocusWithin)
             _ = Dispatcher.InvokeAsync(() =>
-            { if (_followLatest && !_speakerRows.IsKeyboardFocusWithin && !_shutdown.IsCancellationRequested) _speakerScroll.ScrollToEnd(); },
+            { if (_followLatest && !_speakerRows.IsKeyboardFocusWithin && !_shutdown.IsCancellationRequested) _speakerScroll.ScrollToTop(); },
                 System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
@@ -324,6 +367,13 @@ internal sealed partial class SubtitleWindow
         {
             if (Source.Text != item.Source) Source.Text = item.Source;
             if (Translation.Text != item.Translation) Translation.Text = item.Translation;
+            if (_owner._personPickerMessages.Contains(item.UtteranceId) && _header is not null)
+            {
+                // A pending picker owns this anchor. Keep it attached while new
+                // transcript text arrives; refresh names when the choice finishes.
+                _owner.RefreshPersonActionAvailability(_header, item.UtteranceId);
+                return;
+            }
             _owner._people.TryGetValue(item.PersonId ?? "", out SpeakerPerson? person);
             string? feedbackKey = _owner._speakerReviewMessages.GetValueOrDefault(item.UtteranceId) + "|" +
                 (_owner._speakerCorrections.TryGetValue(item.UtteranceId, out var correction) ? FeedbackSummary(correction) : "") + "|" +
@@ -347,6 +397,7 @@ internal sealed partial class SubtitleWindow
                 _feedbackKey = feedbackKey;
             }
             _last = item;
+            if (_header is not null) _owner.RefreshPersonActionAvailability(_header, item.UtteranceId);
         }
         private static TextBox ReadOnlyText(string name, Brush foreground) => new() { Name = name, IsReadOnly = true,
             IsReadOnlyCaretVisible = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, BorderThickness = new Thickness(0),
@@ -355,7 +406,7 @@ internal sealed partial class SubtitleWindow
     }
 
     internal string TranscriptText(long? id = null) => string.Join(Environment.NewLine + Environment.NewLine,
-        _displayHistory.Where(item => id is null || item.UtteranceId == id).OrderBy(item => item.At).Select(item =>
+        _displayHistory.Where(item => id is null || item.UtteranceId == id).OrderByDescending(item => item.At).ThenByDescending(item => item.UtteranceId).Select(item =>
             $"{item.At.ToLocalTime():HH:mm:ss} · {DisplayPersonLabel(item)}{Environment.NewLine}" +
             (_settings.SubtitlesShowOriginalText && !string.IsNullOrWhiteSpace(item.Source) ? item.Source + Environment.NewLine : "") + item.Translation));
 

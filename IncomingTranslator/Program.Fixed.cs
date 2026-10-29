@@ -182,6 +182,8 @@ internal sealed partial class SubtitleWindow : Window
         {
             CancelHeaderDrag(); FlushAppearanceSave(); _shutdown.Cancel(); _appearanceSaveTimer?.Stop();
             if (_appearancePopup is not null) _appearancePopup.IsOpen = false;
+            var actions = _actionSurface; _actionSurface = null;
+            try { actions?.Close(); } catch (Exception error) { LogOverlayError("Close subtitle actions", error); }
             var surface = _textSurface; _textSurface = null;
             try { surface?.Close(); } catch (Exception error) { LogOverlayError("Close subtitle surface", error); }
             try { _transcriptWindow?.Close(); } catch (Exception error) { LogOverlayError("Close subtitle transcript", error); }
@@ -507,6 +509,7 @@ internal sealed partial class SubtitleWindow : Window
         Topmost = enabled;
         _alwaysOnTopButton.Content = enabled ? "◆" : "◇";
         if (_textSurface is not null) _textSurface.Topmost = enabled;
+        if (_actionSurface is not null) _actionSurface.Topmost = enabled;
         System.Windows.Automation.AutomationProperties.SetName(_alwaysOnTopButton, UiFormat("Always on top · {0}", Ui(enabled ? "On" : "Off")));
         _alwaysOnTopButton.ToolTip = Ui(AlwaysOnTopToolTip(enabled));
         _alwaysOnTopButton.Foreground = enabled ? OverlaySage : OverlayMuted;
@@ -668,13 +671,20 @@ internal sealed partial class SubtitleWindow : Window
         {
             args.Handled = true;
             if (_service is null || CorrectSpeakerRequested is null || _speakerReviewBusy.Contains(sentence.UtteranceId)) return;
+            TranslationDisplay selected = HistoryEntry(sentence.UtteranceId) ?? sentence;
+            Window pickerOwner = Window.GetWindow(button) ?? this;
+            bool compact = pickerOwner is SubtitleActionSurface;
+            if (compact) _compactSelectionDepth++;
+            _personPickerMessages.Add(selected.UtteranceId);
+            _speakerReviewBusy.Add(selected.UtteranceId);
             button.IsEnabled = false;
             try
             {
-                SpeakerFeedbackResult? result = await CorrectSpeakerRequested(Window.GetWindow(button) ?? this, button, _service, HistoryEntry(sentence.UtteranceId) ?? sentence);
+                RenderHistory();
+                SpeakerFeedbackResult? result = await CorrectSpeakerRequested(pickerOwner, button, _service, selected);
                 if (result is not null && !_shutdown.IsCancellationRequested)
                 {
-                    ApplySpeakerCorrection(sentence.UtteranceId, result, sentence.EvidenceId);
+                    ApplySpeakerCorrection(selected.UtteranceId, result, selected.EvidenceId);
                     await SetStatus(FeedbackSummary(result), !result.Applied);
                 }
             }
@@ -683,9 +693,29 @@ internal sealed partial class SubtitleWindow : Window
                 LogOverlayError("Save speaker correction", error);
                 if (!_shutdown.IsCancellationRequested) await SetStatus("Couldn't save that name change. Please try again.", true);
             }
-            finally { button.IsEnabled = true; }
+            finally
+            {
+                _speakerReviewBusy.Remove(selected.UtteranceId);
+                _personPickerMessages.Remove(selected.UtteranceId);
+                if (compact) _compactSelectionDepth--;
+                button.IsEnabled = true;
+                if (!_shutdown.IsCancellationRequested) RenderHistory();
+            }
         };
         header.Children.Add(button);
+    }
+
+    private void RefreshPersonActionAvailability(DependencyObject root, long utteranceId)
+    {
+        bool busy = _speakerReviewBusy.Contains(utteranceId);
+        if (root is Button button)
+        {
+            if (button.Tag is TranslationDisplay) button.IsEnabled = !busy;
+            else if (button.Tag is SpeakerSuggestionAction action)
+                button.IsEnabled = !busy && !string.IsNullOrWhiteSpace(action.Sentence.EvidenceId);
+        }
+        foreach (object child in LogicalTreeHelper.GetChildren(root))
+            if (child is DependencyObject node) RefreshPersonActionAvailability(node, utteranceId);
     }
 
     private static string FeedbackSummary(SpeakerFeedbackResult result)

@@ -3,6 +3,16 @@
 Installers, full notes and matching source archives are on
 [GitHub Releases](https://github.com/z2six/saywhat/releases).
 
+## 0.2.7
+
+- Put the newest subtitles and transcript messages at the top.
+- Added a Visible messages control (1–10, default 3) alongside the overlay’s
+  font and transparency controls, saved without restarting translation.
+- Restored Select a person and suggestion review controls directly on each
+  overlay message. Only those small controls accept clicks; text stays click-through.
+- Kept the selected message still while its person picker is open and shared
+  correction ownership with Logs to prevent duplicate submissions.
+
 ## 0.2.6
 
 - Replaced the large subtitle window with a compact toolbar and three recent,

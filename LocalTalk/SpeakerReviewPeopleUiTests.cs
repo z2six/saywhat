@@ -109,7 +109,7 @@ internal static class SpeakerReviewPeopleUiTests
             var guide = new SubtitleQuickGuide(UiText.T, _ => actions++, () => actions++);
             guide.ShowGuide();
             foreach (string key in new[] { "Tell voices apart",
-                "Use Select a person and the ✓ / ✕ buttons in Transcript to correct or review names.",
+                "Use Select a person and the ✓ / ✕ buttons beside a message to correct or review names, in the overlay or Transcript.",
                 "Maybe names are suggestions. ✓ confirms one; ✕ marks it unknown. Guesses never teach themselves.",
                 "Selecting a person can save a clear voice example. Mixed, short or old audio may only change the name. You can undo a review.",
                 "Your choices improve saved voice examples, not the AI model itself." })

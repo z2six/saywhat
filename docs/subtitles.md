@@ -13,14 +13,18 @@ VRChat messages for your own microphone. Listening continues in either mode.
 
 ## Compact overlay
 
-By default, the overlay shows the **latest three messages**. Each bubble can show the original
-recognized words above their translation. Clicks pass through the bubbles to the
-window underneath, so use the separate **toolbar** to move the overlay or change
-its options.
+New messages appear **at the top**. The overlay shows **three messages** by default;
+choose **Appearance → Visible messages** to show between one and ten, such as five.
+Each bubble can show the original recognized words above their translation.
+Clicks on message text pass through to the window underneath. The name controls
+in each message's header remain clickable. Use the separate **toolbar** to move
+the overlay or change its options.
 
 Open **Appearance** on the toolbar to adjust:
 
 - **Font size:** make subtitles easier to read.
+- **Visible messages:** show more or fewer recent messages without changing the
+  transcript's retained history.
 - **Bubble width:** choose how much horizontal space each message uses.
 - **Background:** change the bubble background's opacity. The default is 65%;
   text remains opaque.
@@ -33,12 +37,12 @@ the dashboard and transcript are ordinary windows.
 ## Read or copy earlier messages
 
 Choose **Logs** on the toolbar to open **Transcript**. It retains up to **200 recent
-messages** for the current subtitle session, rather than putting the whole
+messages**, newest first, for the current subtitle session, rather than putting the whole
 conversation on top of the game. This is a message transcript, separate from the
 diagnostic logs in Troubleshooting.
 
 Select visible original or translated text to copy it, use a message's **Copy** action, or
-choose **Copy all**. **Follow latest** keeps the transcript at the newest messages;
+choose **Copy all**. **Follow latest** keeps the transcript at the top with the newest messages;
 turn it off when reading earlier ones. The transcript is not forced always on top.
 Review copied text before sharing: it can contain private conversation and names.
 
@@ -50,8 +54,8 @@ Neither stage is guaranteed accurate.
 
 ## Names and recognition
 
-Name corrections and ✓ / ✕ review controls are in **Transcript**, where clicks
-are available. Choose **Select a person** to search or pick a saved name. A
+Use the clickable name header on an overlay message, or open **Transcript**, for
+name corrections and ✓ / ✕ review controls. Choose **Select a person** to search or pick a saved name. A
 **Maybe [name]** label is a suggestion: ✓ confirms it and ✕ marks it unknown.
 Guesses do not teach themselves.
 

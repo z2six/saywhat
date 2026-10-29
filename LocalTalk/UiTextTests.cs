@@ -41,7 +41,7 @@ internal static class UiTextTests
             var catalog = UiText.CatalogForTests();
             Check(catalog.Count >= 300, "main interface catalogue is comprehensive");
             string[] required = ["Home", "Languages", "Speakers", "Settings", "Setup", "Advanced", "Interface language",
-                "Subtitle appearance", "Font size", "Bubble width", "Background", "Background opacity", "Original text", "Show original text",
+                "Subtitle appearance", "Visible messages", "Font size", "Bubble width", "Background", "Background opacity", "Original text", "Show original text",
                 "Show early translations", "Show a translation before the sentence is finished. It may change as more words arrive.",
                 "Couldn't show the overlay. Open Logs to read subtitles, or restart subtitles.",
                 "Transcript", "Open transcript", "Close transcript", "Copy all", "Copy", "Follow latest", "No subtitles yet.", "Copied", "Couldn't copy text. Try again.",

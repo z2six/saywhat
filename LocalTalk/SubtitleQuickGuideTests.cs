@@ -67,11 +67,11 @@ internal static class SubtitleQuickGuideTests
                 "reopening and closing the guide does not change translation settings");
             foreach (string phrase in new[]
             {
-                "By default, the overlay shows the latest three messages. Its bubbles let clicks pass through; drag or use controls from the toolbar.",
+                "New messages appear at the top. The default is three; change Visible messages in Appearance. Message text lets clicks pass through, while name controls stay clickable.",
                 "Original text is what speech recognition heard; the translation appears below. Either step can make mistakes.",
-                "Choose Logs for up to 200 recent messages in Transcript. Select text, use Copy all, or turn Follow latest on to keep up.",
-                "Use Select a person and the ✓ / ✕ buttons in Transcript to correct or review names.",
-                "Open Appearance on the toolbar to change Font size, Bubble width, Background and Original text. Changes save immediately.",
+                "Choose Logs for up to 200 recent messages in Transcript, newest first. Select text, use Copy all, or keep Follow latest on to stay at the top.",
+                "Use Select a person and the ✓ / ✕ buttons beside a message to correct or review names, in the overlay or Transcript.",
+                "Open Appearance on the toolbar to change Visible messages, Font size, Bubble width, Background and Original text. Changes save immediately.",
                 "The background starts at 65% opacity; text stays solid. Always on top controls whether the overlay stays in front.",
                 "Use Appearance or Transcript to switch Normal / Groups. Open Settings in Transcript; use ? for this guide.",
                 "Normal uses your chosen speech model. Groups uses an extra local model to recognize separate voices; it adds delay and can still miss overlapping speech.",
