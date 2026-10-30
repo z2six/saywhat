@@ -1082,6 +1082,17 @@ internal static class UiText
         Add("Installing speech recognition", "正在安装语音识别", "音声認識をインストール中", "음성 인식 설치 중");
         Add("Building speech recognition", "正在构建语音识别", "音声認識をビルド中", "음성 인식 빌드 중");
         Add("Preparing speech recognition", "正在准备语音识别", "音声認識を準備中", "음성 인식 준비 중");
+        Add("Downloading the verified speech system image.", "正在下载已验证的语音系统镜像。", "確認済みの音声システムイメージをダウンロード中です。", "검증된 음성 시스템 이미지를 다운로드하고 있습니다.");
+        Add("Preparing speech tools without desktop applications.", "正在准备无需桌面应用的语音工具。", "デスクトップアプリを使わない音声ツールを準備中です。", "데스크톱 앱 없이 음성 도구를 준비하고 있습니다.");
+        Add("Installing the prepared speech tools.", "正在安装已准备好的语音工具。", "準備済みの音声ツールをインストール中です。", "준비된 음성 도구를 설치하고 있습니다.");
+        Add("Updating the Linux speech tools", "正在更新 Linux 语音工具", "Linux の音声ツールを更新中", "Linux 음성 도구 업데이트 중");
+        Add("Connection interrupted. Retrying the download once.", "连接中断，正在重新下载一次。", "接続が中断されました。ダウンロードを一度再試行します。", "연결이 끊겼습니다. 다운로드를 한 번 다시 시도합니다.");
+        Add("Speech setup needs at least 6 GB of free space on its Windows drive. Free some space, then continue setup.", "语音设置所在的 Windows 驱动器至少需要 6 GB 可用空间。请释放空间后继续设置。", "音声セットアップ用の Windows ドライブには 6 GB 以上の空き容量が必要です。空き容量を増やしてセットアップを続けてください。", "음성 설정을 저장할 Windows 드라이브에 최소 6GB의 여유 공간이 필요합니다. 공간을 확보한 뒤 설정을 계속하세요.");
+        Add("Speech setup needs at least 8 GB of free space on its Windows drive. Free some space, then continue setup.", "语音设置所在的 Windows 驱动器至少需要 8 GB 可用空间。请释放空间后继续设置。", "音声セットアップ用の Windows ドライブには 8 GB 以上の空き容量が必要です。空き容量を増やしてセットアップを続けてください。", "음성 설정을 저장할 Windows 드라이브에 최소 8GB의 여유 공간이 필요합니다. 공간을 확보한 뒤 설정을 계속하세요.");
+        Add("CUDA speech setup needs at least 20 GB of free space on its Windows drive. Free some space, then continue setup.", "CUDA 语音设置所在的 Windows 驱动器至少需要 20 GB 可用空间。请释放空间后继续设置。", "CUDA 音声セットアップ用の Windows ドライブには 20 GB 以上の空き容量が必要です。空き容量を増やしてセットアップを続けてください。", "CUDA 음성 설정을 저장할 Windows 드라이브에 최소 20GB의 여유 공간이 필요합니다. 공간을 확보한 뒤 설정을 계속하세요.");
+        Add("This speech option needs Windows 10 version 2004 or newer. Choose Nemotron or FireRed for speech recognition on this Windows version.", "此语音选项需要 Windows 10 2004 或更新版本。在当前 Windows 版本中，请选择 Nemotron 或 FireRed 语音识别。", "この音声オプションには Windows 10 バージョン 2004 以降が必要です。この Windows バージョンでは Nemotron または FireRed を選んでください。", "이 음성 옵션에는 Windows 10 버전 2004 이상이 필요합니다. 현재 Windows에서는 Nemotron 또는 FireRed 음성 인식을 선택하세요.");
+        Add("GPU speech recognition in Linux needs Windows 10 version 21H2 or newer. Choose a Windows speech model, or update Windows before preparing this option.", "Linux GPU 语音识别需要 Windows 10 21H2 或更新版本。请选择 Windows 语音模型，或更新 Windows 后再准备此选项。", "Linux の GPU 音声認識には Windows 10 バージョン 21H2 以降が必要です。Windows 用の音声モデルを選ぶか、Windows を更新してから準備してください。", "Linux GPU 음성 인식에는 Windows 10 버전 21H2 이상이 필요합니다. Windows 음성 모델을 선택하거나 Windows를 업데이트한 뒤 준비하세요.");
+        Add("Update WSL before preparing this Linux speech option, or choose a Windows speech model.", "请先更新 WSL 再准备此 Linux 语音选项，或选择 Windows 语音模型。", "この Linux 音声オプションを準備する前に WSL を更新するか、Windows 用の音声モデルを選んでください。", "이 Linux 음성 옵션을 준비하기 전에 WSL을 업데이트하거나 Windows 음성 모델을 선택하세요.");
         Add("Ready", "准备就绪", "準備完了", "준비 완료");
         Add("Restart needed", "需要重启", "再起動が必要", "다시 시작 필요");
         Add("You're ready. Choose Start on Home when you want to translate.", "准备就绪。需要翻译时，在首页选择开始。", "準備ができました。翻訳したいときにホームで開始を選んでください。", "준비되었습니다. 번역하고 싶을 때 홈에서 시작을 선택하세요.");

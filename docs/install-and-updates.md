@@ -6,9 +6,11 @@
 
 The Windows x64 installer supports current-user and all-users installations. All-users program changes need administrator permission; each user still has their own settings/People/cache data. Existing installations are detected so update/maintenance and uninstall choices can be presented instead of blindly creating another copy.
 
-The minimum installation version is **Windows 10 21H2, build 19044, x64**; Windows 11 is also accepted. Your microphone-to-VRChat translation uses native Windows recognition and translation by default. Windows 10 compatibility is a preview and has **not** been verified on a real Windows 10 PC.
+The minimum installation version is **Windows 10 1809, build 17763, x64**; Windows 11 is also accepted. Your microphone-to-VRChat translation uses native Windows recognition and translation by default. Windows 10 compatibility is a preview and has **not** been verified on a real Windows 10 PC.
 
-Subtitles have a separate audio-capture requirement. **VRChat only** and **Another application** require the process-loopback API available on Windows 11 clients (build 20348+). On Windows 10, **All playback** can be selected explicitly instead; it includes audio from other applications. The app does not silently substitute All playback when application-only capture is unavailable. Optional WSL speech engines retain their own Windows/hardware prerequisites.
+Subtitles have a separate audio-capture requirement. **VRChat only** and **Another application** require the process-loopback API available on Windows 11 clients (build 20348+). On Windows 10, **All playback** can be selected explicitly instead; it includes audio from other applications. The app does not silently substitute All playback when application-only capture is unavailable.
+
+Optional WSL speech engines need Windows 10 2004 (build 19041+) and WSL 2 version 0.48.2 or newer. CUDA speech in WSL needs Windows 10 21H2 (build 19044+) or Windows 11, plus a compatible NVIDIA GPU and driver. Native speech setup does not require WSL or these newer Windows versions.
 
 The post-install **open SayWhat?** option is selected by default and opens the UI, not active translation. First setup chooses the interface language, the language you speak and one to four output languages. Theme selection is optional. It checks hardware locally, suggests models, reviews downloads/permissions and prepares your own voice translation. A nonrecommended translator asks for confirmation before the separate download review and preparation action.
 
@@ -17,6 +19,33 @@ The default microphone recognizer runs directly on Windows and does not require 
 Model-weight download sizes are not the whole setup size. In a selected Linux speech workflow, build tools and NVIDIA toolkit preparation can need several more gigabytes and at least 20 GB of free disk space; that is not a blanket requirement for native own-voice setup. Unknown-duration work shows stage/progress information rather than an invented overall percentage. Verified existing managed models can be reused without redownloading them.
 
 When a selected speech workflow needs WSL2, setup creates an isolated app-managed Ubuntu environment. It does not take over, convert, unregister, or change the default of an unrelated existing Ubuntu installation. Existing supported speech registrations can be reused in advanced setups.
+
+New subtitle settings use the native Windows recognizer too. Existing choices,
+including Voxtral and older imported profiles, are preserved on update.
+
+Starting in 0.2.12, new managed Linux speech components are imported from a
+size- and SHA-256-pinned Canonical Ubuntu 24.04.5 image. Before the first boot,
+setup sets `/etc/wsl.conf`'s `[general] guiApplications=false` in the image and
+disables its shell shortcuts. Speech preparation therefore does not need WSLg,
+RemoteApp or Remote Desktop's ActiveX control. It leaves global `.wslconfig`,
+GPU access, unrelated Ubuntu environments and Windows security settings alone.
+
+The setup receipt binds a completed import to its WSL registration GUID, exact
+storage folder and unique owner marker. An old failed checkpoint or replaced
+same-name environment is left intact while a new component is prepared. Setup
+never boots an unconfirmed partial import just to see whether it works.
+Both Windows backing-volume space and Linux space are checked before building.
+CUDA driver and GPU compatibility checks run before toolkit downloads.
+
+Windows downloads have separate connection and inactivity deadlines, with one
+retry for a transient failure. Linux package output is drained into a private
+temporary transcript even if a progress handle closes. A failed package manager
+retains its real exit code; only its explicit interrupted-transaction condition
+gets one repair attempt. Successful setup removes that package transcript.
+
+These checks reduce known installation failures; they do not certify every
+Windows build, driver or custom Windows installation. In particular, the lower
+1809 installer target and GPU performance still need real-machine acceptance.
 
 The internal speech environment is not another app to open. Version 0.1.22 hides its generated Start/Terminal entry and the CUDA toolkit's unused profiler launchers, without unregistering WSL or removing speech models. Cleanup is limited to verified app-owned registrations and exact generated shortcuts; unrelated Ubuntu and user-created shortcuts are left alone. Recoverable shortcut copies are kept under the app's data folder, and changed Linux desktop metadata retains original backups. The environment remains listed by WSL's technical inventory for troubleshooting.
 

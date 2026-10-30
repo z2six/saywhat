@@ -63,6 +63,7 @@ internal static class SubtitleSpeechUiTests
             Check(scoped.OwnVoiceSourceLanguage == baseline.OwnVoiceSourceLanguage && scoped.OwnVoiceTargetLanguage == baseline.OwnVoiceTargetLanguage && scoped.OwnManagedModelId == baseline.OwnManagedModelId,
                 "unsaved microphone language/model changes cannot be applied by the subtitle action");
             var stage = baseline.Copy();
+            stage.IncomingSpeechEngine = stage.IncomingNormalSpeechEngine = "voxtral";
             Check(MainWindow.StageSubtitleSourceLanguage(stage, "Chinese") && stage.IncomingSpeechEngine == "firered2-aed" && stage.IncomingSourceLanguage == "Chinese", "Chinese from automatic Voxtral visibly selects a compatible Chinese model");
             Check(MainWindow.StageSubtitleSourceLanguage(stage, "Automatic") && stage.IncomingSpeechEngine == "nemotron" && stage.IncomingSourceLanguage == "Automatic", "Any language replaces a Chinese-only model with multilingual recognition");
             Check(MainWindow.StageSubtitleSpeechEngine(stage, "firered2-ctc") && stage.IncomingSourceLanguage == "Chinese", "choosing FireRed from Automatic selects a supported Chinese source");

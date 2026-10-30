@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '0.2.11',
+    [string]$Version = '0.2.12',
     [string]$CompilerPath,
     [switch]$SkipPublish,
     [string]$AppPublishDirectory,
@@ -186,6 +186,12 @@ $sourceArchive = [IO.Compression.ZipFile]::OpenRead((Join-Path $installedSource 
 try {
     foreach ($required in @('LICENSE','Packaging/SOURCE-AND-LICENSES.md',
         'LocalTalk/Provisioning.cs','LocalTalk/MainWindow.cs','LocalTalk/RuntimeController.cs',
+        'LocalTalk/ManagedWslImage.cs','LocalTalk/ManagedWslImageTests.cs',
+        'LocalTalk/ManagedWslSetup.cs','LocalTalk/ManagedWslSetupTests.cs','LocalTalk/WindowsSpeechRequirements.cs',
+        'LocalTalk/NativeSubtitleDefaultTests.cs','Packaging/scripts/preflight-voxtral-backend.sh',
+        'Packaging/ProvisioningTests/test-bootstrap-packages.sh','Packaging/ProvisioningTests/test-cuda-preflight.sh',
+        'Packaging/ManagedWslImageTests/ManagedWslImageTests.csproj','Packaging/ManagedWslImageTests/Program.cs',
+        'Packaging/ManagedWslImageTests/ProvisionAsset.cs',
         'IncomingTranslator/ManagedServicePorts.cs','IncomingTranslator/SessionEndpoints.cs','LocalTalk/RuntimeController.Ports.cs',
         'LocalTalk/MainWindowConnections.cs','LocalTalk/ManagedServicePortTests.cs','LocalTalk/SessionEndpointTests.cs','Packaging/ProvisioningTests/test-managed-ports.py','Packaging/vibevoice/test_ports.py',
         'Packaging/ManagedPortTests/ManagedPortTests.csproj','Packaging/ManagedPortTests/Program.cs','Packaging/ManagedPortTests/fixtures/owned-http.ps1',

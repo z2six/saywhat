@@ -18,6 +18,8 @@ internal static partial class SettingsStore
             JsonObject document = ReadPreferenceDocument();
             AppSettings latest = JsonSerializer.Deserialize<AppSettings>(document, Options)
                 ?? throw new InvalidDataException("The saved settings couldn't be read.");
+            PreserveStoredIncomingSpeechDefaults(latest,
+                document.ContainsKey(nameof(AppSettings.IncomingSpeechEngine)), document.ContainsKey(nameof(AppSettings.IncomingNormalSpeechEngine)));
             string targetKey = incoming ? nameof(AppSettings.IncomingTargetLanguage) : nameof(AppSettings.OwnVoiceTargetLanguage);
             bool separateIncoming = incoming && !latest.ShareTranslationModel;
             string model;

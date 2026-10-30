@@ -449,8 +449,16 @@ internal sealed class LocalTalkProvisioner : IDisposable
     }
 
     internal async Task DownloadVerifiedAsync(ProvisionAsset asset, string destination,
-        IProgress<ProvisionProgress>? progress, CancellationToken token)
+        IProgress<ProvisionProgress>? progress, CancellationToken token,
+        TimeSpan? headerTimeout = null, TimeSpan? readIdleTimeout = null)
     {
+        token.ThrowIfCancellationRequested();
+        TimeSpan headersDeadline = headerTimeout ?? TimeSpan.FromSeconds(30);
+        TimeSpan idleDeadline = readIdleTimeout ?? TimeSpan.FromSeconds(60);
+        if (headersDeadline <= TimeSpan.Zero || headersDeadline.TotalMilliseconds > uint.MaxValue - 1)
+            throw new ArgumentOutOfRangeException(nameof(headerTimeout));
+        if (idleDeadline <= TimeSpan.Zero || idleDeadline.TotalMilliseconds > uint.MaxValue - 1)
+            throw new ArgumentOutOfRangeException(nameof(readIdleTimeout));
         if (asset.Sha256.Length != 64 || !asset.Sha256.All(Uri.IsHexDigit)) throw new InvalidDataException("A pinned SHA-256 digest is required.");
         if (!Uri.TryCreate(asset.DownloadUrl, UriKind.Absolute, out Uri? uri) || uri.Scheme != "https")
             throw new InvalidDataException("Verified downloads must use HTTPS.");
@@ -465,45 +473,110 @@ internal sealed class LocalTalkProvisioner : IDisposable
         long needed = asset.SizeBytes + 64L * 1024 * 1024;
         var disk = new DriveInfo(Path.GetPathRoot(destination)!);
         if (disk.AvailableFreeSpace < needed) throw new IOException($"At least {needed / 1_000_000_000.0:0.0} GB of free disk space is required.");
-        string partial = destination + ".part-" + Guid.NewGuid().ToString("N");
+        // Retry an interrupted transfer once, always into a new owned partial.
+        // Catalog/hash failures, disk errors and caller cancellation are never retried.
+        for (int attempt = 0; ; attempt++)
+        {
+            token.ThrowIfCancellationRequested();
+            string partial = destination + ".part-" + Guid.NewGuid().ToString("N");
+            try
+            {
+                using HttpResponseMessage response = await DownloadNetworkOperationAsync(
+                    cancellation => _http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellation),
+                    headersDeadline, token);
+                try { response.EnsureSuccessStatusCode(); }
+                catch (HttpRequestException error) when (IsTransientDownloadError(error))
+                { throw new DownloadTransportException(error); }
+                if (response.Content.Headers.ContentLength is long size && size != asset.SizeBytes)
+                    throw new InvalidDataException("The download size differs from the pinned catalog.");
+                await using Stream source = await DownloadNetworkOperationAsync(
+                    cancellation => response.Content.ReadAsStreamAsync(cancellation), idleDeadline, token);
+                await using (var output = new FileStream(partial, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                    1024 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan))
+                using (var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256))
+                {
+                    byte[] buffer = new byte[1024 * 1024];
+                    long received = 0;
+                    DateTimeOffset lastReport = DateTimeOffset.MinValue;
+                    while (true)
+                    {
+                        int read = await DownloadNetworkOperationAsync(
+                            cancellation => source.ReadAsync(buffer.AsMemory(), cancellation).AsTask(), idleDeadline, token);
+                        if (read == 0) break;
+                        received += read;
+                        if (received > asset.SizeBytes) throw new InvalidDataException("The download exceeded the pinned size.");
+                        hash.AppendData(buffer, 0, read);
+                        await output.WriteAsync(buffer.AsMemory(0, read), token);
+                        if (DateTimeOffset.UtcNow - lastReport >= TimeSpan.FromMilliseconds(150))
+                        {
+                            progress?.Report(new("Downloading", asset.FileName, received, asset.SizeBytes));
+                            lastReport = DateTimeOffset.UtcNow;
+                        }
+                    }
+                    if (received != asset.SizeBytes)
+                        throw new DownloadTransportException(new EndOfStreamException("The download ended before its pinned size was received."));
+                    if (!string.Equals(Convert.ToHexString(hash.GetHashAndReset()), asset.Sha256, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidDataException("Download verification failed. The incomplete file will not be installed.");
+                    await output.FlushAsync(token);
+                }
+                token.ThrowIfCancellationRequested();
+                File.Move(partial, destination, overwrite: false);
+                progress?.Report(new("Verified", asset.FileName, asset.SizeBytes, asset.SizeBytes));
+                return;
+            }
+            catch (Exception) when (token.IsCancellationRequested) { token.ThrowIfCancellationRequested(); throw; }
+            catch (Exception error) when (attempt == 0 && !token.IsCancellationRequested &&
+                error is DownloadTransportException or DownloadTimeoutException)
+            {
+                progress?.Report(new("Downloading", asset.FileName, 0, asset.SizeBytes)
+                    { Detail = "Connection interrupted. Retrying the download once." });
+            }
+            finally { if (File.Exists(partial)) File.Delete(partial); }
+        }
+    }
+
+    private static async Task<T> DownloadNetworkOperationAsync<T>(Func<CancellationToken, Task<T>> operation,
+        TimeSpan timeout, CancellationToken token)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
+        deadline.CancelAfter(timeout);
+        Task<T>? pending = null;
+        bool received = false;
         try
         {
-            using HttpResponseMessage response = await _http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, token);
-            response.EnsureSuccessStatusCode();
-            if (response.Content.Headers.ContentLength is long size && size != asset.SizeBytes)
-                throw new InvalidDataException("The download size differs from the pinned catalog.");
-            await using Stream source = await response.Content.ReadAsStreamAsync(token);
-            await using (var output = new FileStream(partial, FileMode.CreateNew, FileAccess.Write, FileShare.None,
-                1024 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan))
-            using (var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256))
-            {
-                byte[] buffer = new byte[1024 * 1024];
-                long received = 0;
-                DateTimeOffset lastReport = DateTimeOffset.MinValue;
-                while (true)
-                {
-                    int read = await source.ReadAsync(buffer.AsMemory(), token);
-                    if (read == 0) break;
-                    received += read;
-                    if (received > asset.SizeBytes) throw new InvalidDataException("The download exceeded the pinned size.");
-                    hash.AppendData(buffer, 0, read);
-                    await output.WriteAsync(buffer.AsMemory(0, read), token);
-                    if (DateTimeOffset.UtcNow - lastReport >= TimeSpan.FromMilliseconds(150))
-                    {
-                        progress?.Report(new("Downloading", asset.FileName, received, asset.SizeBytes));
-                        lastReport = DateTimeOffset.UtcNow;
-                    }
-                }
-                if (received != asset.SizeBytes || !string.Equals(Convert.ToHexString(hash.GetHashAndReset()), asset.Sha256, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidDataException("Download verification failed. The incomplete file will not be installed.");
-                await output.FlushAsync(token);
-            }
-            token.ThrowIfCancellationRequested();
-            File.Move(partial, destination, overwrite: false);
-            progress?.Report(new("Verified", asset.FileName, asset.SizeBytes, asset.SizeBytes));
+            pending = operation(deadline.Token);
+            T result = await pending.WaitAsync(deadline.Token);
+            received = true;
+            return result;
         }
-        finally { if (File.Exists(partial)) File.Delete(partial); }
+        catch (Exception) when (token.IsCancellationRequested) { token.ThrowIfCancellationRequested(); throw; }
+        catch (OperationCanceledException error) when (!token.IsCancellationRequested)
+        { throw new DownloadTimeoutException(error); }
+        catch (HttpRequestException error) when (IsTransientDownloadError(error))
+        { throw new DownloadTransportException(error); }
+        catch (IOException error) { throw new DownloadTransportException(error); }
+        finally
+        {
+            // A handler/stream that ignores cancellation must not hold setup open.
+            // Dispose a late response/stream and observe a late fault after the bounded wait.
+            if (!received && pending is not null)
+                _ = pending.ContinueWith(finished =>
+                {
+                    if (finished.Status == TaskStatus.RanToCompletion && finished.Result is IDisposable resource)
+                        resource.Dispose();
+                    else _ = finished.Exception;
+                }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        }
     }
+
+    private static bool IsTransientDownloadError(HttpRequestException error) => error.StatusCode is null or
+        System.Net.HttpStatusCode.RequestTimeout or System.Net.HttpStatusCode.TooManyRequests or
+        System.Net.HttpStatusCode.InternalServerError or System.Net.HttpStatusCode.BadGateway or
+        System.Net.HttpStatusCode.ServiceUnavailable or System.Net.HttpStatusCode.GatewayTimeout;
+    private sealed class DownloadTransportException(Exception error)
+        : IOException("The download was interrupted. Check your connection, then try setup again.", error);
+    private sealed class DownloadTimeoutException(Exception error)
+        : TimeoutException("The download stopped responding. Check your connection, then try setup again.", error);
 
     internal static async Task<bool> VerifyDigestAsync(string path, string expected, CancellationToken token)
     {
@@ -677,6 +750,9 @@ internal sealed class LocalTalkProvisioner : IDisposable
     private static ProcessStartInfo WslCommand(string distribution, params string[] arguments)
     {
         var info = NewProcess(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "wsl.exe"));
+        info.Environment["WSL_UTF8"] = "1";
+        info.StandardOutputEncoding = Encoding.UTF8;
+        info.StandardErrorEncoding = Encoding.UTF8;
         foreach (string argument in new[] { "--distribution", distribution, "--exec" }.Concat(arguments)) info.ArgumentList.Add(argument);
         return info;
     }

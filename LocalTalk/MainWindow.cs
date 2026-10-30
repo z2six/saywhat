@@ -213,9 +213,16 @@ internal sealed partial class MainWindow : Window
         Closed += (_, _) => UiText.LanguageChanged -= RefreshInterfaceLanguage;
         UiLocalization.ApplyTree(this);
         if(!artworkAvailable)UiLocalization.SetText(_status,"Background image unavailable. Choose it again in Settings → Themes.");
-        if (!preview) DesktopLog.Write(launchOptions?.StartAll == true
-            ? "Dashboard opened with an explicit --start-all request. Startup will run after the window loads."
-            : "Dashboard opened. Engines remain stopped until Start is selected.");
+        if (!preview)
+        {
+            DesktopLog.Write($"SayWhat? {AppBrand.Version}; Windows {Environment.OSVersion.Version}; " +
+                $"process {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}; " +
+                $"speech own={_settings.OwnRecognitionEngine}, subtitles={_settings.IncomingSpeechEngine}; " +
+                $"profile={_settings.ActiveTranslationProfileId}; source={_settings.IncomingAudioMode}.");
+            DesktopLog.Write(launchOptions?.StartAll == true
+                ? "Dashboard opened with an explicit --start-all request. Startup will run after the window loads."
+                : "Dashboard opened. Engines remain stopped until Start is selected.");
+        }
     }
 
     internal Window CreateFirstRunIntroductionDialog() => FirstRunIntroductionUi.Create(this);

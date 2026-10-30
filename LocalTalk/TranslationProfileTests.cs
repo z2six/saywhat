@@ -24,6 +24,7 @@ internal static class TranslationProfileTests
 
         var initial = new AppSettings
         {
+            IncomingSpeechEngine = "voxtral", IncomingNormalSpeechEngine = "voxtral",
             OwnManagedModelId = "hy-mt2-7b-q4_k_m", IncomingManagedModelId = "translategemma-4b-q4_k_m",
             OwnTranslatorModel = "custom-own-model", TranslatorModel = "custom-incoming-model",
             OwnVoiceTargetLanguage = "Chinese", IncomingTargetLanguage = "Korean", UiLanguage = "ja",

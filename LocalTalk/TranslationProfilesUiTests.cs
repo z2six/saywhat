@@ -189,7 +189,7 @@ internal static class TranslationProfilesUiTests
             picker.SelectedItem = picker.Items.OfType<TranslationProfileUiChoice>().Single(choice => choice.Id == TranslationProfiles.GroupsId);
             Layout(content, new Size(1160, 800)); mainScroll.ScrollToTop(); DrainPresentation(); Layout(content, new Size(1160, 800));
             Render(content, new Size(1160, 800), "profiles-settings-groups.png");
-            Check(settings.ActiveTranslationProfileId == TranslationProfiles.NormalId && settings.IncomingSpeechEngine == "voxtral", "Groups visual selection remains unapplied");
+            Check(settings.ActiveTranslationProfileId == TranslationProfiles.NormalId && settings.IncomingSpeechEngine == preview.IncomingSpeechEngine, "Groups visual selection remains unapplied");
 
             overlay = new SubtitleWindow();
             typeof(SubtitleWindow).GetField("_settings", flags)!.SetValue(overlay, preview.Copy());

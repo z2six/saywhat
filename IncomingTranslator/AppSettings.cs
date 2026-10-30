@@ -28,8 +28,8 @@ internal sealed class AppSettings
     public string TranslationQuality { get; set; } = "Fast";
     public string ActiveTranslationProfileId { get; set; } = TranslationProfiles.NormalId;
     public List<TranslationProfile> CustomTranslationProfiles { get; set; } = new();
-    public string IncomingSpeechEngine { get; set; } = "voxtral";
-    public string IncomingNormalSpeechEngine { get; set; } = "voxtral";
+    public string IncomingSpeechEngine { get; set; } = "nemotron";
+    public string IncomingNormalSpeechEngine { get; set; } = "nemotron";
     public string IncomingNormalSourceLanguage { get; set; } = "Automatic";
     public int SubtitlePreviewStableMilliseconds { get; set; } = 500;
     public bool IncomingSendEarlyPreviews { get; set; } = false;
@@ -279,6 +279,10 @@ internal static partial class SettingsStore
             if (!document.RootElement.TryGetProperty(nameof(AppSettings.OwnVoiceSourceLanguage), out _))
                 settings.OwnVoiceSourceLanguage = "Automatic";
         }
+        if (document.RootElement.ValueKind == JsonValueKind.Object)
+            PreserveStoredIncomingSpeechDefaults(settings,
+                document.RootElement.TryGetProperty(nameof(AppSettings.IncomingSpeechEngine), out _),
+                document.RootElement.TryGetProperty(nameof(AppSettings.IncomingNormalSpeechEngine), out _));
         // Reading this new delivery preference is inert. Only the old default
         // pause migrates; a customized pause or saved new choice is preserved.
         if (document.RootElement.ValueKind == JsonValueKind.Object &&
@@ -317,6 +321,14 @@ internal static partial class SettingsStore
             !document.RootElement.TryGetProperty(nameof(AppSettings.ActiveTranslationProfileId), out _))
             TranslationProfiles.MigrateExistingSettings(settings);
         return settings;
+    }
+
+    internal static void PreserveStoredIncomingSpeechDefaults(AppSettings settings, bool hasIncomingEngine, bool hasNormalEngine)
+    {
+        // New objects use native recognition. Sparse saved settings and profile
+        // imports predate that default and must retain their historical engine.
+        if (!hasIncomingEngine) settings.IncomingSpeechEngine = "voxtral";
+        if (!hasNormalEngine) settings.IncomingNormalSpeechEngine = "voxtral";
     }
 
     public static void Save(AppSettings settings) => Save(settings, applyingProfile: false);

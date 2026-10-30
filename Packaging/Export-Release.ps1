@@ -90,6 +90,14 @@ if ([version]($Version -split '-', 2)[0] -ge [version]'0.2.11') {
     $requiredSource += @('IncomingTranslator/ManagedServicePorts.cs','IncomingTranslator/SessionEndpoints.cs','LocalTalk/RuntimeController.Ports.cs','LocalTalk/MainWindowConnections.cs','LocalTalk/ManagedServicePortTests.cs','LocalTalk/SessionEndpointTests.cs','Packaging/ProvisioningTests/test-managed-ports.py','Packaging/vibevoice/test_ports.py',
         'Packaging/ManagedPortTests/ManagedPortTests.csproj','Packaging/ManagedPortTests/Program.cs','Packaging/ManagedPortTests/fixtures/owned-http.ps1')
 }
+if ([version]($Version -split '-', 2)[0] -ge [version]'0.2.12') {
+    $requiredSource += @('LocalTalk/ManagedWslImage.cs','LocalTalk/ManagedWslImageTests.cs',
+        'LocalTalk/ManagedWslSetup.cs','LocalTalk/ManagedWslSetupTests.cs','LocalTalk/WindowsSpeechRequirements.cs',
+        'LocalTalk/NativeSubtitleDefaultTests.cs','Packaging/scripts/preflight-voxtral-backend.sh',
+        'Packaging/ProvisioningTests/test-bootstrap-packages.sh','Packaging/ProvisioningTests/test-cuda-preflight.sh',
+        'Packaging/ManagedWslImageTests/ManagedWslImageTests.csproj','Packaging/ManagedWslImageTests/Program.cs',
+        'Packaging/ManagedWslImageTests/ProvisionAsset.cs')
+}
 $privateNames += '|(^|[\\/])people-photos[\\/]'
 if ([version]($Version -split '-', 2)[0] -ge [version]'0.1.25') {
     $requiredSource += @('LocalTalk/HomeTargetLanguageUi.cs','LocalTalk/HomeTargetLanguageUiTests.cs',

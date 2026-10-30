@@ -9,10 +9,14 @@ source archives; see [source provenance](../SOURCE-PROVENANCE.md).
 
 For the primary app and host:
 
-- Windows 10 21H2 (build 19044) or newer, or Windows 11, x64. Your own voice and
+- Windows 10 1809 (build 17763) or newer, or Windows 11, x64. Native own voice and
   explicit All playback subtitles can use Windows 10; process-specific playback
   capture requires the Windows 11 client API (build 20348+). Windows 10 support
   is compatibility-preview work, not a claim of verified real-Windows-10 testing.
+  Optional WSL speech needs Windows 10 2004 (build 19041+) and WSL 2 version
+  0.48.2 or newer; CUDA in WSL needs Windows 10 21H2 (build 19044+) or Windows 11
+  and a compatible NVIDIA GPU/driver. These are runtime feature requirements,
+  not prerequisites for compiling or running the offline checks.
 - .NET SDKs **8 and 9**. The dashboard targets `net8.0-windows`; the capture host
   targets `net9.0`. A machine that builds framework-dependent output also needs
   the corresponding desktop/runtime components to run it; the SDK installers

@@ -29,6 +29,7 @@ internal static class AutomaticSetupOfflineTests
         AppSettings Settings() => new()
         {
             UseManagedTranslator = false, UseAiSpeakerRecognition = false,
+            IncomingSpeechEngine = "voxtral", IncomingNormalSpeechEngine = "voxtral",
             OwnManagedModelId = "hy-mt2-7b-q4_k_m", IncomingManagedModelId = "hy-mt2-1.8b-q4_k_m",
             ShareTranslationModel = true, OwnVoiceTargetLanguage = "Chinese", IncomingTargetLanguage = "English",
             OwnVoiceEndPauseMilliseconds = 2700, IncomingSettleMilliseconds = 1700,
@@ -222,6 +223,13 @@ internal static class AutomaticSetupOfflineTests
         var noNvidia = new FakePlatform { Nvidia = false };
         await new AutomaticSetupService(noNvidia, Data("vulkan")).RunAsync(Settings(), true, token: token).ConfigureAwait(false);
         Check(noNvidia.Builds.Single().Backend == "vulkan" && noNvidia.Builds.All(build => build.Backend != "cpu"), "non-NVIDIA setup selects Vulkan, never silently falls back to CPU");
+        var renamed = new FakePlatform { ReplacementDistributionName = "SayWhat-Ubuntu-abcdef12" };
+        string renamedRoot = Data("verified-replacement");
+        await new AutomaticSetupService(renamed, renamedRoot).RunAsync(Settings(), true, token: token).ConfigureAwait(false);
+        using (JsonDocument replacedCheckpoint = JsonDocument.Parse(File.ReadAllText(Path.Combine(renamedRoot, "setup-progress.json"))))
+            Check(renamed.Builds.Single().Distribution == renamed.ReplacementDistributionName &&
+                replacedCheckpoint.RootElement.GetProperty("DistributionName").GetString() == renamed.ReplacementDistributionName,
+                "the verified replacement name is saved and built instead of blindly reusing a collided checkpoint name");
         var collision = new FakePlatform(); collision.Distributions.Add(AppBrand.SpeechDistributionName); collision.Distributions.Add("LocalTalk-Ubuntu"); collision.Distributions.Add("Ubuntu");
         await new AutomaticSetupService(collision, Data("collision")).RunAsync(Settings(), true, token: token).ConfigureAwait(false);
         Check(collision.CreatedDistributions.Single().StartsWith(AppBrand.SpeechDistributionName + "-", StringComparison.Ordinal) && collision.Distributions.Contains("Ubuntu") &&
@@ -442,6 +450,7 @@ internal static class AutomaticSetupOfflineTests
         internal long NativeSpeechBytes;
         internal SetupPrerequisiteResult NativeOutcome = SetupPrerequisiteResult.Ready, WindowsOutcome = SetupPrerequisiteResult.Ready;
         internal string? FailAt;
+        internal string? ReplacementDistributionName;
         internal Action<string>? BeforeCall;
         internal FakePlatform(WslSpeechRegistration? speech = null) => Speech = speech;
         private void Step(string call, CancellationToken token)
@@ -460,12 +469,13 @@ internal static class AutomaticSetupOfflineTests
         { Step("Native", token); if (NativeOutcome == SetupPrerequisiteResult.Ready) NativeReady = true; return Task.FromResult(NativeOutcome); }
         public Task<SetupPrerequisiteResult> EnsureWindowsSpeechAsync(IProgress<ProvisionProgress>? progress, CancellationToken token)
         { Step("WindowsSpeech", token); return Task.FromResult(WindowsOutcome); }
-        public Task EnsureDistributionAsync(string name, IProgress<ProvisionProgress>? progress, CancellationToken token)
+        public Task<string> EnsureDistributionAsync(string name, IProgress<ProvisionProgress>? progress, CancellationToken token)
         {
             Step("Distribution:" + name, token);
             if (DistributionNeedsRestart) throw new SetupRestartRequiredException();
+            name = ReplacementDistributionName ?? name;
             if (Distributions.Add(name)) CreatedDistributions.Add(name);
-            return Task.CompletedTask;
+            return Task.FromResult(name);
         }
         public Task EnsureModelAsync(string id, IProgress<ProvisionProgress>? progress, CancellationToken token)
         {

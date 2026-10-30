@@ -19,7 +19,9 @@ There are no subscriptions or paid features. Speech recognition, translation and
 
 No separate LM Studio or FoxTrans installation is needed. The default speech recognizer runs directly on Windows. Optional Voxtral and Groups modes use additional local tools; setup explains their requirements before preparing them. Nothing starts listening merely because you open the app.
 
-SayWhat? accepts **Windows 10 21H2 (build 19044) or newer, and Windows 11, x64** for your own voice-to-VRChat translation. VRChat-only and selected-application subtitles require Windows 11; on Windows 10, you can explicitly choose **All playback**, which also hears other applications. It never switches to that wider capture scope automatically.
+SayWhat? accepts **Windows 10 1809 (build 17763) or newer, and Windows 11, x64** for native own-voice translation. VRChat-only and selected-application subtitles require Windows 11; on Windows 10, you can explicitly choose **All playback**, which also hears other applications. It never switches to that wider capture scope automatically.
+
+Optional WSL speech engines need Windows 10 2004 (build 19041+) and WSL 2 version 0.48.2 or newer. CUDA speech in WSL needs Windows 10 21H2 (build 19044+) or Windows 11, plus a compatible NVIDIA GPU and driver. These requirements do not apply to the default native speech engine.
 
 Windows 10 compatibility is a **preview and has not been verified on a real Windows 10 PC**. The recommended translation runtime needs compatible GPU acceleration, and downloaded models require additional disk space. The installer is unsigned; hardware compatibility and fresh-PC installation are still being tested. See the [requirements](https://saywhat.pages.dev/#requirements) and [installation guide](docs/install-and-updates.md).
 

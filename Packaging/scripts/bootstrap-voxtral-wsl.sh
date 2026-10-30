@@ -12,7 +12,16 @@ grep -qi 'microsoft.*WSL2' /proc/sys/kernel/osrelease || {
 
 job_file="/tmp/localtalk-build-$job_id.pid"
 printf '%s\n' "$$" > "$job_file"
-trap 'rm -f -- "$job_file"' EXIT
+cleanup() {
+    local result=$?
+    rm -f -- "$job_file"
+    [[ -z "${package_output:-}" ]] || rm -f -- "$package_output"
+    # Retain failure diagnostics for troubleshooting; successful setup does not
+    # leave an accumulating copy of the package manager's normal output.
+    if [[ "$result" == 0 && -n "${package_log:-}" ]]; then rm -f -- "$package_log"; fi
+    return "$result"
+}
+trap cleanup EXIT
 trap 'echo "SayWhat? setup was cancelled; no inference engine was started." >&2; exit 130' INT TERM
 source /etc/os-release
 [[ "$ID" == ubuntu && "$VERSION_ID" == 24.04 ]] || {
@@ -26,14 +35,69 @@ required_mb=4096
     echo "Speech build requires at least $required_mb MB of free Linux disk space; only $available_mb MB is available." >&2
     exit 4
 }
+if [[ "$backend" == cuda ]]; then
+    /bin/bash "$(dirname "$0")/preflight-voxtral-backend.sh" cuda
+fi
+
 echo 'Step 1/5: Installing signed Ubuntu build packages (may download several hundred MB).'
 export DEBIAN_FRONTEND=noninteractive
 # Newline-delimited status works through a background pipe without a terminal.
 # Percentages describe the current package transaction, not the entire setup.
 export LC_ALL=C
-apt_progress=(-q -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0)
-apt-get "${apt_progress[@]}" update
-apt-get "${apt_progress[@]}" install -y --no-install-recommends build-essential cmake ninja-build git curl ca-certificates libboost-json-dev python3-minimal
+apt_progress=(-q -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0 -o DPkg::Lock::Timeout=120)
+package_log=$(umask 077; mktemp "/tmp/localtalk-packages-$job_id.XXXXXXXX.log")
+package_output=$(umask 077; mktemp "/tmp/localtalk-package-output-$job_id.XXXXXXXX")
+echo "Package setup transcript: $package_log"
+
+# Begin package transaction helpers. The offline fixture exercises this block.
+relay_package_output() (
+    # Only this relay ignores SIGPIPE. Package scripts must never inherit a
+    # failed WSL/Windows output handle, nor stop halfway through configuration
+    # just because its progress consumer went away. Keep draining to the log.
+    trap '' PIPE
+    local line forwarding=true
+    exec 4>> "$package_log" 5> "$package_output" || exit 1
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        printf '%s\n' "$line" >&4 || exit 1
+        printf '%s\n' "$line" >&5 || exit 1
+        if "$forwarding" && ! printf '%s\n' "$line" 2>/dev/null; then
+            forwarding=false
+        fi
+    done
+)
+run_package() {
+    local -a results
+    if "$@" </dev/null 2>&1 | relay_package_output; then
+        results=("${PIPESTATUS[@]}")
+    else
+        results=("${PIPESTATUS[@]}")
+    fi
+    if [[ "${results[1]}" != 0 ]]; then
+        echo "Cannot write the package setup transcript: $package_log" >&2
+        # Do not replace an actual package failure with the relay's status.
+        if [[ "${results[0]}" == 0 ]]; then return "${results[1]}"; fi
+    fi
+    return "${results[0]}"
+}
+run_apt() {
+    local result
+    if run_package apt-get "${apt_progress[@]}" "$@"; then return 0; else result=$?; fi
+    # Repair only the explicit interrupted-transaction condition. Network,
+    # checksum, lock and maintainer-script failures retain their actual result.
+    # Never remove package locks or stop another package manager.
+    if [[ "$result" == 100 ]] && grep -Fq "dpkg was interrupted, you must manually run 'dpkg --configure -a'" "$package_output"; then
+        if run_package dpkg --configure -a; then
+            if run_package apt-get "${apt_progress[@]}" "$@"; then return 0; else result=$?; fi
+        else
+            result=$?
+        fi
+    fi
+    return "$result"
+}
+# End package transaction helpers.
+
+run_apt update
+run_apt install -y --no-install-recommends build-essential cmake ninja-build git curl ca-certificates libboost-json-dev python3-minimal
 
 cuda_options=()
 vulkan_options=(-DGGML_VULKAN=OFF)
@@ -49,17 +113,17 @@ if [[ "$backend" == cuda ]]; then
             echo 'The NVIDIA repository keyring did not match the pinned checksum. It was not installed.' >&2
             exit 8
         }
-        dpkg -i "$keyring"
+        run_package dpkg -i "$keyring"
         rm -- "$keyring"
-        apt-get "${apt_progress[@]}" update
-        apt-get "${apt_progress[@]}" install -y --no-install-recommends cuda-toolkit-13-1
+        run_apt update
+        run_apt install -y --no-install-recommends cuda-toolkit-13-1
     fi
     export PATH="/usr/local/cuda-13.1/bin:$PATH"
     export LD_LIBRARY_PATH="/usr/local/cuda-13.1/lib64:/usr/lib/wsl/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     cuda_options=(-DGGML_CUDA=ON -DCMAKE_CUDA_COMPILER=/usr/local/cuda-13.1/bin/nvcc -DCMAKE_CUDA_ARCHITECTURES=native)
 elif [[ "$backend" == vulkan ]]; then
     echo 'Step 2/5: Installing Vulkan build tools and probing the actual WSL Vulkan device.'
-    apt-get "${apt_progress[@]}" install -y --no-install-recommends libvulkan-dev glslc vulkan-tools
+    run_apt install -y --no-install-recommends libvulkan-dev glslc vulkan-tools
     info=$(vulkaninfo --summary 2>&1) || { echo "$info"; echo 'Vulkan is unavailable in this WSL distribution. No CPU fallback was silently selected.' >&2; exit 6; }
     echo "$info"
     if ! grep -Eq 'PHYSICAL_DEVICE_TYPE_(DISCRETE|INTEGRATED)_GPU' <<< "$info"; then

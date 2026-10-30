@@ -112,6 +112,10 @@ internal static class DesktopTests
             checks+=Task.Run(() => AiSpeakerIdentifier.RunRecognitionControlOfflineSelfTestsAsync(Path.Combine(directory, "recognition-backend"))).GetAwaiter().GetResult();
             checks+=IncomingTranslationService.RunSpeakerRecognitionOfflineChecksAsync(Path.Combine(directory, "speaker-controls")).GetAwaiter().GetResult();
             checks+=AutomaticSetupOfflineTests.RunAsync().GetAwaiter().GetResult();
+            checks+=WindowsSpeechRequirementTests.Run();
+            checks+=ManagedWslImageTests.Run(Path.Combine(directory, "headless-image-fixtures"));
+            checks+=ManagedWslSetupTests.RunAsync().GetAwaiter().GetResult();
+            checks+=NativeSubtitleDefaultTests.Run();
             checks+=ManagedSpeechIntegrationTests.Run(Path.Combine(directory, "speech-shortcut-fixtures"));
             checks+=TranslationSelectionPreparation.RunOfflineChecksAsync().GetAwaiter().GetResult();
             checks+=SetupChoiceUiTests.Run(window);

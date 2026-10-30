@@ -28,7 +28,8 @@ internal interface IAutomaticSetupPlatform
     Task<AutomaticSetupSnapshot> InspectAsync(AppSettings settings, CancellationToken token);
     Task<SetupPrerequisiteResult> EnsureNativeRuntimeAsync(IProgress<ProvisionProgress>? progress, CancellationToken token);
     Task<SetupPrerequisiteResult> EnsureWindowsSpeechAsync(IProgress<ProvisionProgress>? progress, CancellationToken token);
-    Task EnsureDistributionAsync(string name, IProgress<ProvisionProgress>? progress, CancellationToken token);
+    Task<string> EnsureDistributionAsync(string name, IProgress<ProvisionProgress>? progress, CancellationToken token);
+    void ValidateSpeechPlatform(string backend) { }
     Task EnsureModelAsync(string id, IProgress<ProvisionProgress>? progress, CancellationToken token);
     Task EnsureRuntimeAsync(string id, IProgress<ProvisionProgress>? progress, CancellationToken token);
     Task<string> EnsureSpeakerModelAsync(AppSettings settings, IProgress<ProvisionProgress>? progress, CancellationToken token);
@@ -83,6 +84,7 @@ internal sealed class AutomaticSetupService
         ValidateSelections(settings, _ownVoiceOnly, _incomingVoiceOnly);
         AutomaticSetupSnapshot snapshot = await _platform.InspectAsync(settings, token);
         bool nativeSpeech = UsesNativeSpeech(settings);
+        if (!nativeSpeech) _platform.ValidateSpeechPlatform(snapshot.Speech?.Backend ?? (snapshot.HasNvidiaGpu ? "cuda" : "vulkan"));
         string[] models = UsesBuiltInTranslation(settings) ? TranslationIds(settings, _ownVoiceOnly, _incomingVoiceOnly) : [];
         long bytes = models.Where(id => !snapshot.ModelIds.Contains(id))
             .Sum(id => LocalTalkProvisioner.ModelCatalog.Single(model => model.Id == id).SizeBytes);
@@ -125,6 +127,7 @@ internal sealed class AutomaticSetupService
             await Stage("Checking this PC", state, progress, token);
             AutomaticSetupSnapshot snapshot = await _platform.InspectAsync(settings, token);
             bool nativeSpeech = UsesNativeSpeech(settings);
+            if (!nativeSpeech) _platform.ValidateSpeechPlatform(snapshot.Speech?.Backend ?? (snapshot.HasNvidiaGpu ? "cuda" : "vulkan"));
             if (!snapshot.NativeRuntimeReady)
             {
                 await Stage("Preparing Windows components", state, progress, token);
@@ -143,7 +146,13 @@ internal sealed class AutomaticSetupService
                         ? AppBrand.SpeechDistributionName + "-" + Guid.NewGuid().ToString("N")[..8] : AppBrand.SpeechDistributionName;
                     await SaveCheckpoint(state, token);
                 }
-                try { await _platform.EnsureDistributionAsync(state.DistributionName, progress, token); }
+                try
+                {
+                    // A checkpoint name can have been replaced by another distro.
+                    // Keep the verified component name returned by the platform.
+                    state.DistributionName = await _platform.EnsureDistributionAsync(state.DistributionName, progress, token);
+                    await SaveCheckpoint(state, token);
+                }
                 catch (SetupRestartRequiredException) { return await PauseForRestart(state, token); }
             }
             foreach (string id in UsesBuiltInTranslation(settings) ? TranslationIds(settings, _ownVoiceOnly, _incomingVoiceOnly) : [])
@@ -264,6 +273,7 @@ internal sealed class AutomaticSetupService
 
 internal sealed class WindowsAutomaticSetupPlatform(LocalTalkProvisioner provisioner) : IAutomaticSetupPlatform
 {
+    public void ValidateSpeechPlatform(string backend) => WindowsSpeechRequirements.Validate(backend);
     public long PendingOwnNativeSpeechBytes(AppSettings settings) => new NativeSpeechProvisioner(provisioner.DataRoot).PendingDownloadBytes(settings);
     public bool IsOwnNativeSpeechReady(AppSettings settings) => new NativeSpeechProvisioner(provisioner.DataRoot).IsReady(settings);
     public Task EnsureOwnNativeSpeechAsync(AppSettings settings, IProgress<ProvisionProgress>? progress, CancellationToken token) =>
@@ -333,45 +343,30 @@ internal sealed class WindowsAutomaticSetupPlatform(LocalTalkProvisioner provisi
     }
     public async Task<SetupPrerequisiteResult> EnsureWindowsSpeechAsync(IProgress<ProvisionProgress>? progress, CancellationToken token)
     {
-        if (await CanUseWslAsync(token)) return SetupPrerequisiteResult.Ready;
-        int code = await RunElevatedAsync(new(WslExecutable) { UseShellExecute = true, Verb = "runas",
-            Arguments = "--install --no-distribution", WindowStyle = ProcessWindowStyle.Hidden }, token);
-        if (code is not 0 and not 3010) throw new SetupUserException("Windows couldn't prepare speech support. Try setup again; details are in Troubleshooting.");
-        return code == 3010 || !await CanUseWslAsync(token) ? SetupPrerequisiteResult.RestartRequired : SetupPrerequisiteResult.Ready;
-    }
-    public async Task EnsureDistributionAsync(string name, IProgress<ProvisionProgress>? progress, CancellationToken token)
-    {
-        if (!AppBrand.IsOwnedSpeechDistributionName(name)) throw new InvalidOperationException("Invalid app-owned speech component name.");
-        if (!provisioner.InspectLocal().WslDistributions.Contains(name, StringComparer.OrdinalIgnoreCase))
+        WindowsSpeechRequirements.Validate("cpu");
+        if (!await CanUseWslAsync(token))
         {
-            // --name and --version avoid altering the default distribution or converting user data.
-            string help = await ReadCommandAsync(Command(WslExecutable, "--help"), token);
-            if (!help.Contains("--name", StringComparison.Ordinal))
-            {
-                int update = await RunElevatedAsync(new(WslExecutable) { UseShellExecute = true, Verb = "runas", Arguments = "--update", WindowStyle = ProcessWindowStyle.Hidden }, token);
-                if (update is not 0 and not 3010) throw new SetupUserException("Windows couldn't update speech support. Try setup again; details are in Troubleshooting.");
-                if (update == 3010) throw new SetupRestartRequiredException();
-                help = await ReadCommandAsync(Command(WslExecutable, "--help"), token);
-                if (!help.Contains("--name", StringComparison.Ordinal))
-                    throw new SetupRestartRequiredException();
-            }
-            await LocalTalkProvisioner.RunCommandAsync(Command(WslExecutable, "--install", "--distribution", "Ubuntu-24.04",
-                "--name", name, "--version", "2", "--no-launch"), DetailedProgress(), token, TimeSpan.FromMinutes(40));
+            int code = await RunElevatedAsync(new(WslExecutable) { UseShellExecute = true, Verb = "runas",
+                Arguments = "--install --no-distribution", WindowStyle = ProcessWindowStyle.Hidden }, token);
+            if (code is not 0 and not 3010) throw new SetupUserException("Windows couldn't prepare speech support. Try setup again; details are in Troubleshooting.");
+            if (code == 3010 || !await CanUseWslAsync(token)) return SetupPrerequisiteResult.RestartRequired;
         }
-        using RegistryKey? lxss = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Lxss");
-        bool version2 = false;
-        if (lxss is not null) foreach (string key in lxss.GetSubKeyNames())
-        {
-            using RegistryKey? distro = lxss.OpenSubKey(key);
-            if (string.Equals(distro?.GetValue("DistributionName") as string, name, StringComparison.OrdinalIgnoreCase))
-                version2 = Convert.ToInt32(distro?.GetValue("Version") ?? 0) == 2;
-        }
-        if (!version2) throw new SetupRestartRequiredException();
-        // Root command bypasses Ubuntu's interactive account wizard; it applies only to this isolated app distro.
-        await LocalTalkProvisioner.RunCommandAsync(Command(WslExecutable, "--distribution", name, "--user", "root", "--exec", "/bin/true"),
-            null, token, TimeSpan.FromSeconds(90));
-        await HideManagedDesktopEntriesAsync(name, serverPath: null, token);
+        string version = "";
+        try { version = await ReadCommandAsync(Command(WslExecutable, "--version"), token); }
+        catch (Exception error) when (error is IOException or InvalidOperationException or TimeoutException) { }
+        if (WindowsSpeechRequirements.SupportsHeadlessWsl(version)) return SetupPrerequisiteResult.Ready;
+        progress?.Report(new("Preparing the speech component", "Updating the Linux speech tools"));
+        int update = await RunElevatedAsync(new(WslExecutable) { UseShellExecute = true, Verb = "runas",
+            Arguments = "--update", WindowStyle = ProcessWindowStyle.Hidden }, token);
+        if (update == 3010) return SetupPrerequisiteResult.RestartRequired;
+        if (update != 0) throw new SetupUserException(WindowsSpeechRequirements.WslUpdateMessage);
+        try { version = await ReadCommandAsync(Command(WslExecutable, "--version"), token); }
+        catch (Exception error) when (error is IOException or InvalidOperationException or TimeoutException) { version = ""; }
+        if (!WindowsSpeechRequirements.SupportsHeadlessWsl(version)) throw new SetupUserException(WindowsSpeechRequirements.WslUpdateMessage);
+        return SetupPrerequisiteResult.Ready;
     }
+    public Task<string> EnsureDistributionAsync(string name, IProgress<ProvisionProgress>? progress, CancellationToken token) =>
+        new ManagedWslSetup(provisioner).EnsureAsync(name, progress, token);
     public async Task EnsureModelAsync(string id, IProgress<ProvisionProgress>? progress, CancellationToken token)
     {
         if (id == "voxtral-realtime-q4_k_m" && IsManagedSpeechModelMissing(provisioner.SpeechRegistration, provisioner.ModelsRoot))
@@ -412,6 +407,8 @@ internal sealed class WindowsAutomaticSetupPlatform(LocalTalkProvisioner provisi
     }
     public async Task BuildSpeechAsync(string distribution, string backend, IProgress<ProvisionProgress>? progress, CancellationToken token)
     {
+        WindowsSpeechRequirements.Validate(backend);
+        new ManagedWslSetup(provisioner).ValidateBuildCapacity(distribution, backend);
         await provisioner.BootstrapWslSpeechAsync(distribution, backend, true, SpeechBuildProgress(progress), token,
             runAsRoot: true, hideDesktopIntegration: true);
         ManagedSpeechIntegration.TryHideGeneratedWindowsShortcuts(provisioner.SpeechRegistration, provisioner.DataRoot);
@@ -457,6 +454,12 @@ internal sealed class WindowsAutomaticSetupPlatform(LocalTalkProvisioner provisi
     private static ProcessStartInfo Command(string executable, params string[] arguments)
     {
         var info = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        if (string.Equals(executable, WslExecutable, StringComparison.OrdinalIgnoreCase))
+        {
+            info.Environment["WSL_UTF8"] = "1";
+            info.StandardOutputEncoding = Encoding.UTF8;
+            info.StandardErrorEncoding = Encoding.UTF8;
+        }
         foreach (string argument in arguments) info.ArgumentList.Add(argument);
         return info;
     }

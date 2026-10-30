@@ -243,6 +243,8 @@ internal static class TranslationProfiles
                 foreach (var pair in profile.Snapshot ?? new())
                     if (SnapshotProperties.Contains(pair.Key)) safe[pair.Key] = pair.Value?.DeepClone();
                 AppSettings restored = JsonSerializer.Deserialize<AppSettings>(safe) ?? new();
+                SettingsStore.PreserveStoredIncomingSpeechDefaults(restored,
+                    safe.ContainsKey(nameof(AppSettings.IncomingSpeechEngine)), safe.ContainsKey(nameof(AppSettings.IncomingNormalSpeechEngine)));
                 // Snapshot metadata was stripped, so this recursive normalizer has
                 // no nested custom library and cannot recurse through stored profiles.
                 SettingsStore.Normalize(restored);

@@ -1008,6 +1008,7 @@ internal sealed partial class RuntimeController : IAsyncDisposable, ISpeakerFeed
 
     private void ValidateSpeechHelpers(WslSpeechRegistration speech, int port)
     {
+        WindowsSpeechRequirements.Validate(speech.Backend, _audioWindowsVersion());
         string validationOwner = Guid.NewGuid().ToString("N");
         _provisioner.BuildWslSpeechStartInfo(speech, port, validationOwner);
         _provisioner.BuildWslSpeechStopInfo(speech, port, validationOwner);
@@ -1015,6 +1016,7 @@ internal sealed partial class RuntimeController : IAsyncDisposable, ISpeakerFeed
 
     private void ValidateGroupsHelpers(WslSpeechRegistration speech, AppSettings settings)
     {
+        WindowsSpeechRequirements.Validate("cuda", _audioWindowsVersion());
         string owner = Guid.NewGuid().ToString("N");
         VibeVoiceRuntime.ValidateEndpoint(settings.VibeVoiceEndpoint);
         VibeVoiceRuntime.BuildStartInfo(speech, _provisioner.DataRoot, settings.VibeVoiceModelId, owner);

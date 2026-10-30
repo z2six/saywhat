@@ -116,7 +116,7 @@ Recognizing a voice is not the same as separating overlapping speech. Live trans
 
 ## Setup limits and troubleshooting
 
-The app accepts Windows 10 21H2 (build 19044) or newer, and Windows 11, x64. Native Nemotron recognition and local translation do not require WSL for your own voice-to-VRChat workflow. FireRedASR2 subtitles also run natively. The optional Voxtral and Groups speech paths use app-managed WSL2 Ubuntu and may require administrator approval, virtualization support, a restart and additional downloads. Backend compatibility still depends on the selected engine and hardware.
+The app accepts Windows 10 1809 (build 17763) or newer, and Windows 11, x64. Native Nemotron recognition and local translation do not require WSL for your own voice-to-VRChat workflow. FireRedASR2 subtitles also run natively. The optional Voxtral and Groups speech paths use app-managed WSL2 Ubuntu and may require administrator approval, virtualization support, a restart and additional downloads. Optional WSL speech needs Windows 10 2004 (build 19041+) and WSL 2 version 0.48.2 or newer; CUDA in WSL needs Windows 10 21H2 (build 19044+) or Windows 11 and a compatible NVIDIA GPU/driver. Backend compatibility still depends on the selected engine and hardware.
 
 VRChat-only and selected-application subtitles need the process-loopback API available on Windows 11 clients (Windows build 20348 or newer). Windows 10 can use subtitles only after explicitly choosing All playback, which includes sounds from other applications. The app never falls back to that wider capture scope automatically. Windows 10 compatibility is a preview and has not been verified on a real Windows 10 PC. Advanced manual setup remains available for existing compatible installations.
 

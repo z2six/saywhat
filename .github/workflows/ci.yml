@@ -66,5 +66,9 @@ jobs:
         run: python3 Packaging/ProvisioningTests/test-managed-ports.py -v
       - name: Check Voxtral cleanup boundaries
         run: bash Packaging/ProvisioningTests/test-stop-voxtral.sh
+      - name: Check CUDA compatibility without a GPU
+        run: bash Packaging/ProvisioningTests/test-cuda-preflight.sh
+      - name: Check headless package setup and interrupted transaction recovery
+        run: bash Packaging/ProvisioningTests/test-bootstrap-packages.sh
       - name: Check Groups port arguments without inference dependencies
         run: python3 -m unittest discover -s Packaging/vibevoice -p test_ports.py -v

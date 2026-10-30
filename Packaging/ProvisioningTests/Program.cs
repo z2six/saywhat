@@ -113,6 +113,7 @@ try
     try { await provisioner.DownloadVerifiedAsync(new("verified.bin", data.Length + 1, sha, "https://example.test/asset"), downloaded, null, CancellationToken.None); }
     catch (InvalidDataException) { preserved = true; }
     Check(preserved && File.ReadAllBytes(downloaded).SequenceEqual(data), "A mismatched existing file is kept unchanged");
+    await CheckDownloadRecoveryAsync(testRoot, Check);
     string zipPath = Path.Combine(testRoot, "unsafe.zip");
     using (ZipArchive zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
     using (StreamWriter writer = new(zip.CreateEntry("../escape.exe").Open())) writer.Write("not executable");
@@ -143,15 +144,18 @@ try
     Check(startScript.IndexOf("trap cleanup EXIT", StringComparison.Ordinal) < startScript.IndexOf("\"$server\" --model", StringComparison.Ordinal)
         && startScript.Contains("attempt<50", StringComparison.Ordinal), "Speech child cleanup is installed before launch and has a bounded shutdown");
     string bootstrapScriptText = File.ReadAllText(Path.Combine(packagingRoot, "scripts", "bootstrap-voxtral-wsl.sh"));
-    const string aptProgressDefinition = "apt_progress=(-q -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0)";
+    const string aptProgressDefinition = "apt_progress=(-q -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0 -o DPkg::Lock::Timeout=120)";
     Check(bootstrapScriptText.Contains(aptProgressDefinition, StringComparison.Ordinal) &&
         bootstrapScriptText.IndexOf("export LC_ALL=C", StringComparison.Ordinal) >= 0 &&
         bootstrapScriptText.IndexOf("export LC_ALL=C", StringComparison.Ordinal) < bootstrapScriptText.IndexOf(aptProgressDefinition, StringComparison.Ordinal),
-        "Future bootstrap declares newline APT status, no dpkg pseudo-terminal, and invariant locale before package setup");
-    string[] aptCommands = System.Text.RegularExpressions.Regex.Matches(bootstrapScriptText, @"(?m)^\s*apt-get[^\r\n]*$")
+        "Future bootstrap declares newline APT status, no dpkg pseudo-terminal, bounded lock waiting, and invariant locale before package setup");
+    string[] aptCommands = System.Text.RegularExpressions.Regex.Matches(bootstrapScriptText, @"(?m)^\s*run_apt (?:update|install)[^\r\n]*$")
         .Select(match => match.Value.Trim()).ToArray();
-    Check(aptCommands.Length == 5 && aptCommands.All(line => line.StartsWith("apt-get \"${apt_progress[@]}\" ", StringComparison.Ordinal)),
-        "Every bootstrap apt-get call shares the machine-readable progress flags, including CUDA and Vulkan branches");
+    Check(aptCommands.Length == 5 && bootstrapScriptText.Contains("run_package apt-get \"${apt_progress[@]}\" \"$@\"", StringComparison.Ordinal),
+        "Every bootstrap package transaction uses the same supervised APT wrapper, including CUDA and Vulkan branches");
+    Check(bootstrapScriptText.Contains("\"$@\" </dev/null 2>&1 | relay_package_output", StringComparison.Ordinal) &&
+        bootstrapScriptText.Contains("run_package dpkg -i \"$keyring\"", StringComparison.Ordinal),
+        "APT and standalone keyring configuration get headless stdin and a continuously drained diagnostic pipe");
     string[] buildCommands = System.Text.RegularExpressions.Regex.Matches(bootstrapScriptText, @"(?m)^\s*cmake --build[^\r\n]*$")
         .Select(match => match.Value.Trim()).ToArray();
     Check(buildCommands.SequenceEqual(new[] { "cmake --build \"$root/build-$backend\" --parallel 1" }),
@@ -330,6 +334,154 @@ static bool ThrowsArgument(Action action)
 {
     try { action(); return false; }
     catch (ArgumentException) { return true; }
+}
+
+static async Task CheckDownloadRecoveryAsync(string testRoot, Action<bool, string> check)
+{
+    byte[] data = FakeDownloadHandler.Data;
+    string digest = Convert.ToHexString(SHA256.HashData(data));
+    string Destination(string name) => Path.Combine(testRoot, "download-" + name + ".bin");
+    HttpResponseMessage Response(Stream? stream = null, HttpStatusCode status = HttpStatusCode.OK)
+    {
+        var response = new HttpResponseMessage(status)
+        { Content = stream is null ? new ByteArrayContent(data) : new StreamContent(stream) };
+        response.Content.Headers.ContentLength = data.Length;
+        return response;
+    }
+    async Task<Exception?> Download(string name, ScriptedDownloadHandler handler, CancellationToken cancellation = default,
+        TimeSpan? headers = null, TimeSpan? idle = null, string? hash = null, IProgress<ProvisionProgress>? progress = null)
+    {
+        using var http = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
+        using var provisioner = new LocalTalkProvisioner(testRoot, http);
+        try
+        {
+            await provisioner.DownloadVerifiedAsync(new(name, data.Length, hash ?? digest, "https://example.test/fixture"),
+                Destination(name), progress, cancellation, headers ?? TimeSpan.FromMilliseconds(100), idle ?? TimeSpan.FromMilliseconds(100))
+                .WaitAsync(TimeSpan.FromSeconds(5));
+            return null;
+        }
+        catch (Exception error) { return error; }
+    }
+    bool NoPartialOrDestination(string name) => !File.Exists(Destination(name)) && !Directory.EnumerateFiles(testRoot, "*.part-*").Any();
+
+    var blockedHeaders = new ScriptedDownloadHandler(async (_, cancellation) =>
+    { await Task.Delay(Timeout.InfiniteTimeSpan, cancellation); return Response(); });
+    Exception? failure = await Download("blocked-headers", blockedHeaders);
+    check(failure is TimeoutException && failure.Message.Contains("stopped responding", StringComparison.Ordinal) &&
+        blockedHeaders.Requests == 2 && NoPartialOrDestination("blocked-headers"),
+        "Unresponsive response headers time out after one bounded retry and install nothing");
+
+    var blockedBody = new ScriptedDownloadHandler((_, _) => Task.FromResult(Response(new DownloadTestStream(data[..3], stallAtEnd: true))));
+    failure = await Download("blocked-body", blockedBody);
+    check(failure is TimeoutException && failure.Message.Contains("stopped responding", StringComparison.Ordinal) &&
+        blockedBody.Requests == 2 && NoPartialOrDestination("blocked-body"),
+        "A body stalled after real byte progress hits the read inactivity deadline and removes both attempt partials");
+
+    var progressingBody = new ScriptedDownloadHandler((_, _) => Task.FromResult(Response(
+        new DownloadTestStream(data, chunkSize: 1, readDelay: TimeSpan.FromMilliseconds(20)))));
+    failure = await Download("progressing-body", progressingBody, idle: TimeSpan.FromMilliseconds(250));
+    check(failure is null && progressingBody.Requests == 1 && File.ReadAllBytes(Destination("progressing-body")).SequenceEqual(data),
+        "Continued body progress resets the inactivity deadline even when the complete transfer takes longer than that deadline");
+
+    var interrupted = new ScriptedDownloadHandler((attempt, _) => attempt == 1
+        ? Task.FromException<HttpResponseMessage>(new HttpRequestException("offline connection reset"))
+        : Task.FromResult(Response()));
+    var retryProgress = new List<ProvisionProgress>();
+    failure = await Download("transport-retry", interrupted, progress: new InlineProgress(retryProgress.Add));
+    check(failure is null && interrupted.Requests == 2 && File.ReadAllBytes(Destination("transport-retry")).SequenceEqual(data) &&
+        retryProgress.Any(value => value.Detail == "Connection interrupted. Retrying the download once." &&
+            value.BytesReceived == 0 && value.TotalBytes == data.Length),
+        "A transient transport failure explains its one retry before restarting byte progress and committing verified bytes");
+
+    var truncated = new ScriptedDownloadHandler((attempt, _) => Task.FromResult(Response(
+        attempt == 1 ? new DownloadTestStream(data[..3]) : null)));
+    failure = await Download("truncated-retry", truncated);
+    check(failure is null && truncated.Requests == 2 && File.ReadAllBytes(Destination("truncated-retry")).SequenceEqual(data) &&
+        !Directory.EnumerateFiles(testRoot, "*.part-*").Any(),
+        "A truncated HTTP body retries into a fresh partial and verifies the complete replacement");
+
+    var brokenRead = new ScriptedDownloadHandler((attempt, _) => Task.FromResult(Response(
+        attempt == 1 ? new DownloadTestStream(data[..3], failAtEnd: true) : null)));
+    failure = await Download("read-retry", brokenRead);
+    check(failure is null && brokenRead.Requests == 2 && File.ReadAllBytes(Destination("read-retry")).SequenceEqual(data),
+        "A transport IOException from the response stream retries without treating local file errors as transport errors");
+
+    var repeatedTruncation = new ScriptedDownloadHandler((_, _) => Task.FromResult(Response(new DownloadTestStream(data[..3]))));
+    failure = await Download("truncated-failure", repeatedTruncation);
+    check(failure is IOException && repeatedTruncation.Requests == 2 && NoPartialOrDestination("truncated-failure"),
+        "Repeated truncation stops after two attempts and leaves no installed or partial file");
+
+    var unavailable = new ScriptedDownloadHandler((attempt, _) => Task.FromResult(Response(
+        status: attempt == 1 ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK)));
+    failure = await Download("unavailable-retry", unavailable);
+    check(failure is null && unavailable.Requests == 2,
+        "A transient HTTP service failure permits exactly one retry");
+    var missing = new ScriptedDownloadHandler((_, _) => Task.FromResult(Response(status: HttpStatusCode.NotFound)));
+    failure = await Download("missing", missing);
+    check(failure is HttpRequestException { StatusCode: HttpStatusCode.NotFound } && missing.Requests == 1 && NoPartialOrDestination("missing"),
+        "HTTP 404 is surfaced without retry or creating a partial file");
+
+    var badDigest = new ScriptedDownloadHandler((_, _) => Task.FromResult(Response()));
+    failure = await Download("wrong-digest", badDigest, hash: new string('0', 64));
+    check(failure is InvalidDataException && badDigest.Requests == 1 && NoPartialOrDestination("wrong-digest"),
+        "A pinned hash mismatch never retries or installs the downloaded bytes");
+
+    using var headerCancellation = new CancellationTokenSource();
+    var cancelledHeaders = new ScriptedDownloadHandler((_, cancellation) =>
+    { headerCancellation.Cancel(); return Task.FromCanceled<HttpResponseMessage>(cancellation); });
+    failure = await Download("cancelled-headers", cancelledHeaders, headerCancellation.Token);
+    check(failure is OperationCanceledException && cancelledHeaders.Requests == 1 && NoPartialOrDestination("cancelled-headers"),
+        "Caller cancellation while waiting for headers remains cancellation and never retries");
+    using var bodyCancellation = new CancellationTokenSource();
+    var cancelledBody = new ScriptedDownloadHandler((_, _) => Task.FromResult(Response(
+        new DownloadTestStream(data[..3], stallAtEnd: true, onStall: bodyCancellation.Cancel))));
+    failure = await Download("cancelled-body", cancelledBody, bodyCancellation.Token);
+    check(failure is OperationCanceledException && cancelledBody.Requests == 1 && NoPartialOrDestination("cancelled-body"),
+        "Caller cancellation during a body read remains cancellation and removes the owned partial without retry");
+
+    var failedProgress = new ScriptedDownloadHandler((_, _) => Task.FromResult(Response()));
+    failure = await Download("failed-progress", failedProgress,
+        progress: new InlineProgress(_ => throw new IOException("offline local progress failure")));
+    check(failure is IOException && failure.Message == "offline local progress failure" && failedProgress.Requests == 1 && NoPartialOrDestination("failed-progress"),
+        "A local progress callback IOException is not mistaken for a retryable network failure");
+}
+
+internal sealed class ScriptedDownloadHandler(Func<int, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler
+{
+    internal int Requests { get; private set; }
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+        send(++Requests, cancellationToken);
+}
+
+internal sealed class DownloadTestStream(byte[] data, int chunkSize = int.MaxValue, TimeSpan readDelay = default,
+    bool stallAtEnd = false, bool failAtEnd = false, Action? onStall = null) : Stream
+{
+    private int _position;
+    public override bool CanRead => true;
+    public override bool CanSeek => false;
+    public override bool CanWrite => false;
+    public override long Length => throw new NotSupportedException();
+    public override long Position { get => _position; set => throw new NotSupportedException(); }
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        if (_position == data.Length)
+        {
+            if (failAtEnd) throw new IOException("offline response connection reset");
+            if (stallAtEnd) { onStall?.Invoke(); await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken); }
+            return 0;
+        }
+        if (readDelay > TimeSpan.Zero) await Task.Delay(readDelay, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        int count = Math.Min(Math.Min(buffer.Length, chunkSize), data.Length - _position);
+        data.AsMemory(_position, count).CopyTo(buffer);
+        _position += count;
+        return count;
+    }
+    public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    public override void Flush() => throw new NotSupportedException();
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    public override void SetLength(long value) => throw new NotSupportedException();
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 }
 
 internal sealed class FakeDownloadHandler : HttpMessageHandler
