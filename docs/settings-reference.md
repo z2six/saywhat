@@ -8,6 +8,8 @@ Home's everyday voice choices wait for their card's Apply action. Other settings
 
 The persisted application settings file is `vrchat-translation-settings.json` in the [per-user data directory](privacy-and-storage.md). The tables give its key names for technical inspection. They are settings, not a stable third-party API. UI labels may change or be translated; compatibility keys still use some older `Speaker` names.
 
+The app also maintains `own-voice-runtime.json`, a small derived view read by the microphone controller and capture host. A growing custom-profile library in the main settings file therefore does not enlarge each worker settings read. Change these choices in the app rather than editing the derived file. Legacy standalone capture roots without that file can still read the main settings file; an invalid derived file is reported rather than silently replaced with older choices.
+
 ## Everyday voice controls on Home
 
 Choose **I speak**, target-language chips, a speech-model card or a translator card directly. These edits stay pending together; clicking a choice does not save it, download a model or restart translation. The microphone follows the Windows default unless you select another device.

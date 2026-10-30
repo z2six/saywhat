@@ -13,7 +13,7 @@ const allowedModes = new Set(['100644', '100755']);
 const assetExtensions = /\.(?:png|jpe?g|gif|webp|ico|bmp|ttf|otf|woff2?)$/i;
 const binaryExtensions = /\.(?:exe|dll|pdb|zip|tar|tgz|gz|bz2|7z|gguf|onnx|safetensors|pt|pth|ckpt|bin|wav|mp3|flac|ogg|m4a|mp4|webm|log|dmp|cache|bak|backup|tmp|user|suo|key|pem|pfx|p12|kdbx)$/i;
 const privateBaseNames = new Set([
-  'vrchat-translation-settings.json', 'incoming-speaker-feedback.json',
+  'vrchat-translation-settings.json', 'own-voice-runtime.json', 'incoming-speaker-feedback.json',
   'incoming-ai-speaker-profiles.json', 'provisioning.json', 'setup-progress.json',
   'own-voice-setup-progress.json', 'incoming-voice-setup-progress.json',
   'ui-language.json', 'credentials', 'credentials.json', 'credentials.toml',
@@ -30,7 +30,7 @@ function pathProblems(name, mode = '100644', bytes = 0, linked = false) {
     problems.push('invalid repository path');
   if (!allowedModes.has(mode) || linked) problems.push('symlink or submodule');
   if (parts.slice(0, -1).some(part => privateDirectories.test(part))) problems.push('generated or private directory');
-  if (privateBaseNames.has(base) || /^\.env(?:\.|$)/i.test(base) || /^\.dev\.vars/i.test(base) ||
+  if (privateBaseNames.has(base.replace(/\.tmp-[a-f0-9]{32}$/i, '')) || /^saywhat-support-.*\.txt(?:\.tmp-[a-f0-9]{32})?$/i.test(base) || /^\.env(?:\.|$)/i.test(base) || /^\.dev\.vars/i.test(base) ||
       /^config(?:\..+)?\.jsonc$/i.test(base) && !/^config\.example\.jsonc$/i.test(base))
     problems.push('runtime preferences or credentials file');
   if (binaryExtensions.test(base)) problems.push('compiled, model, recording or runtime artifact');
@@ -175,6 +175,8 @@ function selfTest() {
   for (const name of ['artifacts/app/SayWhat.exe', 'LocalTalk/obj/project.assets.json', '.wrangler/state.json', '.env', 'credentials.json', 'models/asr/model.onnx', 'people-photos/person.png', 'incoming-speaker-feedback.json', 'config.fast-chinese.jsonc', 'recordings/voice.wav', 'Packaging/tools/runtime.zip', '.ssh/id_ed25519'])
     check(pathProblems(name).length > 0, `private/generated file rejected: ${name}`);
   check(pathProblems('docs/link.md', '120000').includes('symlink or submodule'), 'symlink index mode rejected');
+  for (const name of ['own-voice-runtime.json', 'own-voice-runtime.json.tmp-' + 'a'.repeat(32), 'SayWhat-support-20261030-120000.txt', 'saywhat-support-last-failure.txt'])
+    check(pathProblems(name).includes('runtime preferences or credentials file'), `support/runtime data rejected: ${name}`);
   check(pathProblems('vendor/repository', '160000').includes('symlink or submodule'), 'submodule index mode rejected');
   check(pathProblems('docs/redirect.md', '100644', 1, true).includes('symlink or submodule'), 'filesystem link rejected');
   check(pathProblems('LocalTalk/too-large.cs', '100644', maxFileBytes + 1).includes('file exceeds 10 MiB'), 'oversized file rejected');

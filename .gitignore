@@ -66,6 +66,8 @@ data/
 *.pcm
 *.log
 vrchat-translation-settings.json
+own-voice-runtime.json*
+[Ss]ay[Ww]hat-support-*.txt*
 incoming-speaker-feedback.json
 incoming-ai-speaker-profiles.json
 provisioning.json

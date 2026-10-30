@@ -9,7 +9,7 @@
     <AssemblyName>SayWhat</AssemblyName>
     <StartupObject>IncomingTranslator.LocalTalkEntry</StartupObject>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <Version>0.2.13</Version>
+    <Version>0.2.14</Version>
     <ApplicationIcon>Assets/SayWhat.ico</ApplicationIcon>
     <Product>SayWhat?</Product>
     <Title>SayWhat?</Title>
@@ -25,6 +25,7 @@
     <Compile Include="../FoxTransSource/FoxTrans/Providers/TranslationModelCapabilities.cs" Link="Core/TranslationModelCapabilities.cs" />
     <Compile Include="../FoxTransSource/FoxTrans/Providers/RecognitionTextFilter.cs" Link="Core/RecognitionTextFilter.cs" />
     <Compile Include="../IncomingTranslator/AppSettings.cs" Link="Core/AppSettings.cs" />
+    <Compile Include="../IncomingTranslator/OwnVoiceRuntimePreferences.cs" Link="Core/OwnVoiceRuntimePreferences.cs" />
     <Compile Include="../IncomingTranslator/SessionEndpoints.cs" Link="Core/SessionEndpoints.cs" />
     <Compile Include="../IncomingTranslator/TranslationProfiles.cs" Link="Core/TranslationProfiles.cs" />
     <Compile Include="../IncomingTranslator/IncomingPipelineProfiles.cs" Link="Core/IncomingPipelineProfiles.cs" />

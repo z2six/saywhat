@@ -9,10 +9,10 @@ using System.Text.Json.Nodes;
 // model loading, audio capture, protection-setting changes or installer execution.
 internal static class Program
 {
-    private static readonly string[] Preferences = ["vrchat-translation-settings.json", "config.fast-chinese.jsonc", "config.sentence-mode.jsonc",
-        "config.fast-chinese.jsonc.tmp-0123456789abcdef0123456789abcdef"];
+    private static readonly string[] Preferences = ["vrchat-translation-settings.json", "own-voice-runtime.json", "config.fast-chinese.jsonc", "config.sentence-mode.jsonc",
+        "config.fast-chinese.jsonc.tmp-0123456789abcdef0123456789abcdef", "own-voice-runtime.json.tmp-0123456789abcdef0123456789abcdef"];
     private static readonly string[] History = ["incoming-ai-speaker-profiles.json", "incoming-speaker-feedback.json", "incoming-speaker-profiles.json",
-        "saywhat.log", "localtalk.log", "incoming-translator.log", "incoming-vr-overlay.log", "foxtrans-local-host.log", "foxtrans-mute-sync.log",
+        "saywhat.log", "localtalk.log", "saywhat-support-last-failure.txt", "saywhat-support-last-failure.txt.tmp-0123456789abcdef0123456789abcdef", "incoming-translator.log", "incoming-vr-overlay.log", "foxtrans-local-host.log", "foxtrans-mute-sync.log",
         "foxtrans-osc-sentence.log", "foxtrans-provider-errors.log", "incoming-ai-speaker-profiles.json.before-named-feedback-v1.backup",
         "incoming-ai-speaker-profiles.json.backup-20261005-123456-1234567", "incoming-speaker-feedback.json.tmp-0123456789abcdef0123456789abcdef",
         "incoming-ai-speaker-profiles.json.tmp", "people-photos/0123456789abcdef0123456789abcdef.png",

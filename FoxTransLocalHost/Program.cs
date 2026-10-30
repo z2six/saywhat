@@ -39,7 +39,7 @@ internal static class LocalHost
     {
         try
         {
-            using var settings = JsonDocument.Parse(File.ReadAllText(Path.Combine(Root, "vrchat-translation-settings.json")));
+            using var settings = IncomingTranslator.OwnVoiceRuntimePreferences.Read(Root);
             return !settings.RootElement.TryGetProperty("FinishCapturedSentenceOnMute", out var flag) || flag.GetBoolean();
         }
         catch { return true; }
@@ -49,7 +49,7 @@ internal static class LocalHost
     {
         try
         {
-            using var settings = JsonDocument.Parse(File.ReadAllText(Path.Combine(Root, "vrchat-translation-settings.json")));
+            using var settings = IncomingTranslator.OwnVoiceRuntimePreferences.Read(Root);
             return ResolveEarlyPreviewPreference(settings.RootElement);
         }
         catch (FileNotFoundException) { return false; }
@@ -82,9 +82,7 @@ internal static class LocalHost
     }
     internal static OwnVoiceLivePreferences ReadLivePreferences(OwnVoiceLivePreferences fallback)
     {
-        string path = Path.Combine(Root, "vrchat-translation-settings.json");
-        if (new FileInfo(path).Length > 65536) throw new IOException("Preferences exceed the safe size limit.");
-        using var document = JsonDocument.Parse(File.ReadAllText(path));
+        using var document = IncomingTranslator.OwnVoiceRuntimePreferences.Read(Root);
         return ResolveLivePreferences(document.RootElement, fallback);
     }
     internal sealed record OwnRecognitionPreferences(bool Native, string Language);
@@ -106,11 +104,12 @@ internal static class LocalHost
     }
     internal static OwnRecognitionPreferences ReadRecognitionPreferences()
     {
-        string path = Path.Combine(Root, "vrchat-translation-settings.json");
-        if (!File.Exists(path)) return new(false, "auto"); // Legacy configurations keep their existing provider.
-        if (new FileInfo(path).Length > 65536) throw new IOException("Preferences exceed the safe size limit.");
-        using var document = JsonDocument.Parse(File.ReadAllText(path));
-        return ResolveRecognitionPreferences(document.RootElement);
+        try
+        {
+            using var document = IncomingTranslator.OwnVoiceRuntimePreferences.Read(Root);
+            return ResolveRecognitionPreferences(document.RootElement);
+        }
+        catch (FileNotFoundException) { return new(false, "auto"); } // Legacy configurations keep their existing provider.
     }
 
     internal sealed record OwnVoiceLanguages(IReadOnlyList<string> Targets, string? Glossary = null,
@@ -122,14 +121,12 @@ internal static class LocalHost
 
     internal static OwnVoiceLanguages ReadOwnVoiceLanguages()
     {
-        string path = Path.Combine(Root, "vrchat-translation-settings.json");
         try
         {
-            if (!File.Exists(path)) return OwnVoiceLanguages.Disabled;
-            if (new FileInfo(path).Length > 65536) throw new IOException("Preferences exceed the safe size limit.");
-            using var settings = JsonDocument.Parse(File.ReadAllText(path));
+            using var settings = IncomingTranslator.OwnVoiceRuntimePreferences.Read(Root);
             return ResolveOwnVoiceLanguages(settings.RootElement);
         }
+        catch (FileNotFoundException) { return OwnVoiceLanguages.Disabled; }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException)
         {
             Log("WARN Multiple chat languages could not be read; using the existing single-language translation configuration.");
@@ -196,7 +193,8 @@ internal static class LocalHost
                     throw new ArgumentException("Self-tests require --root with an existing, isolated absolute test directory.");
                 string testRoot = Path.GetFullPath(args[index + 1]);
                 if (!Directory.Exists(testRoot) || File.Exists(Path.Combine(testRoot, "config.fast-chinese.jsonc")) ||
-                    File.Exists(Path.Combine(testRoot, "vrchat-translation-settings.json")))
+                    File.Exists(Path.Combine(testRoot, "vrchat-translation-settings.json")) ||
+                    File.Exists(Path.Combine(testRoot, IncomingTranslator.OwnVoiceRuntimePreferences.FileName)))
                     throw new ArgumentException("The self-test root must be an existing isolated directory without live settings.");
                 Root = testRoot;
                 LogPath = Path.Combine(Root, "foxtrans-local-host-tests.log");
@@ -277,6 +275,7 @@ internal static class LocalHost
                 Log("CAPTURE quiesced; the permitted captured sentence and output drain have finished; awaiting reconfiguration.");
             }
             string instance = Guid.NewGuid().ToString("N");
+            Log("SAYWHAT_STATUS component=microphone-host event=control-ready");
             Log($"Local FoxTrans v2.0.0 fork ready. Control 127.0.0.1:{port}; microphone {plan.Audio.DisplayName}; real PCM silence {livePreferences.PauseMilliseconds} ms; recognizer={(recognition.Native ? "nemotron" : "voxtral")}; language={recognition.Language}.");
             Log(earlyPreviews ? $"Cumulative early chat previews enabled; translation groups are throttled to at least {1500 * Math.Max(1, ownLanguages.Targets.Count)} ms." : "Final-only chat output enabled; early previews are disabled.");
             if (ownLanguages.Multiple)
@@ -453,7 +452,31 @@ internal static class LocalHost
             return 0;
         }
         catch (OperationCanceledException) when (shutdown.IsCancellationRequested) { return controlFailure is null ? 0 : 1; }
-        catch (Exception error) { Log("FATAL: " + error); return 1; }
+        catch (Exception error) { Log(SupportFailureLine(error)); Log("FATAL: " + error); return 1; }
+    }
+
+    internal static string SupportFailureLine(Exception error)
+    {
+        Exception cause = error.GetBaseException();
+        // A generic access failure might concern a model/configuration file,
+        // not the microphone. Do not claim microphone permission denial unless
+        // the capture API supplies specific typed evidence.
+        string code = cause switch
+        {
+            DllNotFoundException => "native-library-missing",
+            BadImageFormatException or EntryPointNotFoundException => "native-library-invalid",
+            AudioDeviceSelectionException { NativeCode: -6 } => "microphone-access-denied",
+            AudioDeviceSelectionException => "microphone-unavailable",
+            UnauthorizedAccessException => "access-denied",
+            System.Net.Sockets.SocketException => "endpoint-unavailable",
+            HttpRequestException or WebSocketException => "provider-connection-failed",
+            _ => "host-failed"
+        };
+        int? nativeCode = cause is AudioDeviceSelectionException audio ? audio.NativeCode
+            : cause is System.ComponentModel.Win32Exception win32 ? win32.NativeErrorCode : null;
+        string native = nativeCode is int number ? " native=" + number.ToString(System.Globalization.CultureInfo.InvariantCulture) : "";
+        return "SAYWHAT_STATUS component=microphone-host event=failed code=" + code +
+            " hresult=0x" + unchecked((uint)cause.HResult).ToString("X8", System.Globalization.CultureInfo.InvariantCulture) + native;
     }
 
     // A provider/translation failure belongs to one captured turn. It must not
@@ -687,6 +710,8 @@ internal static class LocalHost
                             // A final alone is not success: defer final output until
                             // the mandatory session.completed acknowledgment arrives.
                             Log("ASR server final received for captured audio.");
+                            Log("SAYWHAT_STATUS component=microphone-host event=recognition-final chars=" +
+                                Math.Min(1_000_000, partial.Text.Length).ToString(System.Globalization.CultureInfo.InvariantCulture));
                             turn?.Stage("asr-final", $"recognized_chars={partial.Text.Length}");
                         }
                     }
@@ -1019,6 +1044,7 @@ internal sealed class ContinuousCapture(IAudioSource microphone, Action stopCapt
         long quietSamples = 0;
         int consecutiveVoice = 0;
         int frameCount = 0, voiceFrames = 0, opened = 0;
+        bool captureReadyReported = false;
         double maxRms = 0;
         bool backpressure = false;
         long skippedSamples = 0;
@@ -1031,6 +1057,11 @@ internal sealed class ContinuousCapture(IAudioSource microphone, Action stopCapt
             await foreach (AudioFrame frame in microphone.ReadFramesAsync(token).WithCancellation(token))
             {
                 int samples = frame.Pcm.Length / 2;
+                if (samples > 0 && !captureReadyReported)
+                {
+                    captureReadyReported = true;
+                    LocalHost.Log("SAYWHAT_STATUS component=microphone-host event=capture-ready");
+                }
                 double sum = 0;
                 ReadOnlySpan<byte> pcm = frame.Pcm.Span;
                 for (int i = 0; i + 1 < pcm.Length; i += 2)
@@ -1115,6 +1146,10 @@ internal sealed class ContinuousCapture(IAudioSource microphone, Action stopCapt
                 if (now - lastLog >= TimeSpan.FromSeconds(5))
                 {
                     LocalHost.Log($"CAPTURE levels: frames={frameCount}, voiced={voiceFrames}, maxRms={maxRms:F5}, activeTurn={current is not null}, queuedTurns={turns.Reader.Count}.");
+                    LocalHost.Log("SAYWHAT_STATUS component=microphone-host event=capture-levels frames=" +
+                        frameCount.ToString(System.Globalization.CultureInfo.InvariantCulture) + " voiced=" +
+                        voiceFrames.ToString(System.Globalization.CultureInfo.InvariantCulture) + " peak=" +
+                        Math.Clamp((int)Math.Round(maxRms * 1_000_000), 0, 1_000_000).ToString(System.Globalization.CultureInfo.InvariantCulture));
                     lastLog = now; maxRms = 0;
                 }
             }
@@ -1217,6 +1252,8 @@ internal sealed class FinalOscSink(ResolvedOscEndpoint endpoint, string session,
             session, LocalHost.FormatChatDisplay(update.Text, multipleLanguages));
         await udp.SendAsync(packet, new IPEndPoint(IPAddress.Parse(endpoint.Host == "localhost" ? "127.0.0.1" : endpoint.Host), endpoint.Port), token);
         FinalCount++;
+        LocalHost.Log("SAYWHAT_STATUS component=microphone-host event=chat-queued chars=" +
+            Math.Min(1_000_000, update.Text.Length).ToString(System.Globalization.CultureInfo.InvariantCulture));
         LocalHost.Log($"FINAL queued e{update.TranscriptEpoch}/u{update.UtteranceId}; {update.Text.Length} translated chars.");
         turn?.Stage("final-queued", $"translated_chars={update.Text.Length}");
     }
@@ -1231,10 +1268,15 @@ internal sealed class MetadataReporter(CapturedTurn? turn = null, bool previews 
     public void Report(AppEvent item)
     {
         if (item.Kind == AppEventKind.TranslationRequestStarted)
+        {
+            LocalHost.Log("SAYWHAT_STATUS component=microphone-host event=translation-start");
             turn?.Stage("translation-start");
+        }
         else if (item.Kind == AppEventKind.RealtimeTranslationCompleted && item.TranslationTelemetry is { } t)
         {
             LocalHost.Log($"LLM e{t.TranscriptEpoch}/u{t.UtteranceId}/r{t.RequestedRevision}: {t.Disposition}; {t.TranslationDuration.TotalMilliseconds:F0} ms.");
+            LocalHost.Log("SAYWHAT_STATUS component=microphone-host event=translation-completed duration_ms=" +
+                Math.Clamp((long)t.TranslationDuration.TotalMilliseconds, 0, 86_400_000).ToString(System.Globalization.CultureInfo.InvariantCulture));
             turn?.Stage("translation-completed", $"duration_ms={t.TranslationDuration.TotalMilliseconds:F0}; disposition={t.Disposition}");
         }
         else if (item.Kind is AppEventKind.RealtimeTranslationFailed or AppEventKind.OutputError or AppEventKind.RealtimeOutputTimedOut)

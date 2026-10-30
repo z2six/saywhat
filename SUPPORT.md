@@ -12,15 +12,13 @@ You do not need subtitles running to translate your own microphone.
 
 ## Report a problem
 
-Include:
+Open **Settings → Problems & logs → Open troubleshooting**, also available under **Advanced → Diagnostics**, and choose **Save support report…**. Attach that text file to an issue with a short description of what failed. The report includes the app/Windows versions, built-in model and language choices, known error codes and recent pipeline progress. It leaves out speech, conversation text, saved names, device names, file paths and raw exception messages. **Copy diagnostics** remains available for a shorter summary.
 
-- Your SayWhat? version and Windows version.
-- Which feature is affected: microphone translation, subtitles, setup, updates or another part of the app.
-- What you expected, what happened and steps that reproduce the issue.
-- The chosen speech recognizer, translator, spoken/output languages and profile, when relevant.
-- The visible error or diagnostics summary. For speed problems, describe approximately how long it takes and whether it eventually catches up.
+Saving the report does not record audio, start models, send a test chat or upload anything. It checks expected app files and briefly checks only local services already running under SayWhat?'s ownership. A stopped service is not itself a failure. A report can show the last observed stage; it cannot prove that VRChat displayed a UDP chat message.
 
-Open **Settings → Problems & logs → Open troubleshooting**, also available under **Advanced → Diagnostics**. **Recent issues** shows the stage where a failure occurred. Use **Copy diagnostics** first; it leaves out conversation text, names, file paths and raw exceptions.
+The app also keeps one local metadata-only failure snapshot, `saywhat-support-last-failure.txt`, in its [data folder](docs/privacy-and-storage.md). It is replaced after a new recent microphone failure and does not contact services. This can preserve evidence if the worker stops before you open troubleshooting.
+
+If useful, add whether the issue follows muting, an audio-device change, music or several people talking. For speed problems, an approximate delay and whether it catches up help. You do not need to collect every detailed log before reporting a problem.
 
 Detailed logs and screenshots may contain private conversations, saved names, photos or paths. Review them before posting. Never share passwords, API tokens, people-profile files or recordings you do not have permission to share.
 

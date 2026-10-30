@@ -98,7 +98,11 @@ After you apply, language and microphone changes may briefly hold capture while 
 
 ## Useful diagnostics
 
-Open **Settings → Problems & logs → Open troubleshooting**, or **Advanced → Diagnostics**. **Recent issues** gives stage-specific problem and recovery summaries. **Copy diagnostics** includes only fixed support codes, timings and safe status information—not conversation text, saved names, file paths or raw exceptions. The detailed-log view refreshes the selected log and follows its newest entries. Detailed exports can contain private content; review them before sharing.
+Open **Settings → Problems & logs → Open troubleshooting**, or **Advanced → Diagnostics**. **Recent issues** gives stage-specific problem and recovery summaries. Choose **Save support report…** for one shareable text file, or **Copy diagnostics** for the shorter summary. Both exclude speech, conversation text, saved/device names, file paths and raw exception messages. The report includes effective built-in model/language choices, Windows/CPU capabilities, known failure codes and recent numeric pipeline progress.
+
+These stages narrow the investigation without assuming the green running status means success: process started → control ready → actual audio frames → recognized text length → translation completion → local chat queued. Not every silence produces recognition; a queued chat is not proof that VRChat displayed it. Unknown startup failures stay unknown when the available evidence cannot establish a cause.
+
+Saving checks expected app files and briefly probes only already-running, app-owned local health endpoints. It does not start engines, record audio, send test chat or upload the report. The app also keeps `saywhat-support-last-failure.txt` in its data folder after a recent microphone failure; this automatic snapshot makes no health requests. Detailed-log views remain available, refresh the selected log and follow its newest entries. Those detailed exports can contain private content; review them before sharing.
 
 | Log | Useful for |
 | --- | --- |
@@ -117,4 +121,4 @@ Managed speech and translation ports are automatic by default. When checking an 
 
 ## Report a reproducible problem
 
-Use [GitHub Issues](https://github.com/z2six/saywhat/issues), including app/Windows versions, profile and incoming speech engine, model/runtime, shared/separate mode, active directions, pause/lookahead choices, expected behavior and a small redacted log excerpt. Note whether it happens only during overlap, music, mute/unmute, audio-device changes, or crowded worlds. If possible compare final-only versus early previews and optional voice recognition on versus off without changing every setting at once.
+Use [GitHub Issues](https://github.com/z2six/saywhat/issues), attach a saved support report and briefly describe what you expected and what happened. Add timing or a triggering action if you know it. Requesting or sharing detailed conversation logs should be a separate decision, not a prerequisite for reporting a failure. If comparing settings, change one factor at a time, such as final-only versus early previews or optional person matching on versus off.

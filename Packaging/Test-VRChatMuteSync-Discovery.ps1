@@ -10,7 +10,7 @@ $names = @('Get-VrChatTcpListeners', 'Get-VrChatCurrentLogHints', 'Get-VrChatQue
     'Test-VrChatHostInfo', 'ConvertFrom-VrChatMuteResponse', 'Test-VrChatCandidateCurrent',
     'Get-InitialMuteState', 'Update-UnverifiedMuteState', 'Set-MuteState', 'Read-OscString',
     'Add-OscString', 'Read-MuteSelf', 'Receive-VrChatOscPacket', 'Receive-PendingVrChatOsc',
-    'Resolve-OwnVoicePauseWhenVrchatMuted', 'Get-OwnVoicePauseWhenVrchatMuted', 'Update-MutePolicySetting', 'Apply-MutePolicy',
+    'Resolve-OwnVoicePauseWhenVrchatMuted', 'Read-OwnVoiceRuntimeSettings', 'Get-OwnVoicePauseWhenVrchatMuted', 'Update-MutePolicySetting', 'Apply-MutePolicy',
     'Get-VrChatQueryRemainingMilliseconds', 'ConvertFrom-VrChatQueryJson', 'Update-PendingMuteQuery')
 foreach ($name in $names) {
     $definition = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)

@@ -33,6 +33,7 @@ $script:lastMutePolicyCheck = [DateTime]::MinValue
 $script:lastMuteQueryProof = $null
 $script:pendingMuteQuery = $null
 $script:lastLogWriteWarning = [DateTime]::MinValue
+$script:hostRestartCount = 0
 
 function Send-LocalControl([string]$address, [bool]$value, [int]$port) {
     $buffer = [System.Collections.Generic.List[byte]]::new()
@@ -44,11 +45,49 @@ function Send-LocalControl([string]$address, [bool]$value, [int]$port) {
 }
 
 function Get-FinishCapturedSetting {
-    try {
-        $settings = Get-Content -LiteralPath (Join-Path $DataRoot 'vrchat-translation-settings.json') -Raw | ConvertFrom-Json
-        if ($null -ne $settings.FinishCapturedSentenceOnMute) { return [bool]$settings.FinishCapturedSentenceOnMute }
-    } catch { }
+    $settings = Read-OwnVoiceRuntimeSettings
+    if ($null -ne $settings -and $settings.PSObject.Properties['FinishCapturedSentenceOnMute'] -and
+        $settings.FinishCapturedSentenceOnMute -is [bool]) { return $settings.FinishCapturedSentenceOnMute }
     return $true
+}
+
+function Read-OwnVoiceRuntimeSettings {
+    $settingsStream = $null
+    try {
+        $path = Join-Path $DataRoot 'own-voice-runtime.json'
+        # A present but malformed projection must not revive a stale full file.
+        if (-not (Test-Path -LiteralPath $path)) { $path = Join-Path $DataRoot 'vrchat-translation-settings.json' }
+        $settingsStream = [IO.FileStream]::new($path, [IO.FileMode]::Open, [IO.FileAccess]::Read,
+            ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+        $buffer = New-Object byte[] 65537
+        $length = 0
+        while ($length -lt $buffer.Length) {
+            $count = $settingsStream.Read($buffer, $length, $buffer.Length - $length)
+            if ($count -eq 0) { break }
+            $length += $count
+        }
+        if ($length -gt 65536) { return $null }
+        $json = [Text.UTF8Encoding]::new($false, $true).GetString($buffer, 0, $length).TrimStart([char]0xFEFF)
+        if (-not $json.TrimStart().StartsWith('{')) { return $null }
+        return ($json | ConvertFrom-Json)
+    }
+    catch { return $null }
+    finally { if ($settingsStream) { $settingsStream.Dispose() } }
+}
+
+function Write-ControllerFailure([Exception]$exception) {
+    $cause = $exception.GetBaseException()
+    $code = 'controller-failed'
+    if ($cause -is [DllNotFoundException]) { $code = 'native-library-missing' }
+    elseif ($cause -is [BadImageFormatException] -or $cause -is [EntryPointNotFoundException]) { $code = 'native-library-invalid' }
+    elseif ($cause -is [UnauthorizedAccessException]) { $code = 'access-denied' }
+    elseif ($cause -is [Net.Sockets.SocketException]) { $code = 'endpoint-unavailable' }
+    $line = 'SAYWHAT_STATUS component=microphone-controller event=failed code=' + $code +
+        ' hresult=0x' + $cause.HResult.ToString('X8', [Globalization.CultureInfo]::InvariantCulture)
+    if ($cause -is [ComponentModel.Win32Exception]) {
+        $line += ' native=' + $cause.NativeErrorCode.ToString([Globalization.CultureInfo]::InvariantCulture)
+    }
+    Write-Status $line
 }
 
 function Write-Status([string]$message) {
@@ -125,6 +164,10 @@ function Start-FoxTransClient {
         return
     }
     if ($script:foxProcess -and $script:foxProcess.HasExited) {
+        if ($script:hostRestartCount -lt [int]::MaxValue) { $script:hostRestartCount++ }
+        Write-Status ('SAYWHAT_STATUS component=microphone-controller event=host-exited restart=' +
+            $script:hostRestartCount.ToString([Globalization.CultureInfo]::InvariantCulture) + ' exit=' +
+            $script:foxProcess.ExitCode.ToString([Globalization.CultureInfo]::InvariantCulture))
         Write-Status "FoxTrans exited with code $($script:foxProcess.ExitCode); reconnecting the provider."
         $script:foxProcess = $null
     }
@@ -134,6 +177,8 @@ function Start-FoxTransClient {
     $arguments = @("run", "--config", ('"' + $ConfigPath + '"'))
     if ($script:usesLocalHost) { $arguments += @('--root', ('"' + $DataRoot + '"'), '--control-port', $HostControlPort) }
     $script:foxProcess = Start-Process -FilePath $FoxTransPath -ArgumentList $arguments -NoNewWindow -PassThru -RedirectStandardError (Join-Path $DataRoot 'foxtrans-provider-errors.log')
+    Write-Status ('SAYWHAT_STATUS component=microphone-controller event=host-started restart=' +
+        $script:hostRestartCount.ToString([Globalization.CultureInfo]::InvariantCulture))
     $script:lastFoxActivity = [DateTime]::UtcNow
     $proxyInfo = Get-Item -LiteralPath $ProxyLogPath -ErrorAction SilentlyContinue
     $script:lastProxyLength = if ($proxyInfo) { $proxyInfo.Length } else { 0L }
@@ -193,34 +238,15 @@ function Stop-FoxTransClient([string]$reason = 'VRChat mic is MUTED') {
 
 function Resolve-OwnVoicePauseWhenVrchatMuted($settings) {
     # Missing, malformed and older preferences always retain the safe default.
-    if ($settings -is [System.Management.Automation.PSCustomObject] -and $settings.OwnVoicePauseWhenVrchatMuted -is [bool]) {
+    if ($settings -is [System.Management.Automation.PSCustomObject] -and $settings.PSObject.Properties['OwnVoicePauseWhenVrchatMuted'] -and
+        $settings.OwnVoicePauseWhenVrchatMuted -is [bool]) {
         return $settings.OwnVoicePauseWhenVrchatMuted
     }
     return $true
 }
 
 function Get-OwnVoicePauseWhenVrchatMuted {
-    $settingsStream = $null
-    try {
-        $path = Join-Path $DataRoot 'vrchat-translation-settings.json'
-        $settingsStream = [IO.FileStream]::new($path, [IO.FileMode]::Open, [IO.FileAccess]::Read,
-            ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
-        $buffer = New-Object byte[] 65537
-        $length = 0
-        while ($length -lt $buffer.Length) {
-            $count = $settingsStream.Read($buffer, $length, $buffer.Length - $length)
-            if ($count -eq 0) { break }
-            $length += $count
-        }
-        if ($length -gt 65536) { return $true }
-        $json = [Text.Encoding]::UTF8.GetString($buffer, 0, $length).TrimStart([char]0xFEFF)
-        # ConvertFrom-Json can unwrap a singleton root array through the pipeline.
-        # Check the root syntax first so malformed preference shapes fail closed.
-        if (-not $json.TrimStart().StartsWith('{')) { return $true }
-        return Resolve-OwnVoicePauseWhenVrchatMuted ($json | ConvertFrom-Json)
-    }
-    catch { return $true }
-    finally { if ($settingsStream) { $settingsStream.Dispose() } }
+    return Resolve-OwnVoicePauseWhenVrchatMuted (Read-OwnVoiceRuntimeSettings)
 }
 
 function Update-MutePolicySetting {
@@ -708,6 +734,7 @@ try {
     }
 }
 catch {
+    Write-ControllerFailure $_.Exception
     Write-Status "FATAL: $($_.Exception.Message)"
     Write-Host $_.Exception.ToString() -ForegroundColor Red
     exit 1

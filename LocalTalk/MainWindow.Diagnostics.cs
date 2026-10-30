@@ -13,6 +13,9 @@ internal sealed partial class MainWindow
     private TextBlock? _pipelineIssueText;
     private bool _refreshingDiagnostics;
     private string? _renderedIssueSignature;
+    private string? _lastAutomaticSupportIssue;
+    private DateTimeOffset _lastAutomaticSupportAt;
+    private bool _savingSupportReport;
 
     private FrameworkElement CreateRecentIssuesCard()
     {
@@ -30,6 +33,8 @@ internal sealed partial class MainWindow
         copy.Name = "CopySafeDiagnosticsButton"; actions.Children.Add(copy);
         var detail = ModernTheme.Button("View detailed logs", (_, _) => { _logView?.BringIntoView(); _logView?.Focus(); });
         detail.Name = "ViewDetailedLogsButton"; actions.Children.Add(detail);
+        var support = ModernTheme.Button("Save support report…", async (_, _) => await SaveSupportReportAsync());
+        support.Name = "SaveSupportReportButton"; actions.Children.Add(support);
         panel.Children.Add(actions);
         panel.Children.Add(ModernTheme.Label("Copied diagnostics exclude speech, names and file paths. Detailed logs may contain conversation text; review them before sharing.", 12, ModernTheme.Muted));
         RenderRecentIssues();
@@ -70,6 +75,7 @@ internal sealed partial class MainWindow
             if (_page is "Diagnostics" or "Home" || _runtime.OwnRunning || _runtime.IncomingRunning)
                 _diagnosticsSnapshot = await Task.Run(() => _diagnosticsMonitor.Read(DateTimeOffset.UtcNow));
             if (_closing) return;
+            await SaveAutomaticSupportReportAsync();
             if (_page == "Diagnostics") RenderRecentIssues();
             RenderPipelineIssue();
         }
@@ -107,6 +113,12 @@ internal sealed partial class MainWindow
 
     private void RenderPipelineIssue()
     {
+        if (_badges.TryGetValue("own", out var badge) && _runtime.OwnRunning)
+        {
+            bool needsAttention = _diagnosticsSnapshot.ActiveOwnIssue(DateTimeOffset.UtcNow) is not null;
+            UiLocalization.SetText(badge, needsAttention ? "Needs attention" : "● Translating");
+            badge.Foreground = needsAttention ? ModernTheme.Warning : ModernTheme.Good;
+        }
         if (_pipelineIssueBanner is null || _pipelineIssueText is null) return;
         string? message = null;
         var incoming = _runtime.IncomingHealth;
@@ -132,8 +144,65 @@ internal sealed partial class MainWindow
     private string SafeDiagnosticsText()
     {
         var incoming = _runtime.IncomingHealth;
+        var applied = _runtime.GetSupportContext(_settings);
         return DiagnosticsMonitor.BuildSafeSummary(_diagnosticsSnapshot, _runtime.OwnRunning, _runtime.IncomingRunning,
-            incoming?.Stage, incoming?.RecoveryCount ?? 0, incoming?.DroppedAudioChunks ?? 0);
+            incoming?.Stage, incoming?.RecoveryCount ?? 0, incoming?.DroppedAudioChunks ?? 0,
+            DiagnosticSupportContext.Create(applied.Own, applied.Incoming));
+    }
+
+    private async Task SaveSupportReportAsync()
+    {
+        if (_preview || _savingSupportReport || _closing) return;
+        var picker = new Microsoft.Win32.SaveFileDialog
+        {
+            Filter = "Text report (*.txt)|*.txt", DefaultExt = ".txt", AddExtension = true,
+            FileName = "SayWhat-support-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss") + ".txt"
+        };
+        if (picker.ShowDialog(this) != true) return;
+        _savingSupportReport = true;
+        UiLocalization.SetText(_status, "Preparing support report");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        try
+        {
+            CancellationToken token = timeout.Token;
+            _diagnosticsSnapshot = await Task.Run(() => _diagnosticsMonitor.Read(DateTimeOffset.UtcNow), token);
+            var checks = await Task.Run(() => SupportReportChecks.InspectFiles(AppContext.BaseDirectory, AppPaths.Root), token);
+            var services = await SupportReportChecks.ProbeAsync(_runtime.GetSupportServiceTargets(), token);
+            string report = SupportReportChecks.Append(SafeDiagnosticsText(), checks.Concat(services), _oscConnection.State);
+            await File.WriteAllTextAsync(picker.FileName, report, token);
+            UiLocalization.SetText(_status, "Support report saved. No speech, names or file paths are included.");
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or OperationCanceledException or System.Security.SecurityException)
+        { UiLocalization.SetText(_status, "Couldn't save the support report. Try a different folder."); }
+        finally { _savingSupportReport = false; }
+    }
+
+    private async Task SaveAutomaticSupportReportAsync()
+    {
+        // Keep one local snapshot for a genuine recent failure. It is never
+        // uploaded, and never starts a model, probe, chat test or audio device.
+        if (_preview || _closing) return;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        var issue = _diagnosticsSnapshot.Issues.FirstOrDefault(item => !item.Recovered &&
+            item.Area == DiagnosticArea.OwnVoice && now >= item.At && now - item.At < TimeSpan.FromMinutes(2));
+        if (issue is null) return;
+        string signature = issue.Code + ":" + issue.At.UtcTicks;
+        if (signature == _lastAutomaticSupportIssue || now - _lastAutomaticSupportAt < TimeSpan.FromSeconds(15)) return;
+        string summary = SafeDiagnosticsText(); var osc = _oscConnection.State;
+        try
+        {
+            await Task.Run(() =>
+            {
+                string report = SupportReportChecks.Append(summary, SupportReportChecks.InspectFiles(AppContext.BaseDirectory, AppPaths.Root), osc);
+                string path = Path.Combine(AppPaths.Root, SupportReportChecks.LastFailureFile);
+                string temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");
+                try { File.WriteAllText(temporary, report); File.Move(temporary, path, overwrite: true); }
+                finally { if (File.Exists(temporary)) File.Delete(temporary); }
+            });
+            _lastAutomaticSupportIssue = signature; _lastAutomaticSupportAt = now;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        { /* Report storage is best effort and never interrupts translation. */ }
     }
 
     private void CopySafeDiagnostics()

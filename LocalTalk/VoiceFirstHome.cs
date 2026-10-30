@@ -12,6 +12,7 @@ internal sealed partial class MainWindow
     private StackPanel VoiceFirstHomePage()
     {
         var page = Page("");
+        page.Children.Add(CreatePipelineIssueBanner());
         var voice = new StackPanel();
         var heading = new DockPanel { LastChildFill = true };
         HomeOwnVoiceApplyState ownApplyState = GetHomeOwnVoiceApplyState();
@@ -151,7 +152,6 @@ internal sealed partial class MainWindow
         var ownCard = ModernTheme.Card(voice); ownCard.Name = "HomeOwnVoiceCard";
         ownCard.Background = ModernTheme.Hero; ownCard.BorderBrush = ModernTheme.HeroStroke;
         ownCard.Padding = new Thickness(20); page.Children.Add(ownCard);
-        page.Children.Add(CreatePipelineIssueBanner());
         page.Children.Add(CreateVoiceFirstSubtitleCard());
         if (_runtime.OwnRunning || _runtime.IncomingRunning)
             page.Children.Add(ModernTheme.Label("Stop all releases the translation models from memory.", 11, ModernTheme.Muted));
@@ -161,6 +161,10 @@ internal sealed partial class MainWindow
             ? "For your voice to appear in chat, turn on OSC in VRChat's Action Menu: OSC → Enabled. You only need to enable it once. Then unmute your VRChat microphone."
             : "For your voice to appear in chat, turn on OSC in VRChat's Action Menu: OSC → Enabled. You only need to enable it once.", 13, ModernTheme.Muted));
         vrchatHelp.Children.Add(ModernTheme.Button("Check connection again", async (_, _) => await CheckOscConnectionAsync(manual: true)));
+        var supportReport = ModernTheme.Button("Save support report…", async (_, _) => await SaveSupportReportAsync());
+        supportReport.Name = "HomeSaveSupportReportButton";
+        vrchatHelp.Children.Add(supportReport);
+        vrchatHelp.Children.Add(VoiceFirstLabel("Creates one report for support without recording your voice or uploading anything.", 12, ModernTheme.Muted));
         _oscHelp = new Expander { Content = vrchatHelp, Foreground = ModernTheme.Muted, Margin = new Thickness(0, 8, 0, 0) };
         // A literal parent would suppress live translations of status changes in
         // its children. Bind the header and keep the help body localizable.

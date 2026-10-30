@@ -19,6 +19,8 @@ Technical installations can override the root with `SAYWHAT_DATA_ROOT` (legacy `
 | File / folder under the root | Contents |
 | --- | --- |
 | `vrchat-translation-settings.json` | App choices, model selections, language/theme and one-time help preferences |
+| `own-voice-runtime.json` | Small derived view of current microphone settings for the capture worker; maintained by the app |
+| `saywhat-support-last-failure.txt` | Latest local metadata-only microphone failure snapshot; replaced rather than accumulating history |
 | `provisioning.json` | Managed/imported asset registrations, runtime and WSL speech registration |
 | `setup-progress.json` | Resumable setup stage/restart state |
 | `incoming-speaker-feedback.json` | Names, photo leaf names, reviewed positive/negative voice fingerprints with exact model provenance, bounded opaque review records and aggregate counters; no audio or transcript text |
@@ -38,7 +40,11 @@ These filenames are descriptive technical details, not a supported manual-edit A
 
 Live audio is buffered in memory with bounded queues; normal operation does not save raw audio recordings. Confirmed voice references are compact embeddings with their model identity and observation/quality metadata, not clips used for model-weight training. Embeddings can still be sensitive personal data; treat a copied profile database accordingly.
 
-Subtitle history and transcripts are displayed in memory, and incoming diagnostic logs **can persist source and translated text**. Some matching logs also contain names. The microphone host uses state/timing/count metadata rather than recording raw speech text, but not every log in the whole application is transcript-free. **Copy diagnostics** generates a whitelist-based summary without conversation text, names, file paths or raw exceptions. Detailed log exports still need review before sharing.
+Subtitle history and transcripts are displayed in memory, and incoming diagnostic logs **can persist source and translated text**. Some matching logs also contain names. The microphone host uses state/timing/count metadata rather than recording raw speech text, but not every log in the whole application is transcript-free. Detailed log exports still need review before sharing.
+
+**Copy diagnostics** and **Save support report…** produce allowlisted summaries without audio, conversation text, saved names, device names, file paths or raw exception messages. They can include Windows/process architecture, CPU AVX/AVX2 availability, built-in model/runtime IDs, language choices, mute policy, known exception categories/codes and numeric progress such as frame counts, text lengths and elapsed time. A manually saved report also checks required files and bounded health endpoints of already-running, app-owned loopback services. It does not contact a separately configured external translator, start an engine or audio device, or send chat. HTTP response bodies and endpoint addresses are not included.
+
+After a recent microphone failure, SayWhat? keeps one local support snapshot using the same safe metadata and file checks, without health requests. Reports and snapshots are not uploaded automatically. The Save action writes to the location you choose; sharing that file remains your decision. A local OSC-ready state or queued-message count is not evidence that VRChat displayed a message.
 
 Optional separator evaluation reads an explicitly selected local WAV. Choosing **Export anonymous sources** writes two estimated recordings to the user's selected files; that explicit export is different from ordinary live capture's no-recording behavior. Do not share somebody else's voice samples without appropriate permission.
 

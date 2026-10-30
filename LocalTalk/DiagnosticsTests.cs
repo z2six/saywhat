@@ -100,12 +100,121 @@ internal static class DiagnosticsTests
         Check(DiagnosticsMonitor.TryParse(Stamp(now, "expired-captured-finals: 1 queued muted final(s) expired."), "foxtrans-osc-sentence.log", out var expired) && expired?.Code == "chat-message-dropped", "finished messages expiring before send are surfaced");
         Check(DiagnosticsMonitor.TryParse(Stamp(now, "fatal: " + privateText), "foxtrans-osc-sentence.log", out var fatal) && fatal?.Code == "chat-connection-stopped" && !fatal.Message.Contains("PRIVATE"), "proxy fatal errors are actionable but text-free");
         Check(!DiagnosticsMonitor.TryParse(Stamp(now, "discarded-muted-final: expected-configured-discard"), "foxtrans-osc-sentence.log", out _), "intentional mute discard is not mislabeled as a broken pipeline");
+        Check(DiagnosticsMonitor.TryParse(Stamp(now, "FATAL: System.InvalidOperationException: " + privateText), "foxtrans-local-host.log", out var hostFatal) &&
+            hostFatal?.Code == "microphone-host-stopped" && hostFatal.Evidence?.Component == "microphone-host",
+            "a host fatal is no longer mislabeled as a controller failure");
+        Check(DiagnosticsMonitor.TryParse(Stamp(now, "FATAL: " + privateText), "foxtrans-mute-sync.log", out var controllerFatal) &&
+            controllerFatal?.Code == "microphone-controller-stopped" && controllerFatal.Evidence?.Component == "microphone-controller",
+            "a controller-owned fatal keeps its exact component without guessing a cause");
+        Check(DiagnosticsMonitor.TryParse(Stamp(now, "Microphone mute controller: [2026-10-06T12:00:00Z] FATAL: System.InvalidOperationException: " + privateText),
+            "saywhat.log", out var inheritedFatal) && inheritedFatal?.Code == "microphone-process-stopped" && inheritedFatal.Evidence?.Component == "unknown",
+            "legacy inherited stdout does not falsely identify the failed child as its controller");
+        Check(DiagnosticsMonitor.TryParse(Stamp(now, "FATAL: System.DllNotFoundException: " + privateText), "foxtrans-local-host.log", out var missingLibrary) &&
+            missingLibrary?.Code == "native-library-missing" && missingLibrary.Evidence?.ExceptionType == "DllNotFoundException" &&
+            !missingLibrary.Message.Contains("PRIVATE", StringComparison.Ordinal), "anchored native-loader failures have fixed, actionable evidence");
+        Check(DiagnosticsMonitor.TryParse(Stamp(now, "FATAL: AudioDeviceSelectionException: No microphone input devices are available. " + privateText),
+            "foxtrans-local-host.log", out var noMicrophone) && noMicrophone?.Code == "microphone-unavailable",
+            "typed audio-device failure is distinguished without retaining device names");
+        Check(DiagnosticsMonitor.TryParse(Stamp(now, "FATAL: System.UnauthorizedAccessException: " + privateText), "foxtrans-local-host.log", out var accessDenied) &&
+            accessDenied?.Code == "access-denied" && accessDenied.Code != "microphone-access-denied", "generic access denial does not invent a microphone-permission diagnosis");
+        Check(DiagnosticsMonitor.TryParse(Stamp(now, "FATAL: System.Runtime.InteropServices.COMException (0x80070005): " + privateText), "foxtrans-local-host.log", out var comDenied) &&
+            comDenied?.Evidence?.HResult == "0x80070005" && comDenied.Code == "access-denied", "known HRESULT evidence survives without arbitrary COM text");
+        Check(DiagnosticsMonitor.TryParse(Stamp(now, "FATAL: System.IO.IOException (0x80070020): " + privateText), "foxtrans-local-host.log", out var lockedFile) &&
+            lockedFile?.Code == "file-in-use", "typed file-sharing HRESULT has its own diagnosis");
+        Check(DiagnosticsMonitor.TryParse(Stamp(now, "FATAL: System.Net.Sockets.SocketException (10048): " + privateText), "foxtrans-local-host.log", out var occupiedPort) &&
+            occupiedPort?.Code == "port-in-use" && occupiedPort.Evidence?.NativeCode == 10048, "a known socket port conflict keeps only its numeric evidence");
+        Check(DiagnosticsMonitor.TryParse(Stamp(now, "FATAL: System.Net.Http.HttpRequestException: " + privateText), "foxtrans-local-host.log", out var unavailableProvider) &&
+            unavailableProvider?.Code == "provider-connection-failed", "typed HTTP failure is a local-service failure without exporting its URL");
+        Check(DiagnosticsMonitor.TryParse(Stamp(now, "FATAL: " + privateText + " System.DllNotFoundException (0x8007007E):"), "foxtrans-local-host.log", out var fakeTypedFatal) &&
+            fakeTypedFatal?.Evidence?.Category == "unknown" && fakeTypedFatal.Evidence.ExceptionType is null,
+            "exception-like words in an arbitrary message never become typed failure evidence");
+        Check(DiagnosticsMonitor.SafeFatalDiagnosticLine(Stamp(now, "FATAL: System.IO.IOException (0x80070020): " + privateText)) ==
+            "FATAL: IOException (0x80070020):", "supervised fatal normalization excludes the original body and path");
+        Check(DiagnosticsMonitor.SafeFatalDiagnosticLine(Stamp(now, "Source: FATAL: System.DllNotFoundException: " + privateText)) is null,
+            "speech containing a fatal-looking sentence is never normalized as process evidence");
+        string Status(string body) => Stamp(now, body).TrimEnd('\r', '\n');
+        const string hostStarted = "SAYWHAT_STATUS component=microphone-controller event=host-started restart=1";
+        const string hostControlReady = "SAYWHAT_STATUS component=microphone-host event=control-ready";
+        const string captureReadyStatus = "SAYWHAT_STATUS component=microphone-host event=capture-ready";
+        Check(!DiagnosticsMonitor.TryParse(Status(hostStarted), "foxtrans-mute-sync.log", out _) &&
+            !DiagnosticsMonitor.TryParse(Status(hostControlReady), "foxtrans-local-host.log", out _),
+            "normal process/control readiness creates report metadata rather than a false Recent issue");
+        Check(DiagnosticsMonitor.TryParse(Status(captureReadyStatus), "foxtrans-local-host.log", out var actualCaptureReady) &&
+            actualCaptureReady?.Code == "capture-recovered" && actualCaptureReady.Recovered, "actual PCM capture readiness has its own scoped recovery");
+        Check(DiagnosticsMonitor.TryParse(Status("SAYWHAT_STATUS component=microphone-host event=failed code=microphone-access-denied hresult=0x80070005"),
+            "foxtrans-local-host.log", out var typedAccess) && typedAccess?.Code == "microphone-access-denied" && typedAccess.Evidence?.HResult == "0x80070005",
+            "a producer's explicit microphone-permission code can be distinguished from generic access denial");
+        Check(DiagnosticsMonitor.TryParse(Status("SAYWHAT_STATUS component=microphone-controller event=failed code=controller-failed hresult=0x80070020"),
+            "foxtrans-mute-sync.log", out var typedLockedFile) && typedLockedFile?.Code == "file-in-use",
+            "a generic typed failure with a known sharing HRESULT is refined without retaining its exception message");
+        Check(DiagnosticsMonitor.TryParse(Status("SAYWHAT_STATUS component=microphone-host event=failed code=microphone-access-denied native=-6"),
+            "foxtrans-local-host.log", out var nativeAccess) && nativeAccess?.Code == "microphone-access-denied" && nativeAccess.Evidence?.NativeCode == -6,
+            "the explicit miniaudio access-denied code remains distinct and exportable");
+        Check(DiagnosticsMonitor.TryParse(Status("SAYWHAT_STATUS component=microphone-host event=failed code=microphone-unavailable native=-204"),
+            "foxtrans-local-host.log", out var nativeNoDevice) && nativeNoDevice?.Evidence?.NativeCode == -204,
+            "the explicit miniaudio no-device code remains exportable without device names");
+        Check(DiagnosticsMonitor.TryParse(Status("SAYWHAT_STATUS component=microphone-controller event=host-exited restart=4 exit=-532462766"),
+            "foxtrans-mute-sync.log", out var childExit) && childExit?.Code == "microphone-host-stopped", "a supervised child exit is not mistaken for a controller exit");
+        File.AppendAllText(Path.Combine(root, "foxtrans-mute-sync.log"), Stamp(now, hostStarted));
+        File.AppendAllText(Path.Combine(root, "foxtrans-local-host.log"), Stamp(now, hostControlReady) +
+            Stamp(now, "SAYWHAT_STATUS component=microphone-host event=capture-levels frames=500 voiced=100 peak=42000") +
+            Stamp(now, "SAYWHAT_STATUS component=microphone-host event=recognition-final chars=27") +
+            Stamp(now, "SAYWHAT_STATUS component=microphone-host event=translation-completed duration_ms=640") +
+            Stamp(now, "SAYWHAT_STATUS component=microphone-host event=chat-queued chars=48"));
+        var runtimeSnapshot = monitor.Read(now);
+        Check(runtimeSnapshot.RuntimeEvents.Count == 6 && runtimeSnapshot.RuntimeEvents.Any(item => item.Event == "chat-queued" && item.Chars == 48),
+            "the latest numeric lifecycle/progress events survive without transcript text");
+        Check(!runtimeSnapshot.Issues.Any(item => item.Code is "host-started" or "control-ready" or "capture-levels"),
+            "ordinary numeric capture activity is not presented as an error");
+        AppSettings reportSettings = new()
+        {
+            OwnRecognitionEngine = "nemotron", OwnVoiceSourceLanguage = "Chinese", OwnVoiceTargetLanguage = "English",
+            OwnVoiceAdditionalLanguagesEnabled = true, OwnVoiceAdditionalTargetLanguages = ["Japanese", "Korean"],
+            OwnManagedModelId = "hy-mt2-7b-q4_k_m", UseManagedTranslator = true, OwnVoicePauseWhenVrchatMuted = false,
+            OwnMicrophoneDeviceId = privateText, IncomingApplicationPath = privateText, IncomingPersonId = privateText,
+            OwnTranslatorModel = privateText, OwnTranslatorBaseUrl = "https://private.invalid/" + privateText,
+            IncomingAudioMode = "application"
+        };
+        var choices = DiagnosticSupportContext.Create(reportSettings) with { WindowsVersion = "10.0.19045.0", OsArchitecture = "X64", ProcessArchitecture = "X64" };
+        string detailedReport = DiagnosticsMonitor.BuildSafeSummary(runtimeSnapshot with { Issues = [missingLibrary!, lockedFile!, occupiedPort!] },
+            true, false, context: choices);
+        Check(detailedReport.Contains("10.0.19045.0") && detailedReport.Contains("source=Chinese") && detailedReport.Contains("targets=English,Japanese,Korean") &&
+            detailedReport.Contains("hy-mt2-7b-q4_k_m") && detailedReport.Contains("follow_vrchat_mute=False") && detailedReport.Contains("microphone=selected"),
+            "one report includes safe Windows/architecture and actual built-in voice choices");
+        Check(detailedReport.Contains("exception=DllNotFoundException") && detailedReport.Contains("hresult=0x80070020") && detailedReport.Contains("native=10048") &&
+            detailedReport.Contains("frames=500") && detailedReport.Contains("voiced=100") && detailedReport.Contains("chars=48") && detailedReport.Contains("duration_ms=640"),
+            "one report includes the typed fault and last working pipeline-stage counters");
+        Check(!detailedReport.Contains("PRIVATE", StringComparison.Ordinal) && !detailedReport.Contains("private.invalid", StringComparison.Ordinal) &&
+            !detailedReport.Contains("朋友", StringComparison.Ordinal), "selected device IDs, endpoints, people and raw exceptions are absent from support context");
+        var separateOwn = reportSettings.Copy(); separateOwn.UseManagedTranslator = false;
+        var separateIncoming = reportSettings.Copy(); separateIncoming.UseManagedTranslator = true;
+        separateIncoming.ShareTranslationModel = false; separateIncoming.IncomingManagedModelId = "hy-mt2-1.8b-q4_k_m";
+        separateIncoming.IncomingSourceLanguage = "Japanese"; separateIncoming.IncomingTargetLanguage = "Korean";
+        string separateReport = DiagnosticsMonitor.BuildSafeSummary(DiagnosticsSnapshot.Empty, false, false,
+            context: DiagnosticSupportContext.Create(separateOwn, separateIncoming));
+        Check(separateReport.Split('\n').Single(line => line.StartsWith("Own choices:", StringComparison.Ordinal)).Contains("translator=external") &&
+            separateReport.Split('\n').Single(line => line.StartsWith("Subtitle choices:", StringComparison.Ordinal)).Contains("source=Japanese; target=Korean; translator=hy-mt2-1.8b-q4_k_m"),
+            "independently applied own/subtitle snapshots preserve their actual directions and translation modes");
+        var hostileChoices = choices with
+        {
+            WindowsVersion = privateText, OsArchitecture = privateText, ProcessArchitecture = privateText,
+            OwnRecognizer = privateText, OwnSource = privateText, OwnTargets = [privateText], OwnTranslator = privateText,
+            IncomingRecognizer = privateText, IncomingSource = privateText, IncomingTarget = privateText, IncomingTranslator = privateText,
+            Runtime = privateText, IncomingRuntime = privateText, Microphone = privateText, IncomingAudioMode = privateText, SharedTranslator = false
+        };
+        var hostileEvidence = new DiagnosticsSnapshot([missingLibrary! with { Evidence = new(privateText, privateText, privateText, privateText, int.MaxValue) }], now)
+        { RuntimeEvents = [new(now, privateText, privateText, Code: privateText), new(now, "microphone-host", "capture-levels", Frames: 1, Voiced: 2, Peak: 1)] };
+        Check(!DiagnosticsMonitor.BuildSafeSummary(hostileEvidence, false, false, context: hostileChoices).Contains("PRIVATE", StringComparison.Ordinal),
+            "hostile context, evidence and impossible numeric events cannot inject report text");
         File.AppendAllText(Path.Combine(root, "foxtrans-local-host.log"), Stamp(now, "OWN VOICE recovered; code=turn-completed; turn=3."));
         var recovered = monitor.Read(now);
         Check(recovered.ActiveOwnIssue(now) is null, "a fully completed valid turn clears prior own-pipeline warnings");
         Check(recovered.Issues.Any(issue => issue.Code == "asr-progress-timeout"), "recovery does not erase diagnostic history");
         var repeatedRead = monitor.Read(now);
         Check(repeatedRead.Issues.SequenceEqual(recovered.Issues), "unchanged log files use cached event results without duplicate counting");
+        var simultaneous = Task.WhenAll(Enumerable.Range(0, 12).Select(_ => Task.Run(() => monitor.Read(now)))).GetAwaiter().GetResult();
+        Check(simultaneous.All(value => value.Issues.SequenceEqual(recovered.Issues)),
+            "support export and background refresh can read one monitor concurrently without cache races");
         File.WriteAllText(Path.Combine(root, "localtalk.log"), Stamp(now.AddDays(-8), "Translation failed: old issue"));
         Check(monitor.Read(now).Issues.All(issue => issue.At >= now.AddDays(-7)), "history excludes stale events outside seven days");
         File.WriteAllText(incomingPath, new string('x', DiagnosticsMonitor.TailLimit * 4) + "\n" + Stamp(now, "Speech stalled: " + privateText));
@@ -123,6 +232,8 @@ internal static class DiagnosticsTests
                 "Speech recognition", "Audio capture", "Recovered", "Recorded issue", "App", "Diagnostics copied. No conversation text is included.",
                 "Couldn't copy diagnostics. Try again.", "{0} · {1} · recorded {2} times", "My voice: {0}"];
             Check(required.All(UiText.Contains) && snapshot.Issues.All(issue => UiText.Contains(issue.Message)), "all recent issue UI and fixed messages are translated");
+            Check(new[] { hostFatal, inheritedFatal, missingLibrary, noMicrophone, accessDenied, comDenied, lockedFile, occupiedPort, unavailableProvider, typedAccess }
+                .All(issue => issue is not null && UiText.Contains(issue.Message)), "new source-specific and typed failure summaries are translated");
             foreach (string locale in new[] { "en", "zh-CN", "ja", "ko" })
             {
                 UiText.Language = locale;
@@ -136,7 +247,7 @@ internal static class DiagnosticsTests
                         Nodes(card).OfType<TextBlock>().All(text => ReferenceEquals(text.Foreground, ModernTheme.Text) || ReferenceEquals(text.Foreground, ModernTheme.Muted) || ReferenceEquals(text.Foreground, ModernTheme.Warning) || ReferenceEquals(text.Foreground, ModernTheme.Good)), "recent issues use theme text roles " + locale + "/" + theme.Id);
                     Check(Nodes(card).OfType<TextBlock>().All(text => text.TextWrapping == TextWrapping.Wrap), "localized summaries wrap without horizontal scrolling");
                     var actions = Nodes(card).OfType<Button>().ToArray();
-                    Check(actions.Length == 3 && actions.All(button => !string.IsNullOrWhiteSpace(AutomationProperties.GetName(button))), "all issue actions have accessible labels");
+                    Check(actions.Length == 4 && actions.All(button => !string.IsNullOrWhiteSpace(AutomationProperties.GetName(button))), "all issue actions have accessible labels");
                     Check(actions.Single(button => button.Name == "CopySafeDiagnosticsButton").Content?.ToString() == UiText.T("Copy diagnostics"), "copy action is localized immediately");
                     var banner = (Border)Invoke(window, "CreatePipelineIssueBanner")!;
                     Check(banner.Visibility == Visibility.Collapsed, "historical failures cannot warn when engines are stopped");

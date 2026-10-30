@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 
 // Isolated file handles and synthetic output callbacks only. No capture device,
 // model, recognizer, HTTP endpoint or real OSC destination is opened.
@@ -18,9 +19,67 @@ internal static class HostLoggingTests
         var console = new List<string>();
         var logger = new BestEffortHostLogger(console.Add);
         string previousLog = LocalHost.LogPath;
+        string previousRoot = LocalHost.Root;
         TextWriter previousOutput = Console.Out;
         try
         {
+            foreach (var item in new (Exception Error, string Code)[]
+            {
+                (new DllNotFoundException("PRIVATE binary"), "native-library-missing"),
+                (new BadImageFormatException("PRIVATE binary"), "native-library-invalid"),
+                (new EntryPointNotFoundException("PRIVATE symbol"), "native-library-invalid"),
+                (new AudioDeviceSelectionException("PRIVATE device name"), "microphone-unavailable"),
+                (new UnauthorizedAccessException("PRIVATE model file"), "access-denied"),
+                (new HttpRequestException("PRIVATE endpoint or request"), "provider-connection-failed"),
+                (new InvalidOperationException("PRIVATE arbitrary exception"), "host-failed"),
+                (new TypeInitializationException("PRIVATE type", new DllNotFoundException("PRIVATE dependency")), "native-library-missing")
+            })
+            {
+                string evidence = LocalHost.SupportFailureLine(item.Error);
+                Check(evidence.StartsWith("SAYWHAT_STATUS component=microphone-host event=failed code=" + item.Code + " hresult=0x", StringComparison.Ordinal) &&
+                    !evidence.Contains("PRIVATE", StringComparison.Ordinal), "typed failure evidence excludes exception text, file names, devices and endpoints");
+            }
+            Check(!LocalHost.SupportFailureLine(new UnauthorizedAccessException("PRIVATE"))
+                .Contains("microphone-access-denied", StringComparison.Ordinal), "a generic access failure is not mislabeled as microphone permission denial");
+            var deniedMicrophone = new AudioDeviceSelectionException("PRIVATE device description") { NativeCode = -6 };
+            Check(deniedMicrophone.NativeCode == -6 && LocalHost.SupportFailureLine(deniedMicrophone)
+                .Contains("code=microphone-access-denied", StringComparison.Ordinal) &&
+                LocalHost.SupportFailureLine(deniedMicrophone).EndsWith(" native=-6", StringComparison.Ordinal),
+                "the actual audio API access-denied result is preserved without parsing its description");
+            Check(LocalHost.SupportFailureLine(new AudioDeviceSelectionException("PRIVATE") { NativeCode = -204 })
+                .EndsWith(" native=-204", StringComparison.Ordinal), "the actual no-device audio result is retained separately from a generic HRESULT");
+            string socketFailure = LocalHost.SupportFailureLine(new System.Net.Sockets.SocketException(10061));
+            Check(socketFailure.Contains("code=endpoint-unavailable", StringComparison.Ordinal) && socketFailure.EndsWith(" native=10061", StringComparison.Ordinal),
+                "a typed socket failure retains its real numeric native error");
+
+            LocalHost.Root = root;
+            LocalHost.LogPath = path;
+            string legacy = Path.Combine(root, "vrchat-translation-settings.json");
+            string projection = Path.Combine(root, "own-voice-runtime.json");
+            File.WriteAllText(legacy, JsonSerializer.Serialize(new { CustomProfiles = new string('x', 70000) }));
+            File.WriteAllText(projection, """{"OwnRecognitionEngine":"nemotron","OwnVoiceSourceLanguage":"Chinese","OwnVoiceTargetLanguage":"English","OwnVoiceAdditionalLanguagesEnabled":true,"OwnVoiceAdditionalTargetLanguages":["Japanese","Korean"],"OwnVoicePauseWhenVrchatMuted":false,"FinishCapturedSentenceOnMute":false,"OwnVoiceEndPauseMilliseconds":1800,"OwnVoiceSendEarlyPreviews":true,"UseManagedTranslator":true,"Glossary":"synthetic terms"}""");
+            Check(LocalHost.ReadRecognitionPreferences() == new LocalHost.OwnRecognitionPreferences(true, "zh-CN"),
+                "native recognition reads the small projection despite an oversized valid dashboard profile library");
+            var languages = LocalHost.ReadOwnVoiceLanguages();
+            Check(languages.Targets.SequenceEqual(new[] { "English", "Japanese", "Korean" }) && languages.ManagedTranslator && languages.Glossary == "synthetic terms",
+                "three chosen target languages and translator preferences come from the same small projection");
+            Check(!LocalHost.FinishCaptured() && LocalHost.EarlyPreviewsEnabled() &&
+                LocalHost.ReadLivePreferences(new(1200, false)) == new LocalHost.OwnVoiceLivePreferences(1800, true),
+                "finish, preview and live timing readers also use projected preferences");
+            File.WriteAllText(legacy, """{"OwnRecognitionEngine":"nemotron","OwnVoiceSourceLanguage":"English"}""");
+            File.WriteAllText(projection, "[]");
+            bool invalidProjectionRejected = false;
+            try { _ = LocalHost.ReadRecognitionPreferences(); } catch (JsonException) { invalidProjectionRejected = true; }
+            Check(invalidProjectionRejected, "a malformed present projection cannot silently revive stale legacy recognition settings");
+            File.Delete(projection);
+            Check(LocalHost.ReadRecognitionPreferences() == new LocalHost.OwnRecognitionPreferences(true, "en-US"),
+                "standalone legacy roots are read when the projection is genuinely absent");
+            File.Delete(legacy);
+            Check(LocalHost.ReadRecognitionPreferences() == new LocalHost.OwnRecognitionPreferences(false, "auto"),
+                "an old root without any preferences retains the historical recognizer default");
+            LocalHost.Root = previousRoot;
+            LocalHost.LogPath = previousLog;
+
             File.WriteAllText(path, "kept fixture\n", new UTF8Encoding(false));
             using (var held = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
             {
@@ -85,6 +144,12 @@ internal static class HostLoggingTests
         {
             Console.SetOut(previousOutput);
             LocalHost.LogPath = previousLog;
+            LocalHost.Root = previousRoot;
+            foreach (string preference in new[] { "own-voice-runtime.json", "vrchat-translation-settings.json" })
+            {
+                string preferencePath = Path.Combine(root, preference);
+                if (File.Exists(preferencePath)) File.Delete(preferencePath);
+            }
             if (File.Exists(path)) { File.SetAttributes(path, FileAttributes.Normal); File.Delete(path); }
             Directory.Delete(root);
         }

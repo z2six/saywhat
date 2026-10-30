@@ -150,6 +150,31 @@ changes, GPU use and first-install/UAC behavior require separate live acceptance
 tests. Use consenting test participants and keep recordings or diagnostic
 exports local unless they explicitly agree to sharing.
 
+### Optional pinned speech-runtime integration test
+
+The manually dispatched **Pinned native speech protocol smoke** workflow is
+separate from the model-free build checks. Its [script](../eng/Test-PinnedSpeechRuntime.ps1)
+requires an explicit flag and a GitHub-hosted Windows x64 runner; it refuses an
+ordinary local run. It downloads about 762 MB of catalog-matched runtime/model
+artifacts, verifies their pinned sizes and SHA-256 values, and runs the native
+Nemotron server on CPU with two threads in an isolated temporary directory.
+
+The [fixture](../eng/PinnedSpeechSmoke/Program.cs) uses original synthetic English
+speech generated to a WAV by an installed Windows voice, plus silence. It tests
+the production streaming adapter with 0.5, 1, 2 and 5 second inputs, checks final
+completion and usable voiced results, and checks the explicit Chinese protocol
+handshake. That handshake is not a Chinese recognition-quality test. A failing
+adapter case can trigger a separate raw-protocol comparison with a longer
+deadline; that comparison cannot turn the adapter failure into a pass.
+
+No microphone, playback capture, translator or OSC is used. Only a metadata
+receipt is retained at `artifacts/test-results/pinned-speech-smoke.json` and in
+the short-lived Actions artifact; it contains counts/timings and fixed errors,
+not recognized words or audio. Temporary runtime/model/audio files are cleaned
+up. Passing proves this limited CPU protocol path on that hosted Windows image;
+it does not certify Windows 10, Vulkan/GPU behavior, a user's audio device,
+recognition quality or end-to-end VRChat delivery/latency.
+
 ## Finding the right place to change
 
 Read the [codebase guide](codebase-guide.md) before changing pipeline behavior.

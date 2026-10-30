@@ -107,7 +107,7 @@
     const notice = manifest.securityNotice;
     const noticeObject = notice && typeof notice === "object" && !Array.isArray(notice) && notice.affectedVersion === version;
     const detectedNotice = noticeObject && version === "0.2.11" && notice.id === "bitdefender-review-pending";
-    const previousNotice = noticeObject && ["0.2.12", "0.2.13"].includes(version) && notice.id === "bitdefender-previous-build-review-pending" &&
+    const previousNotice = noticeObject && ["0.2.12", "0.2.13", "0.2.14"].includes(version) && notice.id === "bitdefender-previous-build-review-pending" &&
       notice.previousAffectedVersion === "0.2.11";
     releaseView = { kind: "available", version: manifest.version, size: byteSize,
       securityNotice: detectedNotice === true || previousNotice === true,

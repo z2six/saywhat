@@ -10,6 +10,7 @@ on:
         options:
           - '0.2.12'
           - '0.2.13'
+          - '0.2.14'
       acknowledge_pending_antivirus_review:
         description: Publish while the 0.2.11 Bitdefender review is pending; the selected candidate has no established detection status or vendor clearance
         required: true
@@ -25,7 +26,7 @@ concurrency:
 
 jobs:
   promote:
-    if: ${{ github.repository == 'z2six/saywhat' && github.ref == 'refs/heads/main' && (inputs.version == '0.2.12' || inputs.version == '0.2.13') && inputs.acknowledge_pending_antivirus_review == true }}
+    if: ${{ github.repository == 'z2six/saywhat' && github.ref == 'refs/heads/main' && (inputs.version == '0.2.12' || inputs.version == '0.2.13' || inputs.version == '0.2.14') && inputs.acknowledge_pending_antivirus_review == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

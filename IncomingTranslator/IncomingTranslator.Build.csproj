@@ -15,6 +15,7 @@
     <Compile Include="../FoxTransSource/FoxTrans/Providers/TranslationModelCapabilities.cs" Link="Core/TranslationModelCapabilities.cs" />
     <Compile Include="../FoxTransSource/FoxTrans/Providers/RecognitionTextFilter.cs" Link="Core/RecognitionTextFilter.cs" />
     <Compile Include="AppSettings.cs" />
+    <Compile Include="OwnVoiceRuntimePreferences.cs" />
     <Compile Include="SessionEndpoints.cs" />
     <Compile Include="TranslationProfiles.cs" />
     <Compile Include="IncomingPipelineProfiles.cs" />

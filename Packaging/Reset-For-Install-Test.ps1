@@ -134,7 +134,7 @@ Assert-PlainPath $backupRoot
 
 # Literal root-level file names only: never recurse into assets, WSL disks or another app.
 $stateNames = @(
-    'vrchat-translation-settings.json', 'setup-progress.json',
+    'vrchat-translation-settings.json', 'own-voice-runtime.json', 'saywhat-support-last-failure.txt', 'setup-progress.json',
     'config.fast-chinese.jsonc', 'config.sentence-mode.jsonc',
     'incoming-ai-speaker-profiles.json', 'incoming-speaker-feedback.json', 'incoming-speaker-profiles.json',
     'foxtrans-local-host.log', 'foxtrans-mute-sync.log', 'foxtrans-osc-sentence.log', 'foxtrans-provider-errors.log',

@@ -94,7 +94,7 @@ internal static partial class NativeAudioInterop
     {
         if (result != 0)
             throw new AudioDeviceSelectionException(
-                $"{operation}: {DescribeResult(result)}.");
+                $"{operation}: {DescribeResult(result)}.") { NativeCode = result };
     }
 
     private static string ReadUtf8(byte[] bytes)

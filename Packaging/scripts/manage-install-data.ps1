@@ -699,11 +699,11 @@ try {
     Assert-AppClosed
     $plan = New-Object 'System.Collections.Generic.List[object]'
     $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
-    $preferenceNames = @('vrchat-translation-settings.json','config.fast-chinese.jsonc','config.sentence-mode.jsonc')
+    $preferenceNames = @('vrchat-translation-settings.json','own-voice-runtime.json','config.fast-chinese.jsonc','config.sentence-mode.jsonc')
     # setup-progress.json and provisioning.json retain the installation's WSL ownership/registrations.
     $historyNames = @('incoming-ai-speaker-profiles.json','incoming-speaker-feedback.json','incoming-speaker-profiles.json',
         'foxtrans-local-host.log','foxtrans-mute-sync.log','foxtrans-osc-sentence.log','foxtrans-provider-errors.log',
-        'incoming-translator.log','incoming-vr-overlay.log','saywhat.log','localtalk.log')
+        'incoming-translator.log','incoming-vr-overlay.log','saywhat.log','localtalk.log','saywhat-support-last-failure.txt')
     if ($ResetPreferences) { foreach ($name in $preferenceNames) { Add-SelectedFile $name } }
     if ($ClearHistory) {
         foreach ($name in $historyNames) { Add-SelectedFile $name }
@@ -727,8 +727,9 @@ try {
     if ((Test-Path -LiteralPath $resolvedRoot -PathType Container) -and ($ResetPreferences -or $ClearHistory)) {
         foreach ($entry in @(Get-ChildItem -LiteralPath $resolvedRoot -Force)) {
             $name = $entry.Name
-            $selected = ($ResetPreferences -and $name -match '^(vrchat-translation-settings[.]json|config[.](fast-chinese|sentence-mode)[.]jsonc)[.]tmp-[a-f0-9]{32}$') -or
-                ($ClearHistory -and $name -match '^incoming-(ai-speaker-profiles|speaker-feedback|speaker-profiles)[.]json[.](tmp(-[a-f0-9]{32})?|backup-[0-9]{8}-[0-9]{6}-[0-9]{7}|before-named-feedback-v1[.]backup)$')
+            $selected = ($ResetPreferences -and $name -match '^(vrchat-translation-settings[.]json|own-voice-runtime[.]json|config[.](fast-chinese|sentence-mode)[.]jsonc)[.]tmp-[a-f0-9]{32}$') -or
+                ($ClearHistory -and ($name -match '^incoming-(ai-speaker-profiles|speaker-feedback|speaker-profiles)[.]json[.](tmp(-[a-f0-9]{32})?|backup-[0-9]{8}-[0-9]{6}-[0-9]{7}|before-named-feedback-v1[.]backup)$' -or
+                    $name -match '^saywhat-support-last-failure[.]txt[.]tmp-[a-f0-9]{32}$'))
             if ($selected) { Add-SelectedFile $name }
         }
     }

@@ -204,6 +204,8 @@ try {
             Invoke-BuildTool $windowsPowerShell @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
                 (Join-Path $repoRoot 'Packaging\Test-VRChatMuteSync-Logging.ps1'))
             Invoke-BuildTool $windowsPowerShell @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
+                (Join-Path $repoRoot 'Packaging\Test-VRChatMuteSync-Support.ps1'))
+            Invoke-BuildTool $windowsPowerShell @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
                 (Join-Path $repoRoot 'Packaging\Test-OscSentenceProxy-Logging.ps1'), '-SourceRoot', $repoRoot, '-TestRoot', $testTemp)
             Invoke-BuildTool $windowsPowerShell @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
                 (Join-Path $repoRoot 'Packaging\Test-UpdateInstallerContract.ps1'), '-SourceRoot', $repoRoot)

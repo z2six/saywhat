@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '0.2.13',
+    [string]$Version = '0.2.14',
     [string]$CompilerPath,
     [switch]$SkipPublish,
     [string]$AppPublishDirectory,
@@ -193,6 +193,8 @@ try {
         'Packaging/ManagedWslImageTests/ManagedWslImageTests.csproj','Packaging/ManagedWslImageTests/Program.cs',
         'Packaging/ManagedWslImageTests/ProvisionAsset.cs',
         'Packaging/Test-VRChatMuteSync-Logging.ps1',
+        'Packaging/Test-VRChatMuteSync-Support.ps1','IncomingTranslator/OwnVoiceRuntimePreferences.cs',
+        'LocalTalk/OwnVoiceRuntimePreferenceTests.cs','LocalTalk/SupportReportChecks.cs','LocalTalk/SupportReportChecksTests.cs','LocalTalk/RuntimeController.SupportChecks.cs',
         'Packaging/Test-OscSentenceProxy-Logging.ps1',
         'IncomingTranslator/ManagedServicePorts.cs','IncomingTranslator/SessionEndpoints.cs','LocalTalk/RuntimeController.Ports.cs',
         'LocalTalk/MainWindowConnections.cs','LocalTalk/ManagedServicePortTests.cs','LocalTalk/SessionEndpointTests.cs','Packaging/ProvisioningTests/test-managed-ports.py','Packaging/vibevoice/test_ports.py',

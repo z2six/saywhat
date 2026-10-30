@@ -43,6 +43,9 @@ internal sealed partial class RuntimeController : IAsyncDisposable, ISpeakerFeed
     { _provisioner = provisioner; _audioWindowsVersion = audioWindowsVersion ?? (() => IncomingCaptureCapabilities.CurrentVersion); }
     public bool OwnRunning => _ownRunning;
     public bool IncomingRunning => _incomingRunning;
+    internal (AppSettings Own, AppSettings Incoming) GetSupportContext(AppSettings fallback) =>
+        ((_ownRunning ? _ownSettings : null)?.Copy() ?? fallback.Copy(),
+         (_incomingRunning ? _incomingSettings : null)?.Copy() ?? fallback.Copy());
     internal IncomingHealthSnapshot? IncomingHealth => _overlay?.HealthSnapshot;
     public SpeakerRecognitionStatus RecognitionStatus => _overlay?.RecognitionStatus ?? new(false, false, "Off");
     public event Action? StateChanged;
@@ -1531,9 +1534,131 @@ internal sealed partial class RuntimeController : IAsyncDisposable, ISpeakerFeed
         && data.ValueKind == JsonValueKind.Array && data.EnumerateArray().Any(item => item.TryGetProperty("id", out JsonElement id)
             && id.ValueKind == JsonValueKind.String && id.GetString() == alias);
 
+    // Deliberately narrow protocol for owned helper evidence. Unlike a raw
+    // exception or engine line, these records contain no device names, paths,
+    // endpoints, recognized words or translated text.
+    internal sealed record SupportStatus(string Component, string Event, int? Restart = null, int? Exit = null,
+        string? Code = null, string? HResult = null, int? NativeCode = null, int? Frames = null,
+        int? Voiced = null, int? Peak = null, int? Chars = null, int? DurationMilliseconds = null)
+    {
+        internal string CanonicalLine => "SAYWHAT_STATUS component=" + Component + " event=" + Event +
+            (Restart is int restart ? " restart=" + restart.ToString(System.Globalization.CultureInfo.InvariantCulture) : "") +
+            (Exit is int exit ? " exit=" + exit.ToString(System.Globalization.CultureInfo.InvariantCulture) : "") +
+            (Code is not null ? " code=" + Code : "") +
+            (HResult is not null ? " hresult=" + HResult : "") +
+            (NativeCode is int native ? " native=" + native.ToString(System.Globalization.CultureInfo.InvariantCulture) : "") +
+            (Frames is int frames ? " frames=" + frames.ToString(System.Globalization.CultureInfo.InvariantCulture) : "") +
+            (Voiced is int voiced ? " voiced=" + voiced.ToString(System.Globalization.CultureInfo.InvariantCulture) : "") +
+            (Peak is int peak ? " peak=" + peak.ToString(System.Globalization.CultureInfo.InvariantCulture) : "") +
+            (Chars is int chars ? " chars=" + chars.ToString(System.Globalization.CultureInfo.InvariantCulture) : "") +
+            (DurationMilliseconds is int duration ? " duration_ms=" + duration.ToString(System.Globalization.CultureInfo.InvariantCulture) : "");
+    }
+
+    internal static bool TryParseSupportStatus(string body, out SupportStatus? status)
+    {
+        status = null;
+        if (body.Length is < 1 or > 512 || body.Any(char.IsControl)) return false;
+        string[] parts = body.Split(' ');
+        if (parts.Length < 3 || parts[0] != "SAYWHAT_STATUS") return false;
+        var fields = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (string part in parts.Skip(1))
+        {
+            int equals = part.IndexOf('=');
+            if (equals <= 0 || equals == part.Length - 1 || part.IndexOf('=', equals + 1) >= 0 ||
+                !fields.TryAdd(part[..equals], part[(equals + 1)..])) return false;
+        }
+        if (fields.Keys.Any(key => key is not ("component" or "event" or "restart" or "exit" or "code" or "hresult" or "native" or
+                "frames" or "voiced" or "peak" or "chars" or "duration_ms")) ||
+            !fields.TryGetValue("component", out string? component) ||
+            component is not ("microphone-controller" or "microphone-host" or "osc-relay") ||
+            !fields.TryGetValue("event", out string? ev)) return false;
+        static bool Integer(string text, out int value)
+        {
+            value = 0;
+            return Regex.IsMatch(text, @"^-?(?:0|[1-9][0-9]{0,9})$", RegexOptions.CultureInvariant) &&
+                int.TryParse(text, System.Globalization.NumberStyles.AllowLeadingSign,
+                    System.Globalization.CultureInfo.InvariantCulture, out value);
+        }
+        bool Metric(string key, int maximum, out int? result)
+        {
+            result = null;
+            if (!fields.TryGetValue(key, out string? raw)) return true;
+            if (!Integer(raw, out int value) || value < 0 || value > maximum) return false;
+            result = value; return true;
+        }
+        int? restart = null, exit = null, native = null;
+        if (fields.TryGetValue("restart", out string? rawRestart))
+        {
+            if (!Integer(rawRestart, out int parsed) || parsed < 0) return false;
+            restart = parsed;
+        }
+        if (fields.TryGetValue("exit", out string? rawExit))
+        {
+            if (!Integer(rawExit, out int parsed)) return false;
+            exit = parsed;
+        }
+        if (fields.TryGetValue("native", out string? rawNative))
+        {
+            if (!Integer(rawNative, out int parsed)) return false;
+            native = parsed;
+        }
+        if (!Metric("frames", int.MaxValue, out int? frames) || !Metric("voiced", int.MaxValue, out int? voiced) ||
+            !Metric("peak", 1_000_000, out int? peak) || !Metric("chars", 1_000_000, out int? chars) ||
+            !Metric("duration_ms", 86_400_000, out int? duration)) return false;
+        fields.TryGetValue("code", out string? code);
+        fields.TryGetValue("hresult", out string? hresult);
+        if (hresult is not null)
+        {
+            if (!Regex.IsMatch(hresult, @"^0x[0-9A-Fa-f]{8}$", RegexOptions.CultureInvariant)) return false;
+            hresult = "0x" + hresult[2..].ToUpperInvariant();
+        }
+        if (ev == "host-started")
+        {
+            if (component != "microphone-controller" || restart is null || fields.Count != 3) return false;
+        }
+        else if (ev == "host-exited")
+        {
+            if (component != "microphone-controller" || restart is null || exit is null || fields.Count != 4) return false;
+        }
+        else if (ev is "control-ready" or "capture-ready" or "translation-start")
+        {
+            if (component != "microphone-host" || fields.Count != 2) return false;
+        }
+        else if (ev == "capture-levels")
+        {
+            if (component != "microphone-host" || fields.Count != 5 || frames is null || voiced is null ||
+                peak is null || voiced > frames) return false;
+        }
+        else if (ev is "recognition-final" or "chat-queued")
+        {
+            if (component != "microphone-host" || fields.Count != 3 || chars is null) return false;
+        }
+        else if (ev == "translation-completed")
+        {
+            if (component != "microphone-host" || fields.Count != 3 || duration is null) return false;
+        }
+        else if (ev == "failed")
+        {
+            if (restart is not null || exit is not null || code is not ("native-library-missing" or "native-library-invalid" or
+                "microphone-unavailable" or "microphone-access-denied" or "access-denied" or "endpoint-unavailable" or
+                "provider-connection-failed" or "log-unavailable" or "host-failed" or "controller-failed" or "proxy-failed") ||
+                fields.Count != 3 + (hresult is null ? 0 : 1) + (native is null ? 0 : 1)) return false;
+            if ((code == "host-failed" && component != "microphone-host") ||
+                (code == "controller-failed" && component != "microphone-controller") ||
+                (code == "proxy-failed" && component != "osc-relay")) return false;
+        }
+        else return false;
+        status = new(component, ev, restart, exit, code, hresult, native, frames, voiced, peak, chars, duration);
+        return true;
+    }
+
     internal static string? SafeDiagnosticLine(string line)
     {
         line = Regex.Replace(line, @"\x1B\[[0-?]*[ -/]*[@-~]", "").Trim();
+        if (TryParseSupportStatus(line, out SupportStatus? status)) return status!.CanonicalLine;
+        if (DiagnosticsMonitor.TryTimestamp(line, out _, out string statusBody) &&
+            TryParseSupportStatus(statusBody, out status)) return status!.CanonicalLine;
+        if (DiagnosticsMonitor.SafeFatalDiagnosticLine(line) is { } fatal) return fatal;
         // Check the ENTIRE line before truncation. A content marker after character 512 is still rejected.
         if (line.Length == 0 || Regex.IsMatch(line,
             @"(?i)\b(?:prompts?|transcripts?|translations?|source(?:_text)?|messages?|content|texts?|chat_template|completions?|request_body|response_body|rendered|tokenized)\b|<\||\|>")) return null;
@@ -1755,11 +1880,61 @@ internal sealed partial class RuntimeController : IAsyncDisposable, ISpeakerFeed
         Require(SafeDiagnosticLine("llama_model_load: " + new string('a', 700))!.Length <= 513, "bounded diagnostic record");
         Require(SafeDiagnosticLine("llama_model_load: " + new string('a', 700) + " prompt private") is null, "content marker beyond bound still omitted");
         Require(SafeDiagnosticLine("ggml_cuda_init: safe\rraw private speech") is null, "multiline injection omitted");
+        Require(SafeDiagnosticLine("[2026-01-01 10:00:00.000] FATAL: System.DllNotFoundException: PRIVATE binary and transcript words") ==
+            "FATAL: DllNotFoundException:", "fatal dependency category survives without its potentially private message");
+        Require(SafeDiagnosticLine("[2026-01-01 10:00:00.000] FATAL: PRIVATE user words or file path") == "FATAL: unknown",
+            "untyped fatal output retains no guessed cause or original content");
+        foreach (string eventLine in new[]
+        {
+            "SAYWHAT_STATUS component=microphone-controller event=host-started restart=0",
+            "SAYWHAT_STATUS component=microphone-controller event=host-exited restart=2 exit=-1073741515",
+            "SAYWHAT_STATUS component=microphone-host event=failed code=native-library-missing hresult=0x8007007e",
+            "SAYWHAT_STATUS component=microphone-controller event=failed code=endpoint-unavailable hresult=0x80004005 native=10048",
+            "SAYWHAT_STATUS component=microphone-host event=control-ready",
+            "SAYWHAT_STATUS component=microphone-host event=capture-ready",
+            "SAYWHAT_STATUS component=microphone-host event=capture-levels frames=200 voiced=15 peak=6200",
+            "SAYWHAT_STATUS component=microphone-host event=recognition-final chars=32",
+            "SAYWHAT_STATUS component=microphone-host event=translation-start",
+            "SAYWHAT_STATUS component=microphone-host event=translation-completed duration_ms=310",
+            "SAYWHAT_STATUS component=microphone-host event=chat-queued chars=86"
+        })
+        {
+            Require(TryParseSupportStatus(eventLine, out SupportStatus? support), "typed helper metadata schema");
+            Require(SafeDiagnosticLine(eventLine) == support!.CanonicalLine &&
+                SafeDiagnosticLine("[2026-01-01 10:00:00.000] " + eventLine) == support.CanonicalLine,
+                "bare and timestamped helper metadata survive without raw stdout");
+        }
+        foreach (string invalid in new[]
+        {
+            "SAYWHAT_STATUS component=microphone-controller event=host-started restart=-1",
+            "SAYWHAT_STATUS component=microphone-controller event=host-exited restart=0 exit=2147483648",
+            "SAYWHAT_STATUS component=microphone-controller event=host-exited restart=0 exit=1 text=PRIVATE",
+            "SAYWHAT_STATUS component=microphone-host event=failed code=PRIVATE hresult=0x80070005",
+            "SAYWHAT_STATUS component=microphone-host event=failed code=controller-failed",
+            "SAYWHAT_STATUS component=microphone-host event=failed code=host-failed hresult=PRIVATE",
+            "SAYWHAT_STATUS component=microphone-host event=failed code=host-failed native=99999999999999999999",
+            "SAYWHAT_STATUS component=microphone-controller event=capture-ready",
+            "SAYWHAT_STATUS component=microphone-host event=control-ready code=host-failed",
+            "SAYWHAT_STATUS component=microphone-host event=capture-levels frames=10 voiced=11 peak=1000",
+            "SAYWHAT_STATUS component=microphone-host event=capture-levels frames=10 voiced=1 peak=1000001",
+            "SAYWHAT_STATUS component=microphone-host event=translation-completed duration_ms=86400001",
+            "SAYWHAT_STATUS component=microphone-host event=chat-queued chars=1000001",
+            "SAYWHAT_STATUS component=microphone-host event=chat-queued chars=1 chars=2",
+            "SAYWHAT_STATUS component=microphone-host event=control-ready\nPRIVATE",
+            "SAYWHAT_STATUS component=PRIVATE event=control-ready"
+        })
+            Require(!TryParseSupportStatus(invalid, out _) && SafeDiagnosticLine(invalid) is null,
+                "unbounded, injected, unknown or contradictory helper metadata is omitted");
         string inertRoot = Path.Combine(Path.GetTempPath(), "localtalk-inert-test-" + Guid.NewGuid().ToString("N"));
         using (var provisioner = new LocalTalkProvisioner(inertRoot))
         {
             var controller = new RuntimeController(provisioner);
             Require(!controller.OwnRunning && !controller.IncomingRunning, "constructor is inert");
+            var fallback = new AppSettings { OwnVoiceSourceLanguage = "Chinese", IncomingSourceLanguage = "Japanese" };
+            var effective = controller.GetSupportContext(fallback);
+            effective.Own.OwnVoiceSourceLanguage = "English";
+            Require(fallback.OwnVoiceSourceLanguage == "Chinese" && effective.Incoming.IncomingSourceLanguage == "Japanese",
+                "support settings context uses independent inert copies without changing pending selections");
             controller.StopAllAsync().GetAwaiter().GetResult();
             Require(!controller.OwnRunning && !controller.IncomingRunning, "stopping an inactive controller does not start helpers");
             controller.DisposeAsync().AsTask().GetAwaiter().GetResult();

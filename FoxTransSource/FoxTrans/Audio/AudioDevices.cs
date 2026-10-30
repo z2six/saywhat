@@ -28,7 +28,12 @@ public sealed class NativeAudioInputDeviceCatalogue : IAudioInputDeviceCatalogue
         NativeAudioInterop.GetInputs();
 }
 
-public sealed class AudioDeviceSelectionException(string message) : Exception(message);
+public sealed class AudioDeviceSelectionException(string message) : Exception(message)
+{
+    // Preserve the audio API's result separately from its human-readable
+    // description. Support metadata must never have to parse private text.
+    public int? NativeCode { get; init; }
+}
 
 public static class AudioDeviceSelection
 {

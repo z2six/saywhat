@@ -16,7 +16,7 @@ check(manifest.schemaVersion === 1 && typeof manifest.ready === "boolean", "Mani
 check(manifest.channel === "preview", "Preview status is explicit.");
 if (manifest.securityNotice != null) check(manifest.securityNotice.affectedVersion === manifest.version &&
   ((manifest.version === "0.2.11" && manifest.securityNotice.id === "bitdefender-review-pending") ||
-   (["0.2.12", "0.2.13"].includes(manifest.version) && manifest.securityNotice.id === "bitdefender-previous-build-review-pending" &&
+   (["0.2.12", "0.2.13", "0.2.14"].includes(manifest.version) && manifest.securityNotice.id === "bitdefender-previous-build-review-pending" &&
     manifest.securityNotice.previousAffectedVersion === "0.2.11")), "A public security notice identifies the reviewed issue and exact affected release.");
 check((html.match(/<main\b/g) || []).length === 1 && (html.match(/<\/main>/g) || []).length === 1, "Exactly one main landmark exists.");
 check((html.match(/<h1\b/g) || []).length === 1, "One clear page heading exists.");
@@ -206,7 +206,7 @@ for (const notice of [null, {}, [], "bitdefender-review-pending", { id: "unknown
   check(unrelated.elements.get("release-security-notice").hidden && unrelated.elements.get("installer-link").getAttribute("aria-describedby") === null,
     "Missing, malformed, unknown and mismatched optional notice metadata cannot display an unrelated or injected warning.");
 }
-for (const version of ["0.2.10", "0.2.12", "0.2.13"]) {
+for (const version of ["0.2.10", "0.2.12", "0.2.13", "0.2.14"]) {
   const otherRelease = releaseAtVersion(version);
   otherRelease.securityNotice = { id: "bitdefender-review-pending", affectedVersion: version };
   check((await browserFixture(otherRelease)).elements.get("release-security-notice").hidden,
@@ -218,22 +218,24 @@ const previousNoticeRelease = releaseAtVersion("0.2.12");
 previousNoticeRelease.securityNotice = { id: "bitdefender-previous-build-review-pending", affectedVersion: "0.2.12", previousAffectedVersion: "0.2.11" };
 const latestPreviousNoticeRelease = releaseAtVersion("0.2.13");
 latestPreviousNoticeRelease.securityNotice = { id: "bitdefender-previous-build-review-pending", affectedVersion: "0.2.13", previousAffectedVersion: "0.2.11" };
-for (const reviewedRelease of [previousNoticeRelease, latestPreviousNoticeRelease]) {
+const newestPreviousNoticeRelease = releaseAtVersion("0.2.14");
+newestPreviousNoticeRelease.securityNotice = { id: "bitdefender-previous-build-review-pending", affectedVersion: "0.2.14", previousAffectedVersion: "0.2.11" };
+for (const reviewedRelease of [previousNoticeRelease, latestPreviousNoticeRelease, newestPreviousNoticeRelease]) {
   const previousWarning = await browserFixture(reviewedRelease);
   check(!previousWarning.elements.get("release-security-notice").hidden &&
     previousWarning.elements.get("release-security-body").textContent.includes("flagged version 0.2.11") &&
     previousWarning.elements.get("release-security-body").textContent.includes(`Version ${reviewedRelease.version} has not received a vendor verdict`) &&
     !previousWarning.elements.get("release-security-body").textContent.includes(`currently flags a component in version ${reviewedRelease.version}`),
     "A reviewed preview distinguishes the confirmed predecessor detection from its unknown scan verdict.");
-  for (const previous of ["0.2.10", "0.2.12", "0.2.13", null, "<img>"]) {
+  for (const previous of ["0.2.10", "0.2.12", "0.2.13", "0.2.14", null, "<img>"]) {
     const mismatch = structuredClone(reviewedRelease);
     mismatch.securityNotice.previousAffectedVersion = previous;
     check((await browserFixture(mismatch)).elements.get("release-security-notice").hidden,
       "The predecessor warning cannot carry an unreviewed or injected version.");
   }
 }
-const unreviewedNoticeRelease = releaseAtVersion("0.2.14");
-unreviewedNoticeRelease.securityNotice = { id: "bitdefender-previous-build-review-pending", affectedVersion: "0.2.14", previousAffectedVersion: "0.2.11" };
+const unreviewedNoticeRelease = releaseAtVersion("0.2.15");
+unreviewedNoticeRelease.securityNotice = { id: "bitdefender-previous-build-review-pending", affectedVersion: "0.2.15", previousAffectedVersion: "0.2.11" };
 check((await browserFixture(unreviewedNoticeRelease)).elements.get("release-security-notice").hidden,
   "The predecessor notice never silently applies to an unreviewed future release.");
 await warned.elements.get("refresh-release").events.get("click")();
@@ -304,6 +306,7 @@ const localizedError = await browserFixture(null, true, { catalogs });
 const localizedNotice = await browserFixture(noticeRelease, false, { catalogs });
 const localizedPreviousNotice = await browserFixture(previousNoticeRelease, false, { catalogs });
 const localizedLatestPreviousNotice = await browserFixture(latestPreviousNoticeRelease, false, { catalogs });
+const localizedNewestPreviousNotice = await browserFixture(newestPreviousNoticeRelease, false, { catalogs });
 for (const code of localeCodes) {
   localized.setLanguage(code);
   check(localized.elements.get("installer-link").textContent === catalogs[code]["release.availableInstaller"], `${code}: ready button translates.`);
@@ -334,5 +337,10 @@ for (const code of localeCodes) {
     localizedLatestPreviousNotice.elements.get("release-security-body").textContent === catalogs[code]["release.previousSecurityBody"]
       .replace("{previousVersion}", "0.2.11").replace("{version}", "0.2.13"),
     `${code}: the 0.2.13 notice keeps the predecessor and unknown candidate verdict distinct.`);
+  localizedNewestPreviousNotice.setLanguage(code);
+  check(!localizedNewestPreviousNotice.elements.get("release-security-notice").hidden &&
+    localizedNewestPreviousNotice.elements.get("release-security-body").textContent === catalogs[code]["release.previousSecurityBody"]
+      .replace("{previousVersion}", "0.2.11").replace("{version}", "0.2.14"),
+    `${code}: the 0.2.14 notice keeps the predecessor and unknown candidate verdict distinct.`);
 }
 console.log(`PASS: ${checks} offline website asset/anchor/accessibility-structure/release-gate checks. No network, server, app, model, audio or real clipboard.`);

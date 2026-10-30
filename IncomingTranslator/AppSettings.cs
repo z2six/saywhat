@@ -382,6 +382,7 @@ internal static partial class SettingsStore
             }
             Normalize(settings);
             WriteIfChanged(AppPaths.SettingsPath, JsonSerializer.Serialize(settings, Options));
+            WriteOwnVoiceRuntimePreferences(settings);
             UpdateOwnVoiceConfig(settings, AppPaths.FastConfigPath);
             UpdateOwnVoiceConfig(settings, AppPaths.FoxTransConfigPath);
         }
@@ -489,6 +490,7 @@ internal static partial class SettingsStore
         {
             File.WriteAllText(temporary, document.ToJsonString(Options));
             File.Move(temporary, AppPaths.SettingsPath, overwrite: true);
+            WriteOwnVoiceRuntimePreferences(ReadSettings(document.ToJsonString(Options)));
         }
         finally
         {
@@ -503,6 +505,32 @@ internal static partial class SettingsStore
         // after stopping capture; an identical snapshot needs no file mutation.
         if (File.Exists(path) && string.Equals(File.ReadAllText(path), contents, StringComparison.Ordinal)) return;
         File.WriteAllText(path, contents);
+    }
+
+    private static void WriteOwnVoiceRuntimePreferences(AppSettings settings)
+    {
+        // Match the generated translation prompt's glossary bound. Do not copy
+        // profiles, people, UI state, credentials or endpoint URLs to the host.
+        string glossary = settings.Glossary ?? "";
+        string contents = JsonSerializer.Serialize(new
+        {
+            SchemaVersion = 1,
+            settings.OwnRecognitionEngine, settings.OwnVoiceSourceLanguage,
+            settings.OwnVoiceTargetLanguage, settings.OwnVoiceAdditionalLanguagesEnabled,
+            OwnVoiceAdditionalTargetLanguages = settings.NormalizedOwnVoiceAdditionalLanguages(),
+            settings.UseManagedTranslator, Glossary = glossary[..Math.Min(2000, glossary.Length)],
+            settings.OwnVoicePauseWhenVrchatMuted, settings.FinishCapturedSentenceOnMute,
+            settings.OwnVoiceEndPauseMilliseconds, settings.OwnVoiceSendEarlyPreviews
+        });
+        string path = Path.Combine(AppPaths.Root, OwnVoiceRuntimePreferences.FileName);
+        if (File.Exists(path) && File.ReadAllText(path) == contents) return;
+        string temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            File.WriteAllText(temporary, contents);
+            File.Move(temporary, path, overwrite: true);
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
     internal static AppSettings Normalize(AppSettings settings)
@@ -560,6 +588,7 @@ internal static partial class SettingsStore
         {
             _ownRuntimeSpeechEndpoint = speechEndpoint;
             _ownRuntimeTranslationEndpoint = translatorEndpoint;
+            WriteOwnVoiceRuntimePreferences(settings);
             UpdateOwnVoiceConfig(settings, AppPaths.FastConfigPath);
             UpdateOwnVoiceConfig(settings, AppPaths.FoxTransConfigPath);
         }

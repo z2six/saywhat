@@ -72,6 +72,8 @@ internal static class DesktopTests
             checks+=Task.Run(() => GroupSpeechProtocolTests.RunAsync(Path.Combine(directory, "group-routing"))).GetAwaiter().GetResult();
             Progress("Profiles and local group routing");
             checks+=DiagnosticsTests.Run(window, directory);
+            checks+=OwnVoiceRuntimePreferenceTests.Run(Path.Combine(directory, "runtime-preferences"));
+            checks+=Task.Run(() => SupportReportChecksTests.RunAsync(Path.Combine(directory, "support-checks"))).GetAwaiter().GetResult();
             checks+=OwnVoiceLanguageTests.Run(window, directory);
             checks+=HomeTargetLanguageUiTests.Run(window, directory);
             checks+=VoiceFirstHomeUiTests.Run(window, directory);
