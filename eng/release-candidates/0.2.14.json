@@ -2,27 +2,27 @@
   "schemaVersion": 1,
   "repository": "z2six/saywhat",
   "version": "0.2.14",
-  "sourceCommit": null,
-  "candidateRunId": null,
-  "candidateArtifactId": null,
+  "sourceCommit": "77e225dcac086424cfdef868c1dec8060c84e304",
+  "candidateRunId": 41091103562,
+  "candidateArtifactId": 12993289148,
   "candidateArchive": {
-    "bytes": null,
-    "sha256": null
+    "bytes": 146120740,
+    "sha256": "594537adbf04abaedf7507cc4e5d6c0c7e2611b2bd4164f165293a8648b2514e"
   },
   "installer": {
     "file": "SayWhat-0.2.14-Setup.exe",
-    "bytes": null,
-    "sha256": null
+    "bytes": 135164794,
+    "sha256": "1536790d7f86ceced73275f8483c7dbc9ec78cd26161eb7b25d5105a2a8cb9f0"
   },
   "correspondingSource": {
     "file": "SayWhat-Corresponding-Source.zip",
-    "bytes": null,
-    "sha256": null
+    "bytes": 5116350,
+    "sha256": "a6f910723103e84bb1db28ee58aa035f99764cd638b874b37129183dfc9e20cc"
   },
   "rawAppDll": {
     "file": "diagnostics/SayWhat.dll",
-    "bytes": null,
-    "sha256": null
+    "bytes": 5078528,
+    "sha256": "ab8601e5ba6a8f11d79f221308c2324d0f115240c57bc27f9e474a387f283e07"
   },
   "releaseNotesSha256": "f0cca2a95e196a30ce055125bc992685ccefb1d8f320404e2ce75b98dbda69bf",
   "antivirus": {
