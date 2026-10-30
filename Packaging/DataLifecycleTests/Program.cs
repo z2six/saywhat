@@ -36,11 +36,16 @@ internal static class Program
     private static readonly string[] AllActions = ["ResetPreferences", "ClearHistory", "DeleteCachedModels"];
     private static int _checks, _helperRuns;
     private static string _packaging = "", _fixtures = "", _helper = "", _helperHash = "";
+    private static string _mode = "not-started";
 
     private static async Task<int> Main()
     {
         try
         {
+            using (var identity = System.Security.Principal.WindowsIdentity.GetCurrent())
+                _mode = new System.Security.Principal.WindowsPrincipal(identity).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator)
+                    ? "elevated-runner-refusal-only" : "standard-user-full-lifecycle";
+            Console.WriteLine("Mode: " + _mode);
             DirectoryInfo? folder = new(AppContext.BaseDirectory);
             while (folder is not null && !File.Exists(Path.Combine(folder.FullName, "scripts", "manage-install-data.ps1"))) folder = folder.Parent;
             _packaging = folder?.FullName ?? throw new InvalidOperationException("Run this project from the workspace Packaging tree.");
@@ -51,9 +56,9 @@ internal static class Program
             await RunAsync();
             Check(Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(_helper))) == _helperHash, "the helper source remains unchanged through the final check");
             string report = Path.Combine(_fixtures, "results.json");
-            File.WriteAllText(report, JsonSerializer.Serialize(new { Status = "Passed", Checks = _checks, HelperRuns = _helperRuns, HelperSha256 = _helperHash,
+            File.WriteAllText(report, JsonSerializer.Serialize(new { Status = "Passed", Mode = _mode, Checks = _checks, HelperRuns = _helperRuns, HelperSha256 = _helperHash,
                 Fixtures = _fixtures, Safety = "Tiny synthetic workspace files only. No live data, models, audio, links, process stopping, protection changes or actual installer execution." }, new JsonSerializerOptions { WriteIndented = true }));
-            Console.WriteLine($"PASS {_checks} checks, {_helperRuns} reviewed-helper calls. Report: {report}");
+            Console.WriteLine($"PASS mode={_mode}; {_checks} checks, {_helperRuns} reviewed-helper calls. Report: {report}");
             return 0;
         }
         catch (Exception error)
@@ -62,7 +67,7 @@ internal static class Program
             if (_fixtures.Length > 0)
             {
                 string report = Path.Combine(_fixtures, "results.json");
-                File.WriteAllText(report, JsonSerializer.Serialize(new { Status = "Failed", Checks = _checks, HelperRuns = _helperRuns, HelperSha256 = _helperHash, Error = error.Message,
+                File.WriteAllText(report, JsonSerializer.Serialize(new { Status = "Failed", Mode = _mode, Checks = _checks, HelperRuns = _helperRuns, HelperSha256 = _helperHash, Error = error.Message,
                     Fixtures = _fixtures }, new JsonSerializerOptions { WriteIndented = true }));
                 Console.Error.WriteLine("Inspectable fixtures/report: " + report);
             }
@@ -73,6 +78,31 @@ internal static class Program
     private static async Task RunAsync()
     {
         await IdentityPolicyFixturesAsync();
+        if (_mode == "elevated-runner-refusal-only")
+        {
+            // Exercise the real privileged-token refusal, never replace or bypass
+            // the production policy. Successful cleanup needs a standard-user run.
+            string[][] selections = [["ResetPreferences"], ["ClearHistory"], ["DeleteCachedModels"], AllActions, [.. AllActions, "ValidateOnly"]];
+            foreach (string leaf in new[] { "SayWhat", "LocalTalk" })
+            {
+                Fixture fixture = CreateFixture("administrative-refusal-" + leaf, leaf);
+                string before = Snapshot(fixture.Root);
+                Outcome kept = await InvokeAsync(fixture.Root, []);
+                Check(Snapshot(fixture.Root) == before && kept.RemovedFiles == 0, leaf + " administrative no-choice call preserves all files");
+                foreach (string[] options in selections)
+                {
+                    Outcome refused = await InvokeAsync(fixture.Root, options, success: false);
+                    Check(refused.RemovedFiles == 0 && refused.BackupPath == "" && Snapshot(fixture.Root) == before,
+                        leaf + " administrative selection is refused before any data change: " + string.Join(",", options));
+                    bool administrativeRefusal = refused.Details.Contains("administrator permissions", StringComparison.OrdinalIgnoreCase);
+                    Check(administrativeRefusal, "the actual receipt proves the administrative-token refusal rather than another failure; " +
+                        (administrativeRefusal ? "" : UnexpectedReceiptMetadata(Path.Combine(_fixtures, "receipts", $"{_helperRuns:000}.ini"))));
+                }
+                PreserveAssets(fixture);
+            }
+            Console.WriteLine("Administrative refusal coverage only; successful cleanup transitions were not run.");
+            return;
+        }
         foreach (string leaf in new[] { "SayWhat", "LocalTalk" })
         {
             Fixture keep = CreateFixture("keep-" + leaf, leaf);
@@ -275,7 +305,9 @@ internal static class Program
         catch (OperationCanceledException) { throw new TimeoutException($"Reviewed helper exceeded 30 seconds (PID {process.Id}); no process was killed. Fixtures: {_fixtures}"); }
         string stdout = await output, stderr = await error;
         File.WriteAllText(Path.Combine(_fixtures, "receipts", $"{id:000}.output.txt"), stdout + stderr);
-        Check((process.ExitCode == 0) == success, $"helper outcome for {string.Join(",", options)}: exit {process.ExitCode}; {stderr}");
+        bool expectedOutcome = (process.ExitCode == 0) == success;
+        string receiptFailure = expectedOutcome ? "" : UnexpectedReceiptMetadata(receipt);
+        Check(expectedOutcome, $"helper outcome for {string.Join(",", options)}: exit {process.ExitCode}; {stderr[..Math.Min(4096, stderr.Length)]}; {receiptFailure}");
         if (!requireReceipt) return new Outcome(0, "");
         Check(File.Exists(receipt), "helper produced a structured receipt");
         byte[] bytes = File.ReadAllBytes(receipt);
@@ -291,8 +323,47 @@ internal static class Program
         Check(values["Success"] == (success ? "1" : "0"), "receipt success matches process exit");
         Check(!text.Contains("TINY SYNTHETIC CONTENT", StringComparison.Ordinal) && !text.Contains(ExternalBody, StringComparison.Ordinal), "receipt contains no settings/model/history contents");
         Check(int.TryParse(values["RemovedFiles"], out int count) && count >= 0, "receipt has bounded nonnegative file count");
-        return new Outcome(count, values["BackupPath"]);
+        return new Outcome(count, values["BackupPath"], values["Details"]);
     }
+
+    private static string UnexpectedReceiptMetadata(string receipt)
+    {
+        // Only the failing synthetic invocation's bounded receipt is surfaced.
+        // Never read a caller-provided path outside this run's fixture tree.
+        const int maximumBytes = 16 * 1024;
+        try
+        {
+            string path = Path.GetFullPath(receipt);
+            if (!path.StartsWith(_fixtures + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                return "receipt metadata withheld: outside fixture tree";
+            if (!File.Exists(path)) return "receipt missing: " + path;
+            if ((File.GetAttributes(path) & (FileAttributes.ReparsePoint | FileAttributes.Directory)) != 0)
+                return "receipt metadata withheld: not a plain fixture file";
+            using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            byte[] bytes = new byte[maximumBytes + 1]; int length = 0;
+            while (length < bytes.Length)
+            {
+                int count = file.Read(bytes, length, bytes.Length - length);
+                if (count == 0) break;
+                length += count;
+            }
+            if (length > maximumBytes) return "receipt exceeds 16 KiB: " + path;
+            using var reader = new StreamReader(new MemoryStream(bytes, 0, length), Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            string text = reader.ReadToEnd();
+            var fields = new List<string>();
+            foreach (string line in text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+            {
+                int equal = line.IndexOf('=');
+                if (equal < 0 || line[..equal] is not ("Success" or "Message" or "Details" or "RemovedFiles")) continue;
+                fields.Add(line[..Math.Min(2048, line.Length)]);
+                if (fields.Count == 4) break;
+            }
+            return "receipt " + path + ": " + (fields.Count > 0 ? string.Join("; ", fields) : "no result metadata");
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Security.SecurityException or ArgumentException)
+        { return "receipt metadata unavailable: " + error.GetType().Name; }
+    }
+
     private static void Check(bool condition, string description)
     {
         if (!condition) throw new InvalidOperationException(description);
@@ -302,5 +373,5 @@ internal static class Program
     {
         internal string Path(string relative) => System.IO.Path.Combine(Root, relative);
     }
-    private sealed record Outcome(int RemovedFiles, string BackupPath);
+    private sealed record Outcome(int RemovedFiles, string BackupPath, string Details = "");
 }
