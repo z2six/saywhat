@@ -186,5 +186,6 @@
   "speakers.resources": "L’identification facultative des personnes utilise un petit modèle CPU distinct : CAM++ ou ERes2Net, plus volumineux. Il identifie les voix, sans transcrire ni traduire. Il ne fait pas d’inférence sur le GPU, mais son utilisation du CPU et de la mémoire peut affecter les performances du jeu.",
   "demo.apply": "Appliquer les modifications",
   "release.securityTitle": "Examen par Bitdefender en attente",
-  "release.securityBody": "Bitdefender signale actuellement un composant de la version {version}. Il a été soumis pour examen ; aucun verdict n’a encore été rendu."
+  "release.securityBody": "Bitdefender signale actuellement un composant de la version {version}. Il a été soumis pour examen ; aucun verdict n’a encore été rendu.",
+  "release.previousSecurityBody": "Bitdefender a signalé la version {previousVersion}, dont l’examen est toujours en cours. La version {version} n’a pas encore reçu de verdict de l’éditeur et pourrait aussi être signalée."
 }

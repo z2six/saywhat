@@ -142,11 +142,14 @@ internal static class TimingDefaultsTests
             new HashSet<string> { "Offline-Test-Ubuntu" }, new("Offline-Test-Ubuntu", "/inert/server", "/inert/model.gguf", "cpu"), true, true, false));
         public Task<SetupPrerequisiteResult> EnsureNativeRuntimeAsync(IProgress<ProvisionProgress>? progress, CancellationToken token) => Task.FromResult(SetupPrerequisiteResult.Ready);
         public Task<SetupPrerequisiteResult> EnsureWindowsSpeechAsync(IProgress<ProvisionProgress>? progress, CancellationToken token) => Task.FromResult(SetupPrerequisiteResult.Ready);
-        public Task EnsureDistributionAsync(string name, IProgress<ProvisionProgress>? progress, CancellationToken token) => Task.CompletedTask;
+        public Task<string> EnsureDistributionAsync(string name, IProgress<ProvisionProgress>? progress, CancellationToken token) => Task.FromResult(name);
         public Task EnsureModelAsync(string id, IProgress<ProvisionProgress>? progress, CancellationToken token) => Task.CompletedTask;
         public Task EnsureRuntimeAsync(string id, IProgress<ProvisionProgress>? progress, CancellationToken token) => Task.CompletedTask;
         public Task<string> EnsureSpeakerModelAsync(AppSettings settings, IProgress<ProvisionProgress>? progress, CancellationToken token) => Task.FromResult(settings.SpeakerModelPath);
         public Task ValidateSpeechAsync(WslSpeechRegistration speech, CancellationToken token) => Task.CompletedTask;
         public Task BuildSpeechAsync(string distribution, string backend, IProgress<ProvisionProgress>? progress, CancellationToken token) => Task.CompletedTask;
+        public long PendingOwnNativeSpeechBytes(AppSettings settings) => 0;
+        public bool IsOwnNativeSpeechReady(AppSettings settings) => true;
+        public Task EnsureOwnNativeSpeechAsync(AppSettings settings, IProgress<ProvisionProgress>? progress, CancellationToken token) => Task.CompletedTask;
     }
 }

@@ -186,5 +186,6 @@
   "speakers.resources": "可选的人物识别使用独立的小型 CPU 模型：CAM++，或较大的 ERes2Net。它用于辨认声音，不负责语音转文字或翻译。它不使用 GPU 推理，但 CPU 和内存占用仍可能影响游戏表现。",
   "demo.apply": "应用更改",
   "release.securityTitle": "等待 Bitdefender 审核",
-  "release.securityBody": "Bitdefender 目前会对 {version} 版本中的一个组件发出警报。该组件已提交审核，尚未收到结论。"
+  "release.securityBody": "Bitdefender 目前会对 {version} 版本中的一个组件发出警报。该组件已提交审核，尚未收到结论。",
+  "release.previousSecurityBody": "Bitdefender 曾将 {previousVersion} 版本标记为风险，相关审核仍在进行。{version} 版本尚无厂商的检测结论，也可能被拦截。"
 }

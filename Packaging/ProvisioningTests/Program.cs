@@ -144,11 +144,14 @@ try
     Check(startScript.IndexOf("trap cleanup EXIT", StringComparison.Ordinal) < startScript.IndexOf("\"$server\" --model", StringComparison.Ordinal)
         && startScript.Contains("attempt<50", StringComparison.Ordinal), "Speech child cleanup is installed before launch and has a bounded shutdown");
     string bootstrapScriptText = File.ReadAllText(Path.Combine(packagingRoot, "scripts", "bootstrap-voxtral-wsl.sh"));
-    const string aptProgressDefinition = "apt_progress=(-q -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0 -o DPkg::Lock::Timeout=120)";
+    const string aptProgressDefinition = "apt_progress=(-q -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0 -o DPkg::Lock::Timeout=120";
     Check(bootstrapScriptText.Contains(aptProgressDefinition, StringComparison.Ordinal) &&
         bootstrapScriptText.IndexOf("export LC_ALL=C", StringComparison.Ordinal) >= 0 &&
-        bootstrapScriptText.IndexOf("export LC_ALL=C", StringComparison.Ordinal) < bootstrapScriptText.IndexOf(aptProgressDefinition, StringComparison.Ordinal),
-        "Future bootstrap declares newline APT status, no dpkg pseudo-terminal, bounded lock waiting, and invariant locale before package setup");
+        bootstrapScriptText.IndexOf("export LC_ALL=C", StringComparison.Ordinal) < bootstrapScriptText.IndexOf(aptProgressDefinition, StringComparison.Ordinal) &&
+        bootstrapScriptText.Contains("Acquire::http::Timeout=30", StringComparison.Ordinal) &&
+        bootstrapScriptText.Contains("Acquire::https::Timeout=30", StringComparison.Ordinal) &&
+        bootstrapScriptText.Contains("Acquire::Retries=1", StringComparison.Ordinal),
+        "Future bootstrap declares headless status, bounded network/lock waiting, and invariant locale before package setup");
     string[] aptCommands = System.Text.RegularExpressions.Regex.Matches(bootstrapScriptText, @"(?m)^\s*run_apt (?:update|install)[^\r\n]*$")
         .Select(match => match.Value.Trim()).ToArray();
     Check(aptCommands.Length == 5 && bootstrapScriptText.Contains("run_package apt-get \"${apt_progress[@]}\" \"$@\"", StringComparison.Ordinal),

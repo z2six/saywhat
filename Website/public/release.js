@@ -31,8 +31,11 @@
     byId("release-security-notice").hidden = !showSecurityNotice;
     if (showSecurityNotice) {
       byId("release-security-title").textContent = translated("release.securityTitle", {}, "Bitdefender review pending");
-      byId("release-security-body").textContent = translated("release.securityBody", { version: releaseView.version },
-        `Bitdefender currently flags a component in version ${releaseView.version}. It has been submitted for review; a verdict is pending.`);
+      byId("release-security-body").textContent = releaseView.previousAffectedVersion
+        ? translated("release.previousSecurityBody", { version: releaseView.version, previousVersion: releaseView.previousAffectedVersion },
+          `Bitdefender flagged version ${releaseView.previousAffectedVersion}, which is still under review. Version ${releaseView.version} has not received a vendor verdict and may also be flagged.`)
+        : translated("release.securityBody", { version: releaseView.version },
+          `Bitdefender currently flags a component in version ${releaseView.version}. It has been submitted for review; a verdict is pending.`);
       installerLink.setAttribute("aria-describedby", "release-security-body");
     } else {
       installerLink.removeAttribute("aria-describedby");
@@ -102,9 +105,13 @@
     byId("repository-link").href = urls.repository;
     gatedLinks.forEach((link) => { link.removeAttribute("aria-disabled"); });
     const notice = manifest.securityNotice;
-    const securityNotice = version === "0.2.11" && notice && typeof notice === "object" && !Array.isArray(notice) &&
-      notice.id === "bitdefender-review-pending" && notice.affectedVersion === version;
-    releaseView = { kind: "available", version: manifest.version, size: byteSize, securityNotice: securityNotice === true };
+    const noticeObject = notice && typeof notice === "object" && !Array.isArray(notice) && notice.affectedVersion === version;
+    const detectedNotice = noticeObject && version === "0.2.11" && notice.id === "bitdefender-review-pending";
+    const previousNotice = noticeObject && version === "0.2.12" && notice.id === "bitdefender-previous-build-review-pending" &&
+      notice.previousAffectedVersion === "0.2.11";
+    releaseView = { kind: "available", version: manifest.version, size: byteSize,
+      securityNotice: detectedNotice === true || previousNotice === true,
+      previousAffectedVersion: previousNotice === true ? "0.2.11" : null };
     checksum = installer.sha256.toLowerCase();
     byId("installer-sha").textContent = checksum;
     byId("checksum-panel").hidden = false;

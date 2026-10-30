@@ -44,7 +44,8 @@ export DEBIAN_FRONTEND=noninteractive
 # Newline-delimited status works through a background pipe without a terminal.
 # Percentages describe the current package transaction, not the entire setup.
 export LC_ALL=C
-apt_progress=(-q -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0 -o DPkg::Lock::Timeout=120)
+apt_progress=(-q -o APT::Status-Fd=1 -o Dpkg::Use-Pty=0 -o DPkg::Lock::Timeout=120
+    -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=1)
 package_log=$(umask 077; mktemp "/tmp/localtalk-packages-$job_id.XXXXXXXX.log")
 package_output=$(umask 077; mktemp "/tmp/localtalk-package-output-$job_id.XXXXXXXX")
 echo "Package setup transcript: $package_log"
@@ -107,7 +108,7 @@ if [[ "$backend" == cuda ]]; then
     if [[ ! -x /usr/local/cuda-13.1/bin/nvcc ]]; then
         echo 'Step 2/5: Installing the CUDA 13.1 TOOLKIT only (multi-GB download). No Linux display driver is installed.'
         keyring="/tmp/localtalk-cuda-keyring-$job_id.deb"
-        curl --fail --location --proto '=https' --tlsv1.2 --output "$keyring" \
+        curl --fail --location --proto '=https' --tlsv1.2 --connect-timeout 20 --speed-time 60 --speed-limit 1024 --retry 1 --output "$keyring" \
             'https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/cuda-keyring_1.1-1_all.deb'
         echo "eea6cc5f0eaeb99082d054b8c05ae206a378e31e88048df0310d59f651dceed2  $keyring" | sha256sum --check --status || {
             echo 'The NVIDIA repository keyring did not match the pinned checksum. It was not installed.' >&2
@@ -152,7 +153,7 @@ mkdir -p "$root"
 if [[ ! -f "$source_marker" ]]; then
     echo 'Step 3/5: Downloading and verifying the pinned MIT-licensed Voxtral source archive.'
     archive="/tmp/localtalk-voxtral-$job_id.tar.gz"
-    curl --fail --location --proto '=https' --tlsv1.2 --output "$archive" \
+    curl --fail --location --proto '=https' --tlsv1.2 --connect-timeout 20 --speed-time 60 --speed-limit 1024 --retry 1 --output "$archive" \
         "https://codeload.github.com/MrShitFox/voxtral.cpp/tar.gz/$commit"
     echo "3c0d31da1289ccf7234278d37cb84eead2cc0fc05471292229a5980c8cf015dd  $archive" | sha256sum --check --status || {
         echo 'The Voxtral source archive did not match the pinned checksum. No unverified source will be built.' >&2

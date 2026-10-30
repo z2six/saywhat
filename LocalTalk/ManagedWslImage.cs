@@ -263,7 +263,10 @@ internal static class ManagedWslImage
 
     private static string CanonicalName(string name)
     {
-        if (name.Length is 0 or > 4096 || name.Contains('\\') || name.Any(char.IsControl) || name.StartsWith('/'))
+        // TAR names use POSIX separators. Backslashes are literal filename
+        // bytes (for example systemd's \x2d-escaped units), never separators.
+        // Entries are streamed into another TAR, never extracted on Windows.
+        if (name.Length is 0 or > 4096 || name.Any(char.IsControl) || name.StartsWith('/'))
             throw new InvalidDataException("The speech image contains an unsupported archive path.");
         while (name.StartsWith("./", StringComparison.Ordinal)) name = name[2..];
         name = name.TrimEnd('/');

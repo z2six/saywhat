@@ -1,0 +1,58 @@
+name: Promote a reviewed installer candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Reviewed candidate version with completed immutable pins
+        required: true
+        type: choice
+        options:
+          - '0.2.12'
+      acknowledge_pending_antivirus_review:
+        description: Publish while the 0.2.11 Bitdefender review is pending; 0.2.12 detection and vendor clearance remain unestablished
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: promote-saywhat-v${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    if: ${{ github.repository == 'z2six/saywhat' && github.ref == 'refs/heads/main' && inputs.version == '0.2.12' && inputs.acknowledge_pending_antivirus_review == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: write
+    env:
+      SAYWHAT_VERSION: ${{ inputs.version }}
+    steps:
+      - name: Check out reviewed promotion tooling and pins
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Test strict metadata, archive and publication guards
+        run: python3 eng/Promote-ReleaseCandidate.py --version "$SAYWHAT_VERSION" --self-test
+      - name: Validate every reviewed pin before promotion
+        run: python3 eng/Promote-ReleaseCandidate.py --version "$SAYWHAT_VERSION" --validate-only
+      - name: Verify and publish the exact existing candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SAYWHAT_ACKNOWLEDGE_REVIEW_PENDING: ${{ inputs.acknowledge_pending_antivirus_review }}
+        run: python3 eng/Promote-ReleaseCandidate.py --version "$SAYWHAT_VERSION"
+      - name: Upload publication receipt only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: SayWhat-${{ inputs.version }}-promotion-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/promote-${{ inputs.version }}/promotion-receipt.json
+          if-no-files-found: error
+          retention-days: 30
+
+      # No rebuild, installer execution, antivirus changes, model downloads,
+      # audio capture, website deployment or update-feed change occurs here.

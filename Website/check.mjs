@@ -14,8 +14,10 @@ let checks = 0;
 function check(condition, message) { checks++; assert.ok(condition, message); }
 check(manifest.schemaVersion === 1 && typeof manifest.ready === "boolean", "Manifest readiness is an explicit versioned boolean.");
 check(manifest.channel === "preview", "Preview status is explicit.");
-if (manifest.securityNotice != null) check(manifest.version === "0.2.11" && manifest.securityNotice.id === "bitdefender-review-pending" &&
-  manifest.securityNotice.affectedVersion === manifest.version, "A public security notice identifies the reviewed issue and exact affected release.");
+if (manifest.securityNotice != null) check(manifest.securityNotice.affectedVersion === manifest.version &&
+  ((manifest.version === "0.2.11" && manifest.securityNotice.id === "bitdefender-review-pending") ||
+   (manifest.version === "0.2.12" && manifest.securityNotice.id === "bitdefender-previous-build-review-pending" &&
+    manifest.securityNotice.previousAffectedVersion === "0.2.11")), "A public security notice identifies the reviewed issue and exact affected release.");
 check((html.match(/<main\b/g) || []).length === 1 && (html.match(/<\/main>/g) || []).length === 1, "Exactly one main landmark exists.");
 check((html.match(/<h1\b/g) || []).length === 1, "One clear page heading exists.");
 check(html.includes('lang="en"') && html.includes('class="skip-link"'), "English page and keyboard skip link exist.");
@@ -212,6 +214,20 @@ for (const version of ["0.2.10", "0.2.12"]) {
 }
 for (const invalid of [{ ...noticeRelease, ready: false }, { ...noticeRelease, source: { ...noticeRelease.source, sha256: "invalid" } }])
   assertUnavailable(await browserFixture(invalid));
+const previousNoticeRelease = releaseAtVersion("0.2.12");
+previousNoticeRelease.securityNotice = { id: "bitdefender-previous-build-review-pending", affectedVersion: "0.2.12", previousAffectedVersion: "0.2.11" };
+const previousWarning = await browserFixture(previousNoticeRelease);
+check(!previousWarning.elements.get("release-security-notice").hidden &&
+  previousWarning.elements.get("release-security-body").textContent.includes("flagged version 0.2.11") &&
+  previousWarning.elements.get("release-security-body").textContent.includes("Version 0.2.12 has not received a vendor verdict") &&
+  !previousWarning.elements.get("release-security-body").textContent.includes("currently flags a component in version 0.2.12"),
+  "The new preview distinguishes the confirmed predecessor detection from its unknown scan verdict.");
+for (const previous of ["0.2.10", "0.2.12", null, "<img>"]) {
+  const mismatch = structuredClone(previousNoticeRelease);
+  mismatch.securityNotice.previousAffectedVersion = previous;
+  check((await browserFixture(mismatch)).elements.get("release-security-notice").hidden,
+    "The predecessor warning cannot carry an unreviewed or injected version.");
+}
 await warned.elements.get("refresh-release").events.get("click")();
 assertUnavailable(warned);
 
@@ -278,6 +294,7 @@ const localized = await browserFixture(ready, false, { catalogs });
 const localizedPending = await browserFixture({ ...ready, ready: false }, false, { catalogs });
 const localizedError = await browserFixture(null, true, { catalogs });
 const localizedNotice = await browserFixture(noticeRelease, false, { catalogs });
+const localizedPreviousNotice = await browserFixture(previousNoticeRelease, false, { catalogs });
 for (const code of localeCodes) {
   localized.setLanguage(code);
   check(localized.elements.get("installer-link").textContent === catalogs[code]["release.availableInstaller"], `${code}: ready button translates.`);
@@ -298,5 +315,10 @@ for (const code of localeCodes) {
     `${code}: the active version-specific security warning repaints in the selected language.`);
   check(localizedNotice.elements.get("installer-link").href === noticeRelease.installer.url && localizedNotice.calls.length === 1,
     `${code}: translating the warning neither replaces the installer nor triggers another manifest request.`);
+  localizedPreviousNotice.setLanguage(code);
+  check(!localizedPreviousNotice.elements.get("release-security-notice").hidden &&
+    localizedPreviousNotice.elements.get("release-security-body").textContent === catalogs[code]["release.previousSecurityBody"]
+      .replace("{previousVersion}", "0.2.11").replace("{version}", "0.2.12"),
+    `${code}: the predecessor notice translates both exact versions without claiming a new detection.`);
 }
 console.log(`PASS: ${checks} offline website asset/anchor/accessibility-structure/release-gate checks. No network, server, app, model, audio or real clipboard.`);

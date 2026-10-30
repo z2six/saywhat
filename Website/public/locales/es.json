@@ -186,5 +186,6 @@
   "speakers.resources": "La identificación opcional de personas usa un modelo pequeño de CPU aparte: CAM++ o la opción más grande ERes2Net. Identifica voces; no transcribe ni traduce. No usa inferencia en la GPU, aunque el uso de CPU y memoria puede afectar al rendimiento del juego.",
   "demo.apply": "Aplicar cambios",
   "release.securityTitle": "Revisión de Bitdefender pendiente",
-  "release.securityBody": "Bitdefender detecta actualmente un componente de la versión {version}. Se ha enviado para su revisión y aún no hay un veredicto."
+  "release.securityBody": "Bitdefender detecta actualmente un componente de la versión {version}. Se ha enviado para su revisión y aún no hay un veredicto.",
+  "release.previousSecurityBody": "Bitdefender marcó la versión {previousVersion} y su revisión sigue pendiente. La versión {version} aún no tiene un dictamen del proveedor y también podría ser bloqueada."
 }

@@ -35,6 +35,8 @@ internal static class ManagedWslImageTests
         foreach (TarEntryFormat format in new[] { TarEntryFormat.Pax, TarEntryFormat.Gnu })
         {
             string longName = "usr/share/" + new string('a', 150) + "/fixture.txt";
+            const string escapedUnit = @"usr/lib/systemd/system/system-systemd\x2dcryptsetup.slice";
+            const string literalConfig = @"etc\wsl.conf";
             byte[] original = Archive(format, writer =>
             {
                 Add(writer, format, TarEntryType.Directory, "./");
@@ -45,6 +47,8 @@ internal static class ManagedWslImageTests
                     "[oobe]\ncommand=/usr/lib/wsl/wsl-setup\ndefaultUid=1000\n[SHORTCUT]\nicon=/usr/share/wsl/ubuntu.ico\nEnabled=true\n[WindowsTerminal]\nProfileTemplate=/usr/share/wsl/terminal-profile.json\n[unrelated]\nenabled=true\n");
                 Add(writer, format, TarEntryType.RegularFile, "usr/bin/fixture", "#!/bin/sh\nexit 0\n", mode: ExecutableMode);
                 Add(writer, format, TarEntryType.RegularFile, longName, "retained long path");
+                Add(writer, format, TarEntryType.RegularFile, escapedUnit, "synthetic systemd unit\n", mode: ExecutableMode);
+                Add(writer, format, TarEntryType.RegularFile, literalConfig, "[general]\nguiApplications=true\n");
                 PosixTarEntry binary = format == TarEntryFormat.Pax
                     ? new PaxTarEntry(TarEntryType.RegularFile, "usr/lib/fixture.so") : new GnuTarEntry(TarEntryType.RegularFile, "usr/lib/fixture.so");
                 using var binaryData = new MemoryStream(new byte[] { 0, 255, 127, 0, 1, 254, 128 }, writable: false);
@@ -59,6 +63,12 @@ internal static class ManagedWslImageTests
             Dictionary<string, Snapshot> after = Inspect(prepared);
             Check(after["."].Type == TarEntryType.Directory && after["."].Mode == before["."].Mode,
                 "preserves the relative ./ archive root entry in " + format);
+            Check(after.ContainsKey(escapedUnit) && !after.ContainsKey(escapedUnit.Replace('\\', '/')) &&
+                after[escapedUnit].Digest == before[escapedUnit].Digest && after[escapedUnit].Mode == ExecutableMode,
+                "preserves literal backslashes in systemd unit names, contents and Linux modes in " + format);
+            Check(after.ContainsKey(literalConfig) && after[literalConfig].Text == "[general]\nguiApplications=true\n" &&
+                after[literalConfig].Digest == before[literalConfig].Digest,
+                "a literal etc-backslash-wsl.conf filename remains unrelated to the real per-distro configuration in " + format);
             Snapshot config = after["etc/wsl.conf"];
             Check(config.Text.Contains("[GeNeRaL]\n  GuiApplications = false # retained comment\n", StringComparison.Ordinal), "sets GUI support false while retaining section/key case and comments in " + format);
             foreach (string retained in new[] { "# retained", "[BOOT]\nsystemd=true", "[gpu]\nenabled=true\nappendLibPath=true", "generateResolvConf=false" })
@@ -102,7 +112,7 @@ internal static class ManagedWslImageTests
         byte[] noKey = Archive(TarEntryFormat.Pax, writer => Add(writer, TarEntryFormat.Pax, TarEntryType.RegularFile, "etc/wsl.conf", "[general]\n# retained\n[gpu]\nenabled=true"));
         Check(Inspect(Rewrite(noKey))["etc/wsl.conf"].Text.Contains("[general]\n# retained\nguiApplications=false\n[gpu]\nenabled=true", StringComparison.Ordinal), "inserts missing key in its own section");
 
-        foreach (string name in new[] { "/etc/wsl.conf", "etc/../wsl.conf", "etc//wsl.conf", "etc\\wsl.conf", "etc/./wsl.conf",
+        foreach (string name in new[] { "/etc/wsl.conf", "etc/../wsl.conf", "etc//wsl.conf", "etc/./wsl.conf",
             "./../escape", "./etc/../../escape", "../", "./etc/./wsl.conf", "/./", "//" })
             Refuses(() => Rewrite(Archive(TarEntryFormat.Pax, writer => Add(writer, TarEntryFormat.Pax, TarEntryType.RegularFile, name, "fixture"))), "refuses ambiguous entry path: " + name);
         foreach (string name in new[] { "etc/wsl.conf", "etc/wsl-distribution.conf", "etc/saywhat-owner" })

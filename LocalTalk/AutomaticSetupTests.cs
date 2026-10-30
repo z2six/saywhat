@@ -29,6 +29,7 @@ internal static class AutomaticSetupOfflineTests
         AppSettings Settings() => new()
         {
             UseManagedTranslator = false, UseAiSpeakerRecognition = false,
+            OwnRecognitionEngine = "voxtral", OwnVoiceSourceLanguage = "Automatic",
             IncomingSpeechEngine = "voxtral", IncomingNormalSpeechEngine = "voxtral",
             OwnManagedModelId = "hy-mt2-7b-q4_k_m", IncomingManagedModelId = "hy-mt2-1.8b-q4_k_m",
             ShareTranslationModel = true, OwnVoiceTargetLanguage = "Chinese", IncomingTargetLanguage = "English",

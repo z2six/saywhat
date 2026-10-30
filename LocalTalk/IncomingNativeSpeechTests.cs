@@ -150,7 +150,7 @@ internal static class IncomingNativeSpeechTests
             Task.FromResult(SetupPrerequisiteResult.Ready);
         public Task<SetupPrerequisiteResult> EnsureWindowsSpeechAsync(IProgress<ProvisionProgress>? progress, CancellationToken token)
         { LinuxCalls++; throw new InvalidOperationException("Native subtitle setup must not install Linux."); }
-        public Task EnsureDistributionAsync(string name, IProgress<ProvisionProgress>? progress, CancellationToken token)
+        public Task<string> EnsureDistributionAsync(string name, IProgress<ProvisionProgress>? progress, CancellationToken token)
         { LinuxCalls++; throw new InvalidOperationException("Native subtitle setup must not create a distribution."); }
         public Task ValidateSpeechAsync(WslSpeechRegistration speech, CancellationToken token)
         { LinuxCalls++; throw new InvalidOperationException("Native subtitle setup must not inspect WSL."); }

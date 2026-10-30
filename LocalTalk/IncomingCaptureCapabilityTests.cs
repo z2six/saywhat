@@ -183,7 +183,7 @@ internal static class IncomingCaptureCapabilityTests
         private Task Unexpected() { Preparations++; throw new InvalidOperationException("No preparation is allowed in this fixture."); }
         public Task<SetupPrerequisiteResult> EnsureNativeRuntimeAsync(IProgress<ProvisionProgress>? progress, CancellationToken token) { Unexpected(); throw new InvalidOperationException(); }
         public Task<SetupPrerequisiteResult> EnsureWindowsSpeechAsync(IProgress<ProvisionProgress>? progress, CancellationToken token) { Unexpected(); throw new InvalidOperationException(); }
-        public Task EnsureDistributionAsync(string name, IProgress<ProvisionProgress>? progress, CancellationToken token) => Unexpected();
+        public Task<string> EnsureDistributionAsync(string name, IProgress<ProvisionProgress>? progress, CancellationToken token) { Unexpected(); throw new InvalidOperationException(); }
         public Task EnsureModelAsync(string id, IProgress<ProvisionProgress>? progress, CancellationToken token) => Unexpected();
         public Task EnsureRuntimeAsync(string id, IProgress<ProvisionProgress>? progress, CancellationToken token) => Unexpected();
         public Task<string> EnsureSpeakerModelAsync(AppSettings settings, IProgress<ProvisionProgress>? progress, CancellationToken token) { Unexpected(); throw new InvalidOperationException(); }

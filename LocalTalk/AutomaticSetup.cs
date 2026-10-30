@@ -67,15 +67,26 @@ internal sealed class AutomaticSetupService
             : incomingVoiceOnly ? "incoming-voice-setup-progress.json" : "setup-progress.json");
     }
 
-    private bool UsesOwnNativeSpeech(AppSettings settings) => _ownVoiceOnly && settings.OwnRecognitionEngine != "voxtral";
-    private bool UsesIncomingNativeSpeech(AppSettings settings) => _incomingVoiceOnly && IncomingRecognitionCatalog.UsesNative(settings);
+    private bool IncludesOwnVoice => !_incomingVoiceOnly;
+    private bool IncludesIncomingVoice => !_ownVoiceOnly;
+    private bool UsesOwnNativeSpeech(AppSettings settings) => IncludesOwnVoice && settings.OwnRecognitionEngine != "voxtral";
+    private bool UsesIncomingNativeSpeech(AppSettings settings) => IncludesIncomingVoice && IncomingRecognitionCatalog.UsesNative(settings);
     private bool UsesNativeSpeech(AppSettings settings) => UsesOwnNativeSpeech(settings) || UsesIncomingNativeSpeech(settings);
-    private long PendingNativeSpeechBytes(AppSettings settings) => UsesIncomingNativeSpeech(settings)
-        ? _platform.PendingIncomingNativeSpeechBytes(settings) : _platform.PendingOwnNativeSpeechBytes(settings);
-    private bool IsNativeSpeechReady(AppSettings settings) => UsesIncomingNativeSpeech(settings)
-        ? _platform.IsIncomingNativeSpeechReady(settings) : _platform.IsOwnNativeSpeechReady(settings);
-    private bool NeedsSpeakerAssets(AppSettings settings) => !_ownVoiceOnly && settings.UseAiSpeakerRecognition &&
-        (!_incomingVoiceOnly || !settings.IncomingSinglePerson);
+    private bool NeedsWslSpeech(AppSettings settings) =>
+        (IncludesOwnVoice && !UsesOwnNativeSpeech(settings)) || (IncludesIncomingVoice && !UsesIncomingNativeSpeech(settings));
+    private long PendingNativeSpeechBytes(AppSettings settings)
+    {
+        long ownBytes = UsesOwnNativeSpeech(settings) ? _platform.PendingOwnNativeSpeechBytes(settings) : 0;
+        long incomingBytes = UsesIncomingNativeSpeech(settings) ? _platform.PendingIncomingNativeSpeechBytes(settings) : 0;
+        // Both Nemotron directions reference the same verified runtime/model.
+        // Each preparation call remains independent and reuses those files.
+        return UsesOwnNativeSpeech(settings) && UsesIncomingNativeSpeech(settings) && settings.IncomingSpeechEngine == "nemotron"
+            ? Math.Max(ownBytes, incomingBytes) : ownBytes + incomingBytes;
+    }
+    private bool IsNativeSpeechReady(AppSettings settings) =>
+        (!UsesOwnNativeSpeech(settings) || _platform.IsOwnNativeSpeechReady(settings)) &&
+        (!UsesIncomingNativeSpeech(settings) || _platform.IsIncomingNativeSpeechReady(settings));
+    private bool NeedsSpeakerAssets(AppSettings settings) => IncludesIncomingVoice && RuntimeProfiles.UsesSpeakerRecognition(settings);
 
     // Inspection does not launch WSL, a speech engine, a translator, or an audio device.
     public async Task<AutomaticSetupPlan> PlanAsync(AppSettings settings, CancellationToken token = default)
@@ -84,20 +95,22 @@ internal sealed class AutomaticSetupService
         ValidateSelections(settings, _ownVoiceOnly, _incomingVoiceOnly);
         AutomaticSetupSnapshot snapshot = await _platform.InspectAsync(settings, token);
         bool nativeSpeech = UsesNativeSpeech(settings);
-        if (!nativeSpeech) _platform.ValidateSpeechPlatform(snapshot.Speech?.Backend ?? (snapshot.HasNvidiaGpu ? "cuda" : "vulkan"));
+        bool wslSpeech = NeedsWslSpeech(settings);
+        if (wslSpeech) _platform.ValidateSpeechPlatform(snapshot.Speech?.Backend ?? (snapshot.HasNvidiaGpu ? "cuda" : "vulkan"));
         string[] models = UsesBuiltInTranslation(settings) ? TranslationIds(settings, _ownVoiceOnly, _incomingVoiceOnly) : [];
         long bytes = models.Where(id => !snapshot.ModelIds.Contains(id))
             .Sum(id => LocalTalkProvisioner.ModelCatalog.Single(model => model.Id == id).SizeBytes);
         if (nativeSpeech) bytes += PendingNativeSpeechBytes(settings);
-        else if (snapshot.ManagedSpeechModelMissing || (snapshot.Speech is null && !snapshot.ModelIds.Contains("voxtral-realtime-q4_k_m")))
+        if (wslSpeech && (snapshot.ManagedSpeechModelMissing || (snapshot.Speech is null && !snapshot.ModelIds.Contains("voxtral-realtime-q4_k_m"))))
             bytes += LocalTalkProvisioner.ModelCatalog.Single(model => model.Id == "voxtral-realtime-q4_k_m").SizeBytes;
         if (UsesBuiltInTranslation(settings) && !snapshot.RuntimeIds.Contains(settings.ManagedRuntimeId))
             bytes += LocalTalkProvisioner.RuntimeCatalog.Single(runtime => runtime.Id == settings.ManagedRuntimeId).SizeBytes;
         if (NeedsSpeakerAssets(settings) && !snapshot.SpeakerModelReady) bytes += WindowsAutomaticSetupPlatform.SpeakerAsset.SizeBytes;
         if (!snapshot.NativeRuntimeReady) bytes += WindowsAutomaticSetupPlatform.NativeRuntimeAsset.SizeBytes;
         string summary = bytes > 0 ? $"Download about {bytes / 1e9:0.0} GB of translation files. " : "Reuse the translation files already on this PC. ";
-        summary += nativeSpeech ? "Prepare your selected speech recognizer on Windows. No Linux component is needed."
-            : snapshot.Speech is null
+        if (nativeSpeech) summary += wslSpeech ? "Prepare your selected speech recognizer on Windows. "
+            : "Prepare your selected speech recognizer on Windows. No Linux component is needed.";
+        if (wslSpeech) summary += snapshot.Speech is null
             ? "Set up the speech component automatically. This also downloads Windows/Linux components and build tools; an NVIDIA setup can need several more GB and at least 20 GB of free space. Windows may ask for permission or a restart."
             : snapshot.ManagedSpeechModelMissing
                 ? "Restore the missing speech model for your existing speech component. Keep its registered engine and save the selected languages."
@@ -106,9 +119,10 @@ internal sealed class AutomaticSetupService
         if (!snapshot.NativeRuntimeReady) summary += " Install the Microsoft runtime if needed.";
         summary += _incomingVoiceOnly ? " Live subtitles stay stopped until you press Start. Your own-voice choices are kept."
             : " Translation stays stopped until you press Start.";
-        return new(summary, bytes, !snapshot.NativeRuntimeReady || (!nativeSpeech && snapshot.Speech is null),
-            !snapshot.NativeRuntimeReady || (!nativeSpeech && snapshot.Speech is null))
-            { SpeechSetupRequired = nativeSpeech ? !IsNativeSpeechReady(settings) : snapshot.Speech is null };
+        return new(summary, bytes, !snapshot.NativeRuntimeReady || (wslSpeech && snapshot.Speech is null),
+            !snapshot.NativeRuntimeReady || (wslSpeech && snapshot.Speech is null))
+            { SpeechSetupRequired = (nativeSpeech && !IsNativeSpeechReady(settings)) ||
+                (wslSpeech && (snapshot.Speech is null || snapshot.ManagedSpeechModelMissing)) };
     }
 
     public async Task<AutomaticSetupResult> RunAsync(AppSettings settings, bool explicitConsent,
@@ -127,14 +141,15 @@ internal sealed class AutomaticSetupService
             await Stage("Checking this PC", state, progress, token);
             AutomaticSetupSnapshot snapshot = await _platform.InspectAsync(settings, token);
             bool nativeSpeech = UsesNativeSpeech(settings);
-            if (!nativeSpeech) _platform.ValidateSpeechPlatform(snapshot.Speech?.Backend ?? (snapshot.HasNvidiaGpu ? "cuda" : "vulkan"));
+            bool wslSpeech = NeedsWslSpeech(settings);
+            if (wslSpeech) _platform.ValidateSpeechPlatform(snapshot.Speech?.Backend ?? (snapshot.HasNvidiaGpu ? "cuda" : "vulkan"));
             if (!snapshot.NativeRuntimeReady)
             {
                 await Stage("Preparing Windows components", state, progress, token);
                 if (await _platform.EnsureNativeRuntimeAsync(progress, token) == SetupPrerequisiteResult.RestartRequired)
                     return await PauseForRestart(state, token);
             }
-            if (!nativeSpeech && snapshot.Speech is null)
+            if (wslSpeech && snapshot.Speech is null)
             {
                 await Stage("Preparing the speech component", state, progress, token);
                 if (await _platform.EnsureWindowsSpeechAsync(progress, token) == SetupPrerequisiteResult.RestartRequired)
@@ -175,11 +190,12 @@ internal sealed class AutomaticSetupService
             if (nativeSpeech)
             {
                 await Stage("Preparing speech recognition", state, progress, token);
+                if (UsesOwnNativeSpeech(settings))
+                    await _platform.EnsureOwnNativeSpeechAsync(settings, FriendlyProgress(progress, "Preparing speech recognition"), token);
                 if (UsesIncomingNativeSpeech(settings))
                     await _platform.EnsureIncomingNativeSpeechAsync(settings, FriendlyProgress(progress, "Preparing speech recognition"), token);
-                else await _platform.EnsureOwnNativeSpeechAsync(settings, FriendlyProgress(progress, "Preparing speech recognition"), token);
             }
-            else if (snapshot.Speech is WslSpeechRegistration existing)
+            if (wslSpeech && snapshot.Speech is WslSpeechRegistration existing)
             {
                 if (snapshot.ManagedSpeechModelMissing)
                 {
@@ -191,7 +207,7 @@ internal sealed class AutomaticSetupService
                 // Fail visibly on a broken imported runtime instead of rebuilding or replacing it behind the user's back.
                 await _platform.ValidateSpeechAsync(existing, token);
             }
-            else
+            else if (wslSpeech)
             {
                 await Stage("Downloading speech recognition", state, progress, token);
                 await _platform.EnsureModelAsync("voxtral-realtime-q4_k_m", FriendlyProgress(progress, "Downloading speech recognition"), token);
@@ -247,7 +263,14 @@ internal sealed class AutomaticSetupService
     internal static void ValidateSelections(AppSettings settings, bool ownVoiceOnly = false, bool incomingVoiceOnly = false)
     {
         if (ownVoiceOnly && incomingVoiceOnly) throw new ArgumentException("Choose one independent setup direction.");
-        if (incomingVoiceOnly) RuntimeProfiles.ValidateIncomingSpeech(settings);
+        if (!ownVoiceOnly) RuntimeProfiles.ValidateIncomingSpeech(settings);
+        if (!incomingVoiceOnly)
+        {
+            bool legacyTranslationHint = settings.OwnRecognitionEngine == "voxtral" &&
+                OwnRecognitionCatalog.SupportedSourceLanguages.Contains(AppSettings.CanonicalTranslationLanguage(settings.OwnVoiceSourceLanguage) ?? "");
+            if (!legacyTranslationHint && !OwnRecognitionCatalog.Find(settings.OwnRecognitionEngine).SupportsSource(settings.OwnVoiceSourceLanguage))
+                throw new SetupUserException("Choose a supported spoken language.");
+        }
         if (!UsesBuiltInTranslation(settings))
         {
             if (!incomingVoiceOnly) RuntimeController.ValidateLocalEndpoint(settings.OwnTranslatorBaseUrl);

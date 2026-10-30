@@ -21,7 +21,7 @@ check(englishKeys.length >= 183, 'complete English catalog includes voice-first 
 for (const key of ['benefits.freeTitle', 'benefits.freeBody', 'benefits.localTitle', 'benefits.localBody',
   'benefits.privacyTitle', 'benefits.privacyBody', 'benefits.sourceTitle', 'benefits.sourceBody',
   'demo.home', 'demo.panelTitle', 'demo.speak', 'demo.translate', 'demo.start', 'demo.person', 'demo.caption',
-  'release.securityTitle', 'release.securityBody'])
+  'release.securityTitle', 'release.securityBody', 'release.previousSecurityBody'])
   check(englishKeys.includes(key), `new product copy has a stable catalog key: ${key}`);
 for (const code of languages) {
   equal(Object.keys(catalogs[code]).sort(), englishKeys, `${code}: every English key has a translation`);
