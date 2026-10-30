@@ -134,6 +134,38 @@ SHA256SUMS.txt identifies these bytes; it does not authenticate a publisher.
             [IO.Path]::GetRelativePath($candidateRoot, $_.FullName).Replace('\','/')
     })
     [IO.File]::WriteAllLines((Join-Path $candidateRoot 'SHA256SUMS.txt'), $checksums, [Text.UTF8Encoding]::new($false))
+    # Public metadata only. This lets reviewers pin the completed hosted
+    # candidate without downloading its installer or diagnostic DLL locally.
+    $promotionRunId = $null
+    if ($env:GITHUB_RUN_ID) {
+        [long]$parsedPromotionRunId = 0
+        if ($env:GITHUB_RUN_ID -notmatch '^[1-9][0-9]{0,18}$' -or
+            -not [long]::TryParse($env:GITHUB_RUN_ID, [ref]$parsedPromotionRunId) -or $parsedPromotionRunId -le 0) {
+            throw 'The hosted candidate run ID is invalid.'
+        }
+        $promotionRunId = $parsedPromotionRunId
+    }
+    $promotionPins = [ordered]@{
+        schemaVersion = 1; version = $version; sourceCommit = $sourceCommit; candidateRunId = $promotionRunId
+    }
+    $promotionPaths = [ordered]@{
+        installer = 'package/' + [IO.Path]::GetFileName($built.Installer)
+        correspondingSource = 'package/SayWhat-Corresponding-Source.zip'
+        rawAppDll = 'diagnostics/SayWhat.dll'
+    }
+    foreach ($entry in $promotionPaths.GetEnumerator()) {
+        $pinned = @($manifest.Files | Where-Object { $_.Path -ceq $entry.Value })
+        if ($pinned.Count -ne 1 -or $pinned[0].Bytes -le 0 -or $pinned[0].Sha256 -cnotmatch '^[a-f0-9]{64}$') {
+            throw 'The verified candidate manifest cannot provide complete promotion file pins.'
+        }
+        $promotionPins[$entry.Key] = [ordered]@{
+            file = if ($entry.Key -eq 'rawAppDll') { $entry.Value } else { [IO.Path]::GetFileName($entry.Value) }
+            bytes = [long]$pinned[0].Bytes; sha256 = $pinned[0].Sha256
+        }
+    }
+    $promotionPinsJson = $promotionPins | ConvertTo-Json -Depth 4 -Compress
+    if ($promotionPinsJson.Length -gt 4096) { throw 'Candidate promotion metadata exceeds its safe log size.' }
+    Write-Host ('PROMOTION_PINS=' + $promotionPinsJson)
     Write-Host ('Verified unreleased candidate: ' + $candidateRoot)
     Write-Host ('Source commit: ' + $sourceCommit + '; installer SHA-256: ' + $installerHash)
     [pscustomobject]@{ CandidateDirectory = $candidateRoot; Version = $version; SourceCommit = $sourceCommit; Published = $false }

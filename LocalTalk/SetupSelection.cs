@@ -166,6 +166,7 @@ internal sealed class TranslationSelectionPreparation
             FirstRunSetupCompleted = true, UseManagedTranslator = true, ShareTranslationModel = true,
             OwnManagedModelId = "hy-mt2-1.8b-q4_k_m", IncomingManagedModelId = "hy-mt2-7b-q4_k_m",
             ManagedRuntimeId = "llama-vulkan", OwnVoiceTargetLanguage = "Chinese", IncomingTargetLanguage = "English",
+            IncomingSpeechEngine = "nemotron", IncomingNormalSpeechEngine = "nemotron",
             OwnVoiceSourceLanguage = "Automatic", IncomingSourceLanguage = "Automatic"
         };
         AppSettings saved = Settings(); SetupSelection baseline = SetupSelection.Capture(saved);
@@ -192,7 +193,7 @@ internal sealed class TranslationSelectionPreparation
         Check(separate != baseline, "shared versus separate mode is a meaningful change");
         draft.IncomingManagedModelId = "qwen3-4b-q4_k_m";
         Check(SetupSelection.Capture(draft) != separate, "separate incoming choice participates in equality");
-        draft = saved.Copy(); draft.IncomingSpeechEngine = "nemotron";
+        draft = saved.Copy(); draft.IncomingSpeechEngine = "voxtral";
         changed = SetupSelection.Capture(draft);
         Check(changed != baseline && !changed.LanguagesDifferFrom(baseline) && !changed.TranslatorDiffersFrom(baseline),
             "a speech-model-only change dirties Setup without inventing translation-model or language changes");

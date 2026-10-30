@@ -9,7 +9,7 @@
   "installer": { "file": "SayWhat-0.2.12-Setup.exe", "bytes": null, "sha256": null },
   "correspondingSource": { "file": "SayWhat-Corresponding-Source.zip", "bytes": null, "sha256": null },
   "rawAppDll": { "file": "diagnostics/SayWhat.dll", "bytes": null, "sha256": null },
-  "releaseNotesSha256": "0451258eaa1a29f2c9b8e9bc47e2966be3e1fd7b9f3c6c18a6d9c319bc596e67",
+  "releaseNotesSha256": "6aa5f13e00d49d76c7c1eed9bba9d82bf47e17247d61c754fcf8e44a261defdc",
   "antivirus": {
     "candidateDetection": "unknown",
     "vendorClearance": false,
