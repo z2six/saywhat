@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/provisioning-offline.yml
       - Packaging/ProvisioningTests/**
+      - Packaging/DataLifecycleTests/**
       - Packaging/scripts/**
       - LocalTalk/Provisioning.cs
       - IncomingTranslator/AppBrand.cs
@@ -49,4 +50,10 @@ jobs:
           Copy-Item -LiteralPath 'Packaging/scripts' -Destination (Join-Path $fixtureRoot 'scripts') -Recurse
           $env:SAYWHAT_DATA_ROOT = $fixtureData
           dotnet run --project Packaging/ProvisioningTests/ProvisioningTests.csproj -c Release -- $fixtureData
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run isolated installer data lifecycle regressions
+        run: |
+          # Creates only tiny synthetic files under Packaging/offline-lifecycle-fixtures.
+          # No live app data, model loading, capture, installer execution or process stopping.
+          dotnet run --project Packaging/DataLifecycleTests/DataLifecycleTests.csproj -c Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
