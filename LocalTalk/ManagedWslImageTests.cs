@@ -37,6 +37,7 @@ internal static class ManagedWslImageTests
             string longName = "usr/share/" + new string('a', 150) + "/fixture.txt";
             byte[] original = Archive(format, writer =>
             {
+                Add(writer, format, TarEntryType.Directory, "./");
                 Add(writer, format, TarEntryType.Directory, "./etc");
                 Add(writer, format, TarEntryType.RegularFile, "./etc/wsl.conf",
                     "# retained\r\n[BOOT]\r\nsystemd=true\r\n[GeNeRaL]\r\n  GuiApplications = TRUE # retained comment\r\n[gpu]\r\nenabled=true\r\nappendLibPath=true\r\n[network]\r\ngenerateResolvConf=false\r\n");
@@ -56,6 +57,8 @@ internal static class ManagedWslImageTests
             Dictionary<string, Snapshot> before = Inspect(original);
             byte[] prepared = Rewrite(original);
             Dictionary<string, Snapshot> after = Inspect(prepared);
+            Check(after["."].Type == TarEntryType.Directory && after["."].Mode == before["."].Mode,
+                "preserves the relative ./ archive root entry in " + format);
             Snapshot config = after["etc/wsl.conf"];
             Check(config.Text.Contains("[GeNeRaL]\n  GuiApplications = false # retained comment\n", StringComparison.Ordinal), "sets GUI support false while retaining section/key case and comments in " + format);
             foreach (string retained in new[] { "# retained", "[BOOT]\nsystemd=true", "[gpu]\nenabled=true\nappendLibPath=true", "generateResolvConf=false" })
@@ -99,7 +102,8 @@ internal static class ManagedWslImageTests
         byte[] noKey = Archive(TarEntryFormat.Pax, writer => Add(writer, TarEntryFormat.Pax, TarEntryType.RegularFile, "etc/wsl.conf", "[general]\n# retained\n[gpu]\nenabled=true"));
         Check(Inspect(Rewrite(noKey))["etc/wsl.conf"].Text.Contains("[general]\n# retained\nguiApplications=false\n[gpu]\nenabled=true", StringComparison.Ordinal), "inserts missing key in its own section");
 
-        foreach (string name in new[] { "/etc/wsl.conf", "etc/../wsl.conf", "etc//wsl.conf", "etc\\wsl.conf", "etc/./wsl.conf" })
+        foreach (string name in new[] { "/etc/wsl.conf", "etc/../wsl.conf", "etc//wsl.conf", "etc\\wsl.conf", "etc/./wsl.conf",
+            "./../escape", "./etc/../../escape", "../", "./etc/./wsl.conf", "/./", "//" })
             Refuses(() => Rewrite(Archive(TarEntryFormat.Pax, writer => Add(writer, TarEntryFormat.Pax, TarEntryType.RegularFile, name, "fixture"))), "refuses ambiguous entry path: " + name);
         foreach (string name in new[] { "etc/wsl.conf", "etc/wsl-distribution.conf", "etc/saywhat-owner" })
         {
@@ -190,6 +194,7 @@ internal static class ManagedWslImageTests
             string name = entry.Name;
             while (name.StartsWith("./", StringComparison.Ordinal)) name = name[2..];
             name = name.TrimEnd('/');
+            if (name.Length == 0) name = ".";
             using var data = new MemoryStream();
             entry.DataStream?.CopyTo(data);
             byte[] bytes = data.ToArray();

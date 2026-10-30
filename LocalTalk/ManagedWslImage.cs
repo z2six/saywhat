@@ -3,6 +3,7 @@ using System.Formats.Tar;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace IncomingTranslator;
@@ -141,7 +142,13 @@ internal static class ManagedWslImage
         {
             token.ThrowIfCancellationRequested();
             if (++count > MaximumEntries) throw new InvalidDataException("The speech image contains too many archive entries.");
-            string name = CanonicalName(entry.Name);
+            string name;
+            try { name = CanonicalName(entry.Name); }
+            catch (InvalidDataException error)
+            {
+                string displayed = entry.Name.Length <= 256 ? entry.Name : entry.Name[..256] + "…";
+                throw new InvalidDataException($"{error.Message} Entry {count} ({entry.Format}/{entry.EntryType}), path {JsonSerializer.Serialize(displayed)}.", error);
+            }
             if (name == "." && entry.EntryType != TarEntryType.Directory)
                 throw new InvalidDataException("The speech image root directory is redirected.");
             if (!names.Add(name)) throw new InvalidDataException("The speech image contains duplicate archive paths: " + name);
