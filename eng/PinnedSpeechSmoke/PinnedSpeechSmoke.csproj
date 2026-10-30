@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>preview</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <!-- Use the production adapter, without building/loading the capture DLL. -->
+    <Compile Include="../../FoxTransSource/FoxTrans/**/*.cs" Exclude="../../FoxTransSource/FoxTrans/obj/**/*.cs;../../FoxTransSource/FoxTrans/bin/**/*.cs" />
+    <EmbeddedResource Include="../../FoxTransSource/foxtrans.schema.json" LogicalName="FoxTrans.foxtrans.schema.json" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,44 @@
+name: Pinned native speech protocol smoke
+
+# Explicit integration test, separate from model-free build checks. Downloads
+# ~762 MB of pinned public artifacts onto an ephemeral hosted CPU runner only.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pinned-speech-smoke-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows-cpu:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+    steps:
+      - name: Check out public source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Set up .NET 9
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '9.0.x'
+      - name: Check exact native runtime and production adapter on CPU
+        run: ./eng/Test-PinnedSpeechRuntime.ps1 -AllowHostedCpuInference
+      - name: Save metadata receipt only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pinned-speech-protocol-metadata
+          path: artifacts/test-results/pinned-speech-smoke.json
+          if-no-files-found: warn
+          retention-days: 7
