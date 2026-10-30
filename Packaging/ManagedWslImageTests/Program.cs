@@ -21,7 +21,7 @@ try
 {
     if (!verifyImage)
     {
-        int checks = ManagedWslImageTests.Run(root);
+        int checks = ManagedWslImageTests.Run(root) + RunRawPaxAuditSelfTests();
         Console.WriteLine(JsonSerializer.Serialize(new { mode = "self-test", checks, passed = true }));
         return;
     }
@@ -207,10 +207,17 @@ static RawPaxAudit InspectRawPax(Stream stream, CancellationToken token)
         if (header.All(value => value == 0)) break;
         if (++entries > 200_000) throw new InvalidDataException("Too many raw archive headers.");
         string rawSize = Encoding.ASCII.GetString(header, 124, 12).Trim('\0', ' ');
-        if (rawSize.Length == 0 || rawSize.Any(value => value is < '0' or > '7'))
-            throw new InvalidDataException("Unsupported raw archive size field.");
-        long size = Convert.ToInt64(rawSize, 8);
-        if (size > 4L * 1024 * 1024 * 1024) throw new InvalidDataException("Raw archive entry exceeds its bound.");
+        string SizeDescription() => $"Header {entries} (type 0x{header[156]:X2}, name " +
+            JsonSerializer.Serialize(Encoding.UTF8.GetString(header, 0, 100).TrimEnd('\0')) +
+            "), size bytes " + Convert.ToHexString(header.AsSpan(124, 12)) + ".";
+        if (rawSize.Any(value => value is < '0' or > '7'))
+            throw new InvalidDataException("Unsupported raw archive size field. " + SizeDescription());
+        // .NET's writer leaves zero-size fields entirely NUL; other TAR writers
+        // use explicit octal zero. Both encode zero. An empty field after only
+        // NUL/space trimming is not evidence of corruption or a base-256 size.
+        long size = rawSize.Length == 0 ? 0 : Convert.ToInt64(rawSize, 8);
+        if (size > 4L * 1024 * 1024 * 1024)
+            throw new InvalidDataException("Raw archive entry exceeds its bound. " + SizeDescription());
         if (header[156] is (byte)'x' or (byte)'g')
         {
             if (size > 1_048_576) throw new InvalidDataException("Raw PAX metadata exceeds its bound.");
@@ -252,6 +259,82 @@ static RawPaxAudit InspectRawPax(Stream stream, CancellationToken token)
         else Skip(size + (512 - size % 512) % 512);
     }
     return result;
+}
+
+static int RunRawPaxAuditSelfTests()
+{
+    int checks = 0;
+    void Check(bool condition, string description)
+    {
+        if (!condition) throw new InvalidOperationException("Raw PAX audit: " + description);
+        checks++;
+    }
+    using var source = new MemoryStream();
+    const string placeholder = "ABCDEFGHIJKLMNOPQRST";
+    byte[] capability = Convert.FromHexString("0100000200148000000000000000000000000000");
+    using (var writer = new TarWriter(source, TarEntryFormat.Pax, leaveOpen: true))
+    {
+        writer.WriteEntry(new PaxTarEntry(TarEntryType.Directory, "zero-directory"));
+        writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "empty-file"));
+        // Place the next metadata after a non-block-aligned payload so a zero
+        // size fix cannot conceal an incorrect payload/padding skip.
+        using var data = new MemoryStream(new byte[1025], writable: false);
+        writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "non-empty-file") { DataStream = data });
+        writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "capability-file", new Dictionary<string, string>
+        {
+            [ManagedWslImage.CapabilityAttribute] = placeholder,
+            ["SCHILY.xattr.user.retained"] = "valid UTF-8 日本語"
+        }));
+    }
+    byte[] archive = source.ToArray();
+    int HeaderOffset(string name, byte type) => Enumerable.Range(0, archive.Length / 512)
+        .Select(index => index * 512).First(offset => archive[offset + 156] == type &&
+            Encoding.ASCII.GetString(archive, offset, 100).TrimEnd('\0', '/') == name);
+    int directory = HeaderOffset("zero-directory", (byte)'5');
+    int emptyFile = HeaderOffset("empty-file", (byte)'0');
+    Check(archive.AsSpan(directory + 124, 12).ToArray().All(value => value == 0) &&
+        archive.AsSpan(emptyFile + 124, 12).ToArray().All(value => value == 0),
+        "fixture contains the actual .NET writer's all-NUL zero-size fields");
+    byte[] marker = Encoding.ASCII.GetBytes(ManagedWslImage.CapabilityAttribute + "=" + placeholder + "\n");
+    int attribute = archive.AsSpan().IndexOf(marker);
+    Check(attribute >= 0 && archive.AsSpan(attribute + marker.Length).IndexOf(marker) < 0,
+        "raw binary fixture has one unique fixed-length PAX capability record");
+    capability.AsSpan().CopyTo(archive.AsSpan(attribute + ManagedWslImage.CapabilityAttribute.Length + 1));
+    RawPaxAudit original = InspectRawPax(new MemoryStream(archive, writable: false), CancellationToken.None);
+    Check(original.Capabilities.SequenceEqual(new[] { Convert.ToHexString(capability) }) && original.NonUtf8Capabilities == 1,
+        "zero-size directory/file and padded payload retain the subsequent binary PAX audit");
+    byte[] paddedZero = archive.ToArray();
+    paddedZero.AsSpan(directory + 124, 12).Fill((byte)' ');
+    SetHeaderChecksum(paddedZero.AsSpan(directory, 512));
+    RawPaxAudit spaces = InspectRawPax(new MemoryStream(paddedZero, writable: false), CancellationToken.None);
+    Check(spaces.Capabilities.SequenceEqual(original.Capabilities) && spaces.NonUtf8Capabilities == 1,
+        "space-padded zero remains zero without skipping the following metadata");
+    byte[] explicitZero = archive.ToArray();
+    Encoding.ASCII.GetBytes("00000000000\0").AsSpan().CopyTo(explicitZero.AsSpan(directory + 124, 12));
+    SetHeaderChecksum(explicitZero.AsSpan(directory, 512));
+    Check(InspectRawPax(new MemoryStream(explicitZero, writable: false), CancellationToken.None).Capabilities.SequenceEqual(original.Capabilities),
+        "explicit octal zero retains the same audit result");
+    byte[] malformed = archive.ToArray();
+    malformed[directory + 124] = (byte)'9';
+    SetHeaderChecksum(malformed.AsSpan(directory, 512));
+    bool refused = false;
+    try { InspectRawPax(new MemoryStream(malformed, writable: false), CancellationToken.None); }
+    catch (InvalidDataException error)
+    {
+        refused = error.Message.Contains("zero-directory", StringComparison.Ordinal) &&
+            error.Message.Contains("type 0x35", StringComparison.Ordinal) && error.Message.Contains("390000000000000000000000", StringComparison.Ordinal) &&
+            error.Message.Length <= 512;
+    }
+    Check(refused, "non-octal size still fails with bounded header/type/name/raw-byte diagnostics");
+    return checks;
+}
+
+static void SetHeaderChecksum(Span<byte> header)
+{
+    header.Slice(148, 8).Fill((byte)' ');
+    int sum = 0;
+    foreach (byte value in header) sum += value;
+    Encoding.ASCII.GetBytes(Convert.ToString(sum, 8).PadLeft(6, '0') + "\0 ").AsSpan().CopyTo(header.Slice(148, 8));
 }
 
 static bool AllFalse(string text, string targetSection, string targetKey)

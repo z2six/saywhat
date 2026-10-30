@@ -233,21 +233,19 @@ public static class FoxTransOscSentenceProxy
 
     public static int Run(int listenPort, int targetPort, string logPath, int finalGraceMs, int draftQuietMs, int previewCadenceMs)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(logPath));
-        using (var log = new StreamWriter(logPath, true, new UTF8Encoding(false)))
+        var log = new BestEffortLog(logPath);
         using (var input = new UdpClient(new IPEndPoint(IPAddress.Loopback, listenPort)))
         using (var output = new UdpClient())
         {
-            log.AutoFlush = true;
             input.Client.ReceiveTimeout = 100;
             output.Connect(IPAddress.Loopback, targetPort);
             WriteLog(log, "ready", "Listening on 127.0.0.1:" + listenPort +
                 "; forwarding submitted translations to 127.0.0.1:" + targetPort +
                 "; final grace " + finalGraceMs + " ms; preview cadence " + Math.Max(1500, previewCadenceMs) + " ms.");
-            Console.WriteLine("FoxTrans OSC sentence mode is ready.");
-            Console.WriteLine("FoxTrans -> 127.0.0.1:{0} -> VRChat 127.0.0.1:{1}", listenPort, targetPort);
-            Console.WriteLine("Submitted previews never open the keyboard; final-only clients keep drafts hidden.");
-            Console.WriteLine("Keep this window open. Press Ctrl+C to stop.");
+            WriteStatus("FoxTrans OSC sentence mode is ready.");
+            WriteStatus(String.Format("FoxTrans -> 127.0.0.1:{0} -> VRChat 127.0.0.1:{1}", listenPort, targetPort));
+            WriteStatus("Submitted previews never open the keyboard; final-only clients keep drafts hidden.");
+            WriteStatus("Keep this window open. Press Ctrl+C to stop.");
 
             string latest = null;
             bool pending = false;
@@ -544,10 +542,62 @@ public static class FoxTransOscSentenceProxy
         return true;
     }
 
-    private static void WriteLog(StreamWriter log, string kind, string message)
+    // Log access is independent of forwarding. Open one shared append per entry
+    // so readers, rotation and a temporary lock cannot own the proxy's lifetime.
+    // Path/argument and programming failures are deliberately not swallowed.
+    private sealed class BestEffortLog
+    {
+        private readonly string path;
+        private DateTime lastWarning = DateTime.MinValue;
+        private bool unavailable;
+
+        internal BestEffortLog(string logPath)
+        {
+            if (String.IsNullOrWhiteSpace(logPath)) throw new ArgumentException("Choose a log file path.", "logPath");
+            path = Path.GetFullPath(logPath);
+        }
+
+        internal void WriteLine(string line)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                using (var stream = new FileStream(path, FileMode.Append, FileAccess.Write,
+                    FileShare.ReadWrite | FileShare.Delete))
+                using (var writer = new StreamWriter(stream, new UTF8Encoding(false)))
+                    writer.WriteLine(line);
+                if (unavailable)
+                {
+                    unavailable = false;
+                    WriteStatus("OSC file logging is available again.");
+                }
+            }
+            catch (IOException) { ReportUnavailable(); }
+            catch (UnauthorizedAccessException) { ReportUnavailable(); }
+        }
+
+        private void ReportUnavailable()
+        {
+            unavailable = true;
+            DateTime now = DateTime.UtcNow;
+            if (now - lastWarning < TimeSpan.FromSeconds(30)) return;
+            lastWarning = now;
+            WriteStatus("WARNING OSC: code=log-write-unavailable; The local log could not be updated. Chat forwarding continues.");
+        }
+    }
+
+    private static void WriteStatus(string message)
+    {
+        // A closed diagnostic pipe must not become another output dependency.
+        try { Console.WriteLine(message); }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
+
+    private static void WriteLog(BestEffortLog log, string kind, string message)
     {
         string safe = (message ?? "").Replace("\r", " ").Replace("\n", " ");
-        log.WriteLine("[{0:yyyy-MM-dd HH:mm:ss.fff}] {1}: {2}", DateTime.Now, kind, safe);
+        log.WriteLine(String.Format("[{0:yyyy-MM-dd HH:mm:ss.fff}] {1}: {2}", DateTime.Now, kind, safe));
     }
 }
 '@
@@ -559,8 +609,9 @@ try {
 catch {
     $message = $_.Exception.ToString()
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
-    Add-Content -LiteralPath $LogPath -Value "[$timestamp] fatal: $message"
     Write-Host "FoxTrans OSC sentence mode failed:" -ForegroundColor Red
     Write-Host $message
+    try { Add-Content -LiteralPath $LogPath -Value "[$timestamp] fatal: $message" }
+    catch [IO.IOException], [UnauthorizedAccessException] { }
     exit 1
 }

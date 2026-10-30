@@ -13,6 +13,7 @@ return await LocalHost.RunAsync(args);
 internal static class LocalHost
 {
     public static readonly object LogGate = new();
+    private static readonly BestEffortHostLogger HostLogger = new(line => Console.WriteLine(line));
     public static string Root = Environment.CurrentDirectory;
     public static string LogPath = Path.Combine(Root, "foxtrans-local-host.log");
     private static string FindRoot()
@@ -30,8 +31,7 @@ internal static class LocalHost
         lock (LogGate)
         {
             string line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}";
-            Console.WriteLine(line);
-            File.AppendAllText(LogPath, line + Environment.NewLine);
+            HostLogger.Write(LogPath, line);
         }
     }
 
@@ -769,6 +769,48 @@ internal sealed class CapturedTurnFailureException(string code, string message) 
     public string Code { get; } = code;
 }
 
+// Log files and redirected output can be unavailable while translation is
+// healthy. A diagnostic I/O failure must not abort a capture/translation turn.
+// Unexpected programming errors still propagate to the caller.
+internal sealed class BestEffortHostLogger(Action<string> writeConsole)
+{
+    private readonly object gate = new();
+    private long lastWarning;
+    private bool warningReported;
+
+    public void Write(string path, string line)
+    {
+        lock (gate)
+        {
+            TryConsole(line);
+            try
+            {
+                using var stream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+                byte[] bytes = Encoding.UTF8.GetBytes(line + Environment.NewLine);
+                stream.Write(bytes);
+                stream.Flush();
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                long now = Stopwatch.GetTimestamp();
+                if (!warningReported || now - lastWarning >= Stopwatch.Frequency * 30L)
+                {
+                    warningReported = true; lastWarning = now;
+                    // Do not include paths, conversation text or exception
+                    // bodies, and never recurse into the unavailable file.
+                    TryConsole("WARNING own-voice: code=log-write-unavailable; The local log could not be updated. Voice translation continues.");
+                }
+            }
+        }
+    }
+
+    private void TryConsole(string line)
+    {
+        try { writeConsole(line); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+    }
+}
+
 // The deadline is about new lexical content during continuing real voice, not
 // transport keepalives, padded final audio, punctuation or elapsed idle time.
 internal sealed class OwnSpeechProgressDeadline(DateTimeOffset started, long voicedSamples)
@@ -1255,6 +1297,7 @@ internal static class LocalTests
 {
     public static async Task<int> RunAsync()
     {
+        await HostLoggingTests.RunAsync();
         await NativeSpeechTests.RunAsync();
         await MultiLanguageTests.RunAsync();
         await SpecializedTranslationTests.RunAsync();

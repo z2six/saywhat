@@ -63,9 +63,11 @@ Preparing files does not start capture or inference. At **Ready**, open Home and
 
 The two Home direction controls start your microphone-to-chat or incoming-subtitle pipeline independently. Managed prerequisites and local connections are checked before starting owned tools. Internal speech/translation TCP ports are selected automatically by default; advanced fixed-port mode reports a conflicting listener instead of changing that address. External configured translator URLs and OSC ports are unchanged. Failing partway through startup triggers cleanup of that startup's processes; it does not kill an unknown listener occupying a port.
 
-The microphone controller's diagnostic log is best effort. A temporarily locked
-or unwritable log must not stop capture or prevent a verified mute-state change;
-the controller continues reporting status through its supervised output stream.
+The microphone controller, capture host and OSC relay write diagnostic logs on a
+best-effort basis. A temporarily locked or unwritable log must not stop capture,
+translation, output or a verified mute-state change. Redirected-output I/O
+failures are isolated from capture turns and OSC forwarding too; available
+diagnostic sinks continue receiving status.
 An unknown VRChat mute state still pauses capture when mute-following is enabled.
 
 **Stop all** stops capture/recognition and releases app-owned managed translators. When a shared translator is still used by the other direction, stopping one direction keeps it alive. Turning **Voice recognition** off unloads only the optional identity extractor; speech translation continues.
