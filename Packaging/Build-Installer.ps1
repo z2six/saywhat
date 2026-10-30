@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '0.2.12',
+    [string]$Version = '0.2.13',
     [string]$CompilerPath,
     [switch]$SkipPublish,
     [string]$AppPublishDirectory,
@@ -192,6 +192,7 @@ try {
         'Packaging/ProvisioningTests/test-bootstrap-packages.sh','Packaging/ProvisioningTests/test-cuda-preflight.sh',
         'Packaging/ManagedWslImageTests/ManagedWslImageTests.csproj','Packaging/ManagedWslImageTests/Program.cs',
         'Packaging/ManagedWslImageTests/ProvisionAsset.cs',
+        'Packaging/Test-VRChatMuteSync-Logging.ps1',
         'IncomingTranslator/ManagedServicePorts.cs','IncomingTranslator/SessionEndpoints.cs','LocalTalk/RuntimeController.Ports.cs',
         'LocalTalk/MainWindowConnections.cs','LocalTalk/ManagedServicePortTests.cs','LocalTalk/SessionEndpointTests.cs','Packaging/ProvisioningTests/test-managed-ports.py','Packaging/vibevoice/test_ports.py',
         'Packaging/ManagedPortTests/ManagedPortTests.csproj','Packaging/ManagedPortTests/Program.cs','Packaging/ManagedPortTests/fixtures/owned-http.ps1',

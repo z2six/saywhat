@@ -37,6 +37,14 @@ never boots an unconfirmed partial import just to see whether it works.
 Both Windows backing-volume space and Linux space are checked before building.
 CUDA driver and GPU compatibility checks run before toolkit downloads.
 
+Version 0.2.13 corrects a binary-metadata bug in the 0.2.12 image preparation.
+The TAR library's text conversion changed two Linux file-capability values,
+including the one on `gst-ptp-helper`, which could fail WSL import. The prepared
+image now omits the three file-capability tags on bundled network/Snap helpers
+that speech processing does not use. File contents, permissions, ownership,
+links and other extended metadata are retained. Failed imports are left intact;
+retrying setup prepares a new component with the corrected image revision.
+
 Windows downloads have separate connection and inactivity deadlines, with one
 retry for a transient failure. Linux package output is drained into a private
 temporary transcript even if a progress handle closes. A failed package manager
@@ -54,6 +62,11 @@ Preparing files does not start capture or inference. At **Ready**, open Home and
 ## Start, stop, close and tray
 
 The two Home direction controls start your microphone-to-chat or incoming-subtitle pipeline independently. Managed prerequisites and local connections are checked before starting owned tools. Internal speech/translation TCP ports are selected automatically by default; advanced fixed-port mode reports a conflicting listener instead of changing that address. External configured translator URLs and OSC ports are unchanged. Failing partway through startup triggers cleanup of that startup's processes; it does not kill an unknown listener occupying a port.
+
+The microphone controller's diagnostic log is best effort. A temporarily locked
+or unwritable log must not stop capture or prevent a verified mute-state change;
+the controller continues reporting status through its supervised output stream.
+An unknown VRChat mute state still pauses capture when mute-following is enabled.
 
 **Stop all** stops capture/recognition and releases app-owned managed translators. When a shared translator is still used by the other direction, stopping one direction keeps it alive. Turning **Voice recognition** off unloads only the optional identity extractor; speech translation continues.
 

@@ -100,6 +100,42 @@ internal static class ManagedWslImageTests
                 "same-owner repeat preparation is idempotent in " + format);
         }
 
+        // These are the exact binary file-capability values in the pinned
+        // release. Patch raw PAX bytes after writing an equal-length ASCII
+        // placeholder: using the string API to create the fixture would itself
+        // pre-corrupt the invalid UTF-8 and fail to exercise the original bug.
+        foreach ((string path, string hex, bool losesBytes) in new[]
+        {
+            ("usr/bin/ping", "0100000200200000000000000000000000000000", false),
+            ("usr/lib/snapd/snap-confine", "00000002cf002c01000000000000000000000000", true),
+            ("usr/lib/x86_64-linux-gnu/gstreamer1.0/gstreamer-1.0/gst-ptp-helper", "0100000200148000000000000000000000000000", true)
+        })
+        {
+            byte[] capability = Convert.FromHexString(hex);
+            byte[] archive = RawCapabilityArchive(path, capability);
+            byte[] sourceDigest = SHA256.HashData(archive);
+            Snapshot original = Inspect(archive)[path];
+            Check(Encoding.UTF8.GetBytes(original.Attributes[ManagedWslImage.CapabilityAttribute]).SequenceEqual(capability) != losesBytes,
+                "raw binary PAX negative control demonstrates the string round-trip limitation for " + path);
+            byte[] rewritten = Rewrite(archive);
+            Snapshot prepared = Inspect(rewritten)[path];
+            Check(!prepared.Attributes.ContainsKey(ManagedWslImage.CapabilityAttribute),
+                "omits the exact executable capability attribute before importing " + path);
+            Check(prepared.Attributes["SCHILY.xattr.user.saywhat-fixture"] == "retained 日本語" &&
+                prepared.Attributes["SCHILY.xattr.security.capability.extra"] == "retained-near-match" &&
+                prepared.Attributes["SCHILY.xattr.user.security.capability"] == "retained-user-attribute",
+                "retains unrelated and similarly named PAX attributes for " + path);
+            Check(prepared.Digest == original.Digest && prepared.Mode == original.Mode && prepared.Uid == original.Uid &&
+                prepared.Gid == original.Gid && prepared.Modified == original.Modified && prepared.User == original.User &&
+                prepared.Group == original.Group && prepared.Format == original.Format && prepared.Type == original.Type,
+                "capability omission preserves payload, executable mode, ownership, names, timestamp and format for " + path);
+            Check(SHA256.HashData(archive).SequenceEqual(sourceDigest), "capability preparation never changes its source archive");
+            Snapshot repeated = Inspect(Rewrite(rewritten))[path];
+            Check(repeated.Digest == prepared.Digest && repeated.Attributes.OrderBy(item => item.Key, StringComparer.Ordinal)
+                .SequenceEqual(prepared.Attributes.OrderBy(item => item.Key, StringComparer.Ordinal)),
+                "the capability policy remains idempotent for " + path);
+        }
+
         byte[] missing = Archive(TarEntryFormat.Pax, writer => Add(writer, TarEntryFormat.Pax, TarEntryType.RegularFile, "usr/share/fixture", "unchanged"));
         var created = Inspect(Rewrite(missing));
         Check(created["etc"].Type == TarEntryType.Directory && created["etc/wsl.conf"].Text == "[general]\nguiApplications=false\n",
@@ -125,6 +161,9 @@ internal static class ManagedWslImageTests
                 Add(writer, TarEntryFormat.Pax, TarEntryType.RegularFile, "./" + name, "");
             })), "refuses duplicate canonical configuration paths: " + name);
         }
+        Refuses(() => Rewrite(Archive(TarEntryFormat.Pax, writer => writer.WriteEntry(new PaxTarEntry(TarEntryType.Directory,
+            "usr/share/unexpected-capability", new Dictionary<string, string> { [ManagedWslImage.CapabilityAttribute] = "unexpected" })))),
+            "rejects unexpected capability grants on non-file entries instead of changing their type or permissions");
         Refuses(() => Rewrite(Archive(TarEntryFormat.Pax, writer => Add(writer, TarEntryFormat.Pax, TarEntryType.SymbolicLink, "etc", link: "usr/etc"))), "refuses redirected etc ancestor");
         Refuses(() => Rewrite(Archive(TarEntryFormat.Pax, writer => Add(writer, TarEntryFormat.Pax, TarEntryType.SymbolicLink, ".", link: "elsewhere"))), "refuses redirected root ancestor");
         Refuses(() => Rewrite(Archive(TarEntryFormat.Pax, writer => Add(writer, TarEntryFormat.Pax, TarEntryType.RegularFile, "etc/wsl.conf/child", "fixture"))), "refuses configuration directory descendants");
@@ -161,7 +200,7 @@ internal static class ManagedWslImageTests
         Refuses(() => ManagedWslImage.PrepareAsync(badImage, outputPath, Owner).GetAwaiter().GetResult(), "production preparation refuses an unverified archive");
         Check(!File.Exists(outputPath) && !Directory.EnumerateFiles(fixtureRoot, "*.partial-*").Any() && File.ReadAllBytes(badImage).SequenceEqual(missing),
             "failed verification leaves no import image or temporary image and preserves the source");
-        Check(ManagedWslImage.HeadlessRevision == 1 && ManagedWslImage.UbuntuAsset.SizeBytes == 388_975_696 &&
+        Check(ManagedWslImage.HeadlessRevision == 2 && ManagedWslImage.UbuntuAsset.SizeBytes == 388_975_696 &&
             ManagedWslImage.UbuntuAsset.Sha256.Length == 64 && ManagedWslImage.UbuntuAsset.DownloadUrl.Contains("/24.04.5/", StringComparison.Ordinal),
             "production source pins a released image, exact size and digest");
         Check(ManagedWslImage.UncompressedTarBytes == 1_275_596_800 && ManagedWslImage.PrepareRequiredDiskBytes >= 2L * ManagedWslImage.UncompressedTarBytes,
@@ -174,6 +213,34 @@ internal static class ManagedWslImageTests
         using var stream = new MemoryStream();
         using (var writer = new TarWriter(stream, format, leaveOpen: true)) write(writer);
         return stream.ToArray();
+    }
+
+    private static byte[] RawCapabilityArchive(string path, byte[] capability)
+    {
+        const string placeholder = "ABCDEFGHIJKLMNOPQRST";
+        if (capability.Length != placeholder.Length) throw new ArgumentException("The binary capability fixture must retain its raw PAX length.");
+        byte[] archive = Archive(TarEntryFormat.Pax, writer =>
+        {
+            var entry = new PaxTarEntry(TarEntryType.RegularFile, path, new Dictionary<string, string>
+            {
+                [ManagedWslImage.CapabilityAttribute] = placeholder,
+                ["SCHILY.xattr.user.saywhat-fixture"] = "retained 日本語",
+                ["SCHILY.xattr.security.capability.extra"] = "retained-near-match",
+                ["SCHILY.xattr.user.security.capability"] = "retained-user-attribute"
+            })
+            {
+                Mode = ExecutableMode, Uid = 123, Gid = 456, UserName = "fixture-user", GroupName = "fixture-group", ModificationTime = Stamp
+            };
+            using var data = new MemoryStream(new byte[] { 0, 255, 127, 0, 254 }, writable: false);
+            entry.DataStream = data;
+            writer.WriteEntry(entry);
+        });
+        byte[] marker = Encoding.ASCII.GetBytes(ManagedWslImage.CapabilityAttribute + "=" + placeholder + "\n");
+        int offset = archive.AsSpan().IndexOf(marker);
+        if (offset < 0 || archive.AsSpan(offset + marker.Length).IndexOf(marker) >= 0)
+            throw new InvalidDataException("The raw binary capability fixture has no unique PAX record.");
+        capability.AsSpan().CopyTo(archive.AsSpan(offset + ManagedWslImage.CapabilityAttribute.Length + 1));
+        return archive;
     }
 
     private static void Add(TarWriter writer, TarEntryFormat format, TarEntryType type, string name, string? content = null,
@@ -191,7 +258,8 @@ internal static class ManagedWslImageTests
     }
 
     private sealed record Snapshot(TarEntryFormat Format, TarEntryType Type, UnixFileMode Mode, int Uid, int Gid,
-        DateTimeOffset Modified, string Link, string Text, string Digest, IReadOnlyDictionary<string, string> Attributes);
+        DateTimeOffset Modified, string Link, string Text, string Digest, IReadOnlyDictionary<string, string> Attributes,
+        string User, string Group);
 
     private static Dictionary<string, Snapshot> Inspect(byte[] archive)
     {
@@ -210,7 +278,8 @@ internal static class ManagedWslImageTests
             byte[] bytes = data.ToArray();
             result.Add(name, new(entry.Format, entry.EntryType, entry.Mode, entry.Uid, entry.Gid, entry.ModificationTime,
                 entry.LinkName, Encoding.UTF8.GetString(bytes), Convert.ToHexString(SHA256.HashData(bytes)),
-                entry is PaxTarEntry pax ? pax.ExtendedAttributes : new Dictionary<string, string>()));
+                entry is PaxTarEntry pax ? pax.ExtendedAttributes : new Dictionary<string, string>(),
+                (entry as PosixTarEntry)?.UserName ?? "", (entry as PosixTarEntry)?.GroupName ?? ""));
         }
         return result;
     }

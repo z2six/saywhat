@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "repository": "z2six/saywhat",
+  "version": "0.2.13",
+  "sourceCommit": null,
+  "candidateRunId": null,
+  "candidateArtifactId": null,
+  "candidateArchive": {
+    "bytes": null,
+    "sha256": null
+  },
+  "installer": {
+    "file": "SayWhat-0.2.13-Setup.exe",
+    "bytes": null,
+    "sha256": null
+  },
+  "correspondingSource": {
+    "file": "SayWhat-Corresponding-Source.zip",
+    "bytes": null,
+    "sha256": null
+  },
+  "rawAppDll": {
+    "file": "diagnostics/SayWhat.dll",
+    "bytes": null,
+    "sha256": null
+  },
+  "releaseNotesSha256": "2ca0d8dea3868d8dadb60a73cf096d06fdc40632fb8635407d632855cf6545e2",
+  "antivirus": {
+    "candidateDetection": "unknown",
+    "vendorClearance": false,
+    "review": "submitted-pending",
+    "predecessorDetection": {
+      "version": "0.2.11",
+      "product": "Bitdefender",
+      "signature": "Gen:Variant.MSILHeracles.276181"
+    }
+  }
+}

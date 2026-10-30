@@ -12,7 +12,8 @@ namespace IncomingTranslator;
 // Unix filesystem onto Windows, launch Linux, or change the user's WSL settings.
 internal static class ManagedWslImage
 {
-    internal const int HeadlessRevision = 1;
+    internal const int HeadlessRevision = 2;
+    internal const string CapabilityAttribute = "SCHILY.xattr.security.capability";
     internal const string OwnerMarkerPath = "/etc/saywhat-owner";
     internal const int MaximumConfigBytes = 65_536;
     // The pinned gzip trailer declares this exact raw TAR size (<4 GiB).
@@ -155,6 +156,7 @@ internal static class ManagedWslImage
             if (entry.Length < 0 || entry.Length > MaximumArchiveBytes - payloadBytes)
                 throw new InvalidDataException("The speech image exceeds the supported archive size.");
             payloadBytes += entry.Length;
+            entry = WithoutFileCapabilities(entry);
             if (name == "etc")
             {
                 if (entry.EntryType != TarEntryType.Directory) throw new InvalidDataException("The speech image's etc directory is redirected.");
@@ -189,7 +191,7 @@ internal static class ManagedWslImage
                 if (bytes.Length > MaximumConfigBytes) throw new InvalidDataException("The prepared speech configuration is too large.");
                 using var data = new MemoryStream(bytes, writable: false);
                 entry.DataStream = data;
-                writer.WriteEntry(entry); // Retain format, Linux mode, ownership and extended attributes.
+                writer.WriteEntry(entry); // Retain format, Linux mode, ownership and all retained extended attributes.
             }
         }
         token.ThrowIfCancellationRequested();
@@ -199,6 +201,27 @@ internal static class ManagedWslImage
         if (!foundConfig) WriteNew(writer, "etc/wsl.conf", "[general]\nguiApplications=false\n");
         if (!foundDistribution) WriteNew(writer, "etc/wsl-distribution.conf", "[shortcut]\nenabled=false\n\n[windowsterminal]\nenabled=false\n");
         if (!foundOwner) WriteNew(writer, "etc/saywhat-owner", owner + "\n");
+    }
+
+    private static TarEntry WithoutFileCapabilities(TarEntry entry)
+    {
+        if (entry is not PaxTarEntry pax || !pax.ExtendedAttributes.ContainsKey(CapabilityAttribute)) return entry;
+        // The pinned Canonical image has three executable file-capability grants
+        // for ping, snap-confine and gst-ptp-helper. Speech services need none of
+        // them. These values are binary, but .NET's PAX API decodes/re-encodes
+        // strings as UTF-8; two of those grants contain invalid UTF-8 bytes and
+        // cannot survive that round trip. Omit only the exact capability key,
+        // rather than restoring malformed privileges or dropping other xattrs.
+        // The released image is pinned and independently checked for this exact
+        // metadata policy. Do not treat this as a general binary-xattr copier.
+        if (entry.EntryType != TarEntryType.RegularFile)
+            throw new InvalidDataException("The speech image has unexpected file-capability metadata.");
+        return new PaxTarEntry(entry.EntryType, entry.Name,
+            pax.ExtendedAttributes.Where(attribute => attribute.Key != CapabilityAttribute))
+        {
+            Mode = entry.Mode, Uid = entry.Uid, Gid = entry.Gid, ModificationTime = entry.ModificationTime,
+            UserName = pax.UserName, GroupName = pax.GroupName, DataStream = entry.DataStream
+        };
     }
 
     private static string ReadConfig(TarEntry entry)

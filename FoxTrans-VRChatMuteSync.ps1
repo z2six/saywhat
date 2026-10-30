@@ -32,6 +32,7 @@ $script:mutePolicyInitialized = $false
 $script:lastMutePolicyCheck = [DateTime]::MinValue
 $script:lastMuteQueryProof = $null
 $script:pendingMuteQuery = $null
+$script:lastLogWriteWarning = [DateTime]::MinValue
 
 function Send-LocalControl([string]$address, [bool]$value, [int]$port) {
     $buffer = [System.Collections.Generic.List[byte]]::new()
@@ -53,7 +54,29 @@ function Get-FinishCapturedSetting {
 function Write-Status([string]$message) {
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
     Write-Host "[$timestamp] $message"
-    Add-Content -LiteralPath $LogPath -Value "[$timestamp] $message"
+    # Logging must never stop capture or a verified mute-state transition.
+    # Other readers (editors, diagnostics or security software) may hold the
+    # log temporarily. Share normal reads/writes and tolerate only file I/O or
+    # access failures; programming errors must still reach the controller.
+    try {
+        $logStream = [IO.FileStream]::new($LogPath, [IO.FileMode]::Append, [IO.FileAccess]::Write,
+            ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+        try {
+            $bytes = [Text.Encoding]::UTF8.GetBytes("[$timestamp] $message" + [Environment]::NewLine)
+            $logStream.Write($bytes, 0, $bytes.Length)
+            $logStream.Flush()
+        }
+        finally { $logStream.Dispose() }
+    }
+    catch [IO.IOException], [UnauthorizedAccessException] {
+        $now = [DateTime]::UtcNow
+        if ($now - $script:lastLogWriteWarning -ge [TimeSpan]::FromSeconds(30)) {
+            $script:lastLogWriteWarning = $now
+            # The desktop app separately retains stdout. Never recurse into
+            # the same unavailable file while reporting its failure.
+            Write-Host "[$timestamp] WARNING own-voice: code=log-write-unavailable; The local log could not be updated. Voice translation continues."
+        }
+    }
 }
 
 function Add-OscString([System.Collections.Generic.List[byte]]$buffer, [string]$value) {
